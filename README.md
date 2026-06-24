@@ -100,3 +100,4 @@ ORGANIZER-001 adds draft-first organizer management under `/api/organizer/`, adm
 ## Events
 
 EVENTS-001 provides the authenticated student catalog and detail API under `/api/events/`, profile-snapshot registration, cancellation, and “My events”. Demo seed data creates fictional published events suitable for local testing. Payments, QR tickets, Telegram, custom forms, and exports are intentionally deferred.
+# EduVerse
