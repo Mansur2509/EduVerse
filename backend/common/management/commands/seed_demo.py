@@ -19,7 +19,12 @@ from services.exam_content_service.models import (
     Question,
 )
 from services.subscription_service.models import Plan, Subscription, UsageLimit
-from services.university_service.models import University, UniversityDataSource
+from services.university_service.models import (
+    University,
+    UniversityDataSource,
+    UniversityProgram,
+    UniversityScholarship,
+)
 from services.user_profile_service.services import ensure_profile_records
 
 User = get_user_model()
@@ -148,23 +153,181 @@ class Command(BaseCommand):
             )
 
     def seed_university(self):
-        university, _ = University.objects.update_or_create(
-            slug="eduverse-demo-university",
-            defaults={
+        today = timezone.now().date()
+        next_year = today.year + 1
+        demo_universities = (
+            {
+                "slug": "eduverse-demo-university",
                 "name": "EduVerse Demo University",
-                "country": "Demo",
+                "country": "Demoland",
                 "city": "Sample City",
-                "official_website": "https://example.com/eduverse-demo-university",
-                "summary": "Fictional development record. Not a real institution.",
-                "is_published": True,
+                "institution_type": "",
+                "summary": "Fictional development record. Not a real institution. "
+                "All admissions statistics are intentionally unverified to demonstrate "
+                "honest empty states.",
+                "acceptance_rate": None,
+                "gpa_average": None,
+                "sat_average": None,
+                "tuition_amount": None,
+                "application_deadline": None,
+                "scholarship_available": None,
+            },
+            {
+                "slug": "lakeview-institute-of-technology",
+                "name": "Lakeview Institute of Technology",
+                "country": "Demoland",
+                "city": "Lakeview",
+                "institution_type": University.InstitutionType.PRIVATE,
+                "summary": "Fictional development record used to demonstrate a fully "
+                "populated university profile. Not a real institution.",
+                "acceptance_rate": "18.00",
+                "gpa_average": "3.70",
+                "sat_average": 1420,
+                "tuition_amount": "42000.00",
+                "application_deadline": date(next_year, 1, 15),
+                "scholarship_available": True,
+            },
+            {
+                "slug": "northfield-state-university",
+                "name": "Northfield State University",
+                "country": "Sampleton",
+                "city": "Northfield",
+                "institution_type": University.InstitutionType.PUBLIC,
+                "summary": "Fictional development record used to demonstrate a "
+                "higher-acceptance public university profile. Not a real institution.",
+                "acceptance_rate": "65.00",
+                "gpa_average": "3.20",
+                "sat_average": 1180,
+                "tuition_amount": "12000.00",
+                "application_deadline": date(next_year, 3, 1),
+                "scholarship_available": True,
+            },
+            {
+                "slug": "crestwood-liberal-arts-college",
+                "name": "Crestwood Liberal Arts College",
+                "country": "Sampleton",
+                "city": "Crestwood",
+                "institution_type": University.InstitutionType.PRIVATE,
+                "summary": "Fictional development record used to demonstrate a partially "
+                "verified profile with an unknown scholarship status. Not a real institution.",
+                "acceptance_rate": "28.00",
+                "gpa_average": "3.60",
+                "sat_average": None,
+                "tuition_amount": "51000.00",
+                "application_deadline": date(next_year, 1, 5),
+                "scholarship_available": None,
+            },
+            {
+                "slug": "harborview-polytechnic",
+                "name": "Harborview Polytechnic",
+                "country": "Testford",
+                "city": "Harborview",
+                "institution_type": University.InstitutionType.PUBLIC,
+                "summary": "Fictional development record used to demonstrate a highly "
+                "selective profile with unverified tuition. Not a real institution.",
+                "acceptance_rate": "8.00",
+                "gpa_average": "3.90",
+                "sat_average": 1520,
+                "tuition_amount": None,
+                "application_deadline": None,
+                "scholarship_available": True,
+            },
+            {
+                "slug": "summit-community-college",
+                "name": "Summit Community College",
+                "country": "Testford",
+                "city": "Summit",
+                "institution_type": University.InstitutionType.PUBLIC,
+                "summary": "Fictional development record used to demonstrate an "
+                "accessible-admission profile with unverified academic averages. "
+                "Not a real institution.",
+                "acceptance_rate": "85.00",
+                "gpa_average": None,
+                "sat_average": None,
+                "tuition_amount": "6000.00",
+                "application_deadline": date(next_year, 8, 1),
+                "scholarship_available": True,
+            },
+            {
+                "slug": "ashford-global-university",
+                "name": "Ashford Global University",
+                "country": "Demoland",
+                "city": "Ashford",
+                "institution_type": University.InstitutionType.PRIVATE,
+                "summary": "Fictional development record used to demonstrate a fully "
+                "unverified profile shown entirely as 'Not verified yet'. "
+                "Not a real institution.",
+                "acceptance_rate": None,
+                "gpa_average": None,
+                "sat_average": None,
+                "tuition_amount": None,
+                "application_deadline": None,
+                "scholarship_available": None,
+            },
+            {
+                "slug": "brightwater-college-of-arts",
+                "name": "Brightwater College of Arts",
+                "country": "Sampleton",
+                "city": "Brightwater",
+                "institution_type": University.InstitutionType.PRIVATE,
+                "summary": "Fictional development record used to demonstrate a profile "
+                "missing a verified test-score average. Not a real institution.",
+                "acceptance_rate": "42.00",
+                "gpa_average": "3.45",
+                "sat_average": None,
+                "tuition_amount": "38000.00",
+                "application_deadline": date(next_year, 2, 1),
+                "scholarship_available": False,
             },
         )
-        UniversityDataSource.objects.update_or_create(
-            university=university,
-            source_url="https://example.com/eduverse-demo-university",
+
+        for demo in demo_universities:
+            slug = demo["slug"]
+            university, _ = University.objects.update_or_create(
+                slug=slug,
+                defaults={
+                    "name": demo["name"],
+                    "country": demo["country"],
+                    "city": demo["city"],
+                    "institution_type": demo["institution_type"],
+                    "official_website": f"https://example.com/{slug}",
+                    "summary": demo["summary"],
+                    "acceptance_rate": demo["acceptance_rate"],
+                    "gpa_average": demo["gpa_average"],
+                    "sat_average": demo["sat_average"],
+                    "tuition_amount": demo["tuition_amount"],
+                    "tuition_currency": "USD",
+                    "application_deadline": demo["application_deadline"],
+                    "scholarship_available": demo["scholarship_available"],
+                    "is_published": True,
+                },
+            )
+            UniversityDataSource.objects.update_or_create(
+                university=university,
+                source_url=f"https://example.com/{slug}",
+                defaults={
+                    "source_title": "Fictional demonstration source",
+                    "is_official": False,
+                },
+            )
+
+        lakeview = University.objects.get(slug="lakeview-institute-of-technology")
+        UniversityProgram.objects.update_or_create(
+            university=lakeview,
+            name="Computer Science",
             defaults={
-                "source_title": "Fictional demonstration source",
-                "is_official": False,
+                "degree_level": "Bachelor",
+                "official_url": "https://example.com/lakeview-institute-of-technology/cs",
+            },
+        )
+        crestwood = University.objects.get(slug="crestwood-liberal-arts-college")
+        UniversityScholarship.objects.update_or_create(
+            university=crestwood,
+            name="Fictional Need-Based Grant",
+            defaults={
+                "summary": "Fictional demonstration scholarship record. Not a real award.",
+                "official_url": "https://example.com/crestwood-liberal-arts-college/scholarship",
+                "deadline": date(next_year, 1, 5),
             },
         )
 
