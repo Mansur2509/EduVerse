@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpenCheck,
   CalendarClock,
@@ -13,8 +14,10 @@ import {
   type LucideIcon
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { ApplicationTrackerItem } from "@/entities/application";
+import type { EssayWorkspace } from "@/entities/essay";
 import type { EventRegistration } from "@/entities/event";
 import {
   classCatalog,
@@ -24,7 +27,9 @@ import {
   type StudentProfileDetails
 } from "@/entities/profile";
 import type { RoadmapPlan } from "@/entities/roadmap";
+import { getApplicationsRequest } from "@/features/applications";
 import { useAuth } from "@/features/auth";
+import { getEssaysRequest } from "@/features/essays";
 import { getMyEventRegistrationsRequest } from "@/features/events";
 import {
   getApplicationReadinessRequest,
@@ -46,6 +51,8 @@ export function DashboardScreen() {
   const [readiness, setReadiness] = useState<ApplicationReadiness | null>(null);
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
   const [roadmapPlan, setRoadmapPlan] = useState<RoadmapPlan | null>(null);
+  const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
+  const [essays, setEssays] = useState<EssayWorkspace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
   const [hasPartialError, setHasPartialError] = useState(false);
@@ -58,13 +65,17 @@ export function DashboardScreen() {
       profileResult,
       registrationsResult,
       readinessResult,
-      roadmapResult
+      roadmapResult,
+      applicationsResult,
+      essaysResult
     ] = await Promise.allSettled([
       getProfileCompletionRequest(),
       getProfileRequest(),
       getMyEventRegistrationsRequest(),
       getApplicationReadinessRequest(),
-      getRoadmapRequest()
+      getRoadmapRequest(),
+      getApplicationsRequest(),
+      getEssaysRequest()
     ]);
 
     if (completionResult.status === "fulfilled") {
@@ -89,6 +100,16 @@ export function DashboardScreen() {
     }
     if (roadmapResult.status === "fulfilled") {
       setRoadmapPlan(roadmapResult.value.plan);
+    } else {
+      setHasPartialError(true);
+    }
+    if (applicationsResult.status === "fulfilled") {
+      setApplications(applicationsResult.value.results);
+    } else {
+      setHasPartialError(true);
+    }
+    if (essaysResult.status === "fulfilled") {
+      setEssays(essaysResult.value.results);
     } else {
       setHasPartialError(true);
     }
@@ -130,7 +151,7 @@ export function DashboardScreen() {
   const nextClass = classCatalog.find((item) =>
     selectedClasses.includes(item.value)
   );
-  const roadmapTasks = roadmapPlan?.tasks ?? [];
+  const roadmapTasks = useMemo(() => roadmapPlan?.tasks ?? [], [roadmapPlan]);
   const nextRoadmapTasks = roadmapTasks
     .filter((task) => task.status === "todo")
     .sort((left, right) => {
@@ -143,6 +164,41 @@ export function DashboardScreen() {
   const urgentRoadmapCount = roadmapTasks.filter(
     (task) => task.priority === "urgent" && task.status === "todo"
   ).length;
+
+  const applicationStatusCounts = useMemo(
+    () => ({
+      researching: applications.filter((item) => item.status === "researching").length,
+      preparing: applications.filter((item) => item.status === "preparing").length,
+      submitted: applications.filter((item) => item.status === "submitted").length,
+      awaiting_decision: applications.filter((item) => item.status === "awaiting_decision").length
+    }),
+    [applications]
+  );
+
+  const essayStatusCounts = useMemo(
+    () => ({
+      not_started: essays.filter((item) => item.status === "not_started").length,
+      needs_revision: essays.filter((item) => item.status === "needs_revision").length,
+      ready: essays.filter((item) => item.status === "ready").length,
+      submitted: essays.filter((item) => item.status === "submitted").length
+    }),
+    [essays]
+  );
+
+  const nextDeadline = useMemo(() => {
+    const candidates: Array<{ label: string; date: string }> = [];
+    applications.forEach((application) => {
+      if (application.deadline) {
+        candidates.push({ label: application.university_name, date: application.deadline });
+      }
+    });
+    roadmapTasks
+      .filter((task) => task.category === "deadlines" && task.due_date && task.status === "todo")
+      .forEach((task) => {
+        candidates.push({ label: task.title, date: task.due_date as string });
+      });
+    return candidates.sort((left, right) => left.date.localeCompare(right.date))[0] ?? null;
+  }, [applications, roadmapTasks]);
 
   return (
     <div className="space-y-4">
@@ -360,6 +416,111 @@ export function DashboardScreen() {
           </ul>
         )}
       </Card>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+            {t("dashboard.applicationsWidget.title")}
+          </p>
+          {applications.length === 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t("dashboard.applicationsWidget.empty")}
+            </p>
+          ) : (
+            <dl className="mt-3 space-y-1.5 text-xs">
+              <DashboardCountRow
+                count={applicationStatusCounts.researching}
+                label={t("applications.status.researching")}
+              />
+              <DashboardCountRow
+                count={applicationStatusCounts.preparing}
+                label={t("applications.status.preparing")}
+              />
+              <DashboardCountRow
+                count={applicationStatusCounts.submitted}
+                label={t("applications.status.submitted")}
+              />
+              <DashboardCountRow
+                count={applicationStatusCounts.awaiting_decision}
+                label={t("applications.status.awaiting_decision")}
+              />
+            </dl>
+          )}
+          <Button asChild className="mt-3" size="sm" variant="ghost">
+            <Link href="/applications">{t("dashboard.applicationsWidget.open")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+            {t("dashboard.essaysWidget.title")}
+          </p>
+          {essays.length === 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">{t("dashboard.essaysWidget.empty")}</p>
+          ) : (
+            <dl className="mt-3 space-y-1.5 text-xs">
+              <DashboardCountRow
+                count={essayStatusCounts.not_started}
+                label={t("essays.status.not_started")}
+              />
+              <DashboardCountRow
+                count={essayStatusCounts.needs_revision}
+                label={t("essays.status.needs_revision")}
+              />
+              <DashboardCountRow count={essayStatusCounts.ready} label={t("essays.status.ready")} />
+              <DashboardCountRow
+                count={essayStatusCounts.submitted}
+                label={t("essays.status.submitted")}
+              />
+            </dl>
+          )}
+          <Button asChild className="mt-3" size="sm" variant="ghost">
+            <Link href="/essays">{t("dashboard.essaysWidget.open")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+            {t("dashboard.deadlineWidget.title")}
+          </p>
+          {nextDeadline ? (
+            <>
+              <p className="mt-3 text-sm font-semibold">{nextDeadline.label}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatDate(nextDeadline.date, locale)}
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t("dashboard.deadlineWidget.empty")}
+            </p>
+          )}
+          <Button asChild className="mt-3" size="sm" variant="ghost">
+            <Link href="/roadmap">{t("dashboard.deadlineWidget.open")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+            {t("dashboard.gapsWidget.title")}
+          </p>
+          {readiness && readiness.improvements.length > 0 ? (
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+              {readiness.improvements.slice(0, 4).map((component) => (
+                <li className="flex items-center gap-1.5" key={component}>
+                  <AlertTriangle aria-hidden className="size-3 shrink-0 text-warning" />
+                  {t(`admissions.component.${component}` as TranslationKey)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground">{t("dashboard.gapsWidget.empty")}</p>
+          )}
+          <Button asChild className="mt-3" size="sm" variant="ghost">
+            <Link href="/profile">{t("dashboard.gapsWidget.strengthenProfile")}</Link>
+          </Button>
+        </Card>
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         {readiness ? (
@@ -597,5 +758,14 @@ function DashboardModuleCard({
         <ArrowRight aria-hidden className="size-3" />
       </Link>
     </Card>
+  );
+}
+
+function DashboardCountRow({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold">{count}</span>
+    </div>
   );
 }

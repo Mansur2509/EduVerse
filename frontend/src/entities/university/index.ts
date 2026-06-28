@@ -53,6 +53,8 @@ export type UniversitySummary = {
   admissions_url: string;
   financial_aid_url: string;
   application_portal_url: string;
+  international_office_url: string;
+  virtual_info_session_url: string;
   summary: string;
   institution_type: InstitutionType;
   is_published: boolean;

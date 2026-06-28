@@ -59,6 +59,8 @@ class University(models.Model):
     admissions_url = models.URLField(blank=True, validators=[validate_http_url])
     financial_aid_url = models.URLField(blank=True, validators=[validate_http_url])
     application_portal_url = models.URLField(blank=True, validators=[validate_http_url])
+    international_office_url = models.URLField(blank=True, validators=[validate_http_url])
+    virtual_info_session_url = models.URLField(blank=True, validators=[validate_http_url])
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

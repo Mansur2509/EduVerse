@@ -51,6 +51,39 @@ class RoadmapGenerationTests(APITestCase):
         self.assertFalse(any(key.startswith("university_deadline") for key in task_keys))
         self.assertFalse(any(key.startswith("scholarship") for key in task_keys))
 
+    def test_generate_roadmap_creates_task_for_not_started_essay(self):
+        from services.essay_service.models import EssayWorkspace
+
+        EssayWorkspace.objects.create(user=self.user, title="Common App essay", draft_text="")
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+        self.assertTrue(any(key.startswith("essay_workspace:") for key in task_keys))
+        task = plan.tasks.get(dedup_key__startswith="essay_workspace:")
+        self.assertEqual(task.category, RoadmapTask.Category.ESSAYS)
+        self.assertEqual(task.source_type, RoadmapTask.SourceType.ESSAY_STATUS)
+
+    def test_generate_roadmap_skips_essay_in_progress(self):
+        from services.essay_service.models import EssayWorkspace
+
+        EssayWorkspace.objects.create(
+            user=self.user,
+            title="Common App essay",
+            draft_text="A solid draft already in progress.",
+            status=EssayWorkspace.Status.DRAFTING,
+        )
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+        self.assertFalse(any(key.startswith("essay_workspace:") for key in task_keys))
+
+    def test_regenerating_roadmap_does_not_duplicate_essay_task(self):
+        from services.essay_service.models import EssayWorkspace
+
+        EssayWorkspace.objects.create(user=self.user, title="Common App essay", draft_text="")
+        generate_roadmap(self.user)
+        plan, _ = generate_roadmap(self.user)
+        matching = [k for k in plan.tasks.values_list("dedup_key", flat=True) if k.startswith("essay_workspace:")]
+        self.assertEqual(len(matching), 1)
+
     def test_generate_roadmap_with_structured_profile_skips_satisfied_gaps(self):
         from services.user_profile_service.models import Activity
 

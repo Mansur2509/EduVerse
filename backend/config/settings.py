@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "services.event_service",
     "services.roadmap_service",
     "services.essay_service",
+    "services.application_service",
     "services.ai_gateway_service",
     "services.exam_content_service",
     "services.finance_literacy_service",

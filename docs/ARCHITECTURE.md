@@ -149,6 +149,24 @@ Every `RoadmapTask` is self-only (filtered by `user` in the viewset queryset, mi
 
 The frontend roadmap feature owns `/api/roadmap/` calls and typed roadmap data. The roadmap screen buckets the already-loaded task list into This week / This month / Later / Completed client-side rather than issuing separate paginated requests per bucket; the dedicated `/api/roadmap/tasks/` endpoint with `status`/`category`/`priority`/`linked_university`/`due_before`/`due_after` filters exists for API consumers and tests, not as the screen's primary data path.
 
+`roadmap_generator.py` also reads (read-only) `essay_service.EssayWorkspace`: an essay with status `not_started` or `needs_revision` produces a `category=essays`/`source_type=essay_status` task. This is a plain cross-service query with no new model field on either side, consistent with the synthesis-layer boundary above.
+
+## Essay workspace boundary
+
+`essay_service` owns the safe essay-drafting workflow under `/api/essays/`: `EssayWorkspace` (draft, prompt, word limit, status, optional linked university), `EssayFeedback` (one row per feedback run), and `EssayRevisionTask` (a persistent checklist, separate from the per-run `EssayFeedback.revision_tasks` JSON snapshot). It is unrelated to `user_profile_service.EssayDraft`, the lightweight tracker from the structured-profile phase (`PROFILE-STRUCTURED-001`); the two are intentionally separate systems — `EssayDraft` is a profile-completion signal, `EssayWorkspace` is the actual drafting/feedback tool.
+
+`services/essay_service/feedback_engine.py` is the deterministic, rule-based feedback engine: word count, word-limit status, generic-phrase detection, paragraph-break/conclusion structure, specificity (quantified-detail presence), why-school/why-major prompt-fit, and a sentence-length grammar proxy. It contains no AI call and never returns generated or rewritten essay text — only scores, a summary, strengths, issues, and revision-task suggestions. `POST /api/essays/{id}/feedback/` persists those suggestions as `EssayRevisionTask` rows, updating an existing `todo` task in the same category in place rather than duplicating it on repeated feedback runs, while completed/skipped tasks are preserved as history (the same "skip, don't delete" discipline as `roadmap_service`).
+
+Every essay, feedback row, and revision task is self-only (filtered through the owning `EssayWorkspace.user`). There is no endpoint, button, or rule that writes or rewrites a student's essay; only feedback and checklist generation.
+
+## Application tracker boundary
+
+`application_service` owns the per-university application pipeline under `/api/applications/`: `ApplicationTrackerItem` (one per `(user, university)`, enforced by a unique constraint) and `ApplicationMilestone`. Creating an item never sets `status` beyond its `researching` default — the student moves it through the pipeline explicitly; nothing in the backend infers "applying" or "submitted" from other data.
+
+`ApplicationMilestone.linked_roadmap_task` is an optional, validated-self-only foreign key into `roadmap_service.RoadmapTask`. `application_service` does not generate roadmap tasks itself or duplicate roadmap data; a milestone simply points at an existing task the student (or `roadmap_generator.py`) already created, the same read-without-owning relationship `roadmap_service` has with the services it reads from.
+
+The frontend surfaces the university/roadmap connection without new backend surface: the applications screen and the university detail page's Deadlines/Roadmap tabs call the existing `/api/roadmap/tasks/?linked_university={id}` filter and the `/api/applications/?university={id}` filter (added alongside this feature) to show roadmap tasks and tracked-application status for a given university.
+
 ## Data ownership
 
 The V1 event catalog includes an offline-safe map-preview/list hybrid built from stored coordinates. It does not require a network tile provider, and events without coordinates remain accessible in the catalog. Full Leaflet tile interaction remains an EVENTS-002 enhancement.

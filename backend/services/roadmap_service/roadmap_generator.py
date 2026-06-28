@@ -11,6 +11,7 @@ from datetime import date, timedelta
 
 from django.utils import timezone
 
+from services.essay_service.models import EssayWorkspace
 from services.event_service.models import EventRegistration
 from services.event_service.services import ACTIVE_REGISTRATION_STATUSES
 from services.university_service.models import SavedUniversity
@@ -161,6 +162,7 @@ class RoadmapBuilder:
         self._scholarships(profile, shortlisted)
         self._fit_analysis(profile, shortlisted)
         self._events()
+        self._essay_workspace_tasks()
 
         return warnings
 
@@ -511,6 +513,46 @@ class RoadmapBuilder:
                     generated_reason="Fit analysis is limited by missing verified university data.",
                     evidence_note=f"{university.name}'s {field_labels[missing]} is not verified yet.",
                 )
+
+    def _essay_workspace_tasks(self):
+        essays = EssayWorkspace.objects.filter(
+            user=self.user,
+            status__in=(EssayWorkspace.Status.NOT_STARTED, EssayWorkspace.Status.NEEDS_REVISION),
+        ).select_related("university")
+
+        for essay in essays:
+            due_date = None
+            source_url = ""
+            if essay.university and essay.university.application_deadline:
+                due_date = essay.university.application_deadline
+                source_url = _verified_source_url(essay.university, "application_deadline")
+
+            if essay.status == EssayWorkspace.Status.NOT_STARTED:
+                title = f"Start your essay: {essay.title}"
+                generated_reason = "This essay draft has not been started yet."
+            else:
+                title = f"Revise your essay: {essay.title}"
+                generated_reason = "This essay has open revision tasks from its latest feedback."
+
+            self.add(
+                f"essay_workspace:{essay.id}:{essay.status}",
+                title=title,
+                description=essay.prompt_text[:280]
+                or "Open the essay workspace to continue this draft.",
+                category=Category.ESSAYS,
+                due_date=due_date,
+                priority=_priority_for_due_date(
+                    due_date,
+                    self.today,
+                    blocking=essay.status == EssayWorkspace.Status.NEEDS_REVISION,
+                ),
+                source_type=SourceType.ESSAY_STATUS,
+                linked_university=essay.university,
+                linked_profile_section=f"essay_workspace:{essay.id}",
+                source_url=source_url,
+                generated_reason=generated_reason,
+                evidence_note=f"Essay status: {essay.status}.",
+            )
 
     def _events(self):
         registrations = (

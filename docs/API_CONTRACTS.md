@@ -525,6 +525,15 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | GET/PATCH/DELETE | `/api/roadmap/tasks/{id}/` | Authenticated, self-only | Read/update any own task; delete only `source_type=manual` tasks (others return 400 — skip instead) |
 | POST | `/api/roadmap/tasks/{id}/complete/` | Authenticated, self-only | Mark a task completed and stamp `completed_at` |
 | POST | `/api/roadmap/tasks/{id}/skip/` | Authenticated, self-only | Mark a task skipped without deleting it |
+| GET/POST | `/api/essays/` | Authenticated, self-only | List caller's essay workspaces or create one |
+| GET/PATCH/DELETE | `/api/essays/{id}/` | Authenticated, self-only | Read/update/delete an essay workspace |
+| GET/POST | `/api/essays/{id}/feedback/` | Authenticated, self-only | Read latest feedback, or generate new rule-based feedback (creates `EssayFeedback` + revision tasks) |
+| POST | `/api/essays/{id}/revision-tasks/` | Authenticated, self-only | Add a manual revision task to an essay |
+| GET/PATCH | `/api/essays/revision-tasks/{id}/` | Authenticated, self-only | Read/update a revision task's title/description/category/status |
+| GET/POST | `/api/applications/` | Authenticated, self-only | List caller's application tracker items or start tracking a university |
+| GET/PATCH/DELETE | `/api/applications/{id}/` | Authenticated, self-only | Read/update/delete an application tracker item (filters: `status`, `university`) |
+| GET/POST | `/api/applications/{id}/milestones/` | Authenticated, self-only | List or add milestones for an application |
+| GET/PATCH | `/api/applications/milestones/{id}/` | Authenticated, self-only | Read/update a milestone, optionally linking to one of the caller's own roadmap tasks |
 | GET/PATCH/POST | `/api/v1/events/...` | Role-dependent | Legacy organizer/admin management router |
 | GET/PATCH | `/profiles/me/` | Student | Legacy compatibility route under `/api/v1`; prefer `/api/profile/me/` |
 | GET | `/subscriptions/me/` | Authenticated | Current plan and counters |
@@ -541,6 +550,8 @@ University records carry two complementary sourcing mechanisms:
 
 Any University field with no confirmed source is left `null`/blank and rendered client-side as "Not verified yet" — it is never displayed as zero or guessed. `is_demo: true` marks clearly-fictional development records (see `docs/DECISIONS.md`); the default catalog list excludes them.
 
+`international_office_url` and `virtual_info_session_url` are identity-ish contact links (same exemption as `admissions_url`/`financial_aid_url`/`application_portal_url`) shown on the university detail page's Contact tab; they do not require a `field_verifications` entry and are simply blank when unknown.
+
 The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) only ever compares `acceptance_rate`, `gpa_average`, and `sat_average` against the caller's profile. It returns `category: null` when none of those three are verified for either side, and adds a `limited_data_for_category` next-action when a category is assigned from only one of the three. It never uses the words "probability", "chance", or "percentage"; response keys and UI copy use "fit", "category" (`reach`/`competitive`/`target`/`safety`), "strengths", "risks", "missing_fields", and "next_actions" instead.
 
 ## Roadmap response shapes
@@ -551,6 +562,18 @@ The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) only ever compa
 - `POST /api/roadmap/generate/` → `{"plan": RoadmapPlan, "missing_data_warnings": string[]}`. The warnings (e.g. `no_graduation_year`, `no_shortlisted_universities`) are also persisted on `plan.readiness_snapshot.missing_data_warnings` so they reappear on the next plain `GET` without needing to regenerate.
 
 Each `RoadmapTask` always reports `generated_reason`, `evidence_note`, and `source_url` (empty string when no official source backs the task) so the UI can show why a task exists and where its claim comes from without a second request. `source_type` distinguishes a real verified deadline (`university_deadline`) from a generated/estimated one (`generated`) — never both implied at once.
+
+The generator additionally reads (read-only) the caller's own `EssayWorkspace` records: any essay with `status` in `not_started`/`needs_revision` produces a `category=essays`, `source_type=essay_status` task (dedup key `essay_workspace:{id}:{status}`), with `due_date`/`source_url` populated from the linked university's verified `application_deadline` when one exists. This requires no schema change to `roadmap_service` — it is a plain cross-service query, the same pattern already used for `user_profile_service`/`university_service`/`event_service`.
+
+## Essay workspace response shapes
+
+`EssayWorkspace` embeds its own `latest_feedback` (most recent `EssayFeedback`, or `null`) and `revision_tasks[]` so the frontend can render the editor, feedback panel, and checklist from one request.
+
+`POST /api/essays/{id}/feedback/` runs the deterministic rule engine in `services/essay_service/feedback_engine.py` (word count, word-limit status, generic-language detection, paragraph structure, specificity, prompt-fit for why-school/why-major types, sentence-length grammar proxy) and returns `{"detail": "", "feedback": EssayFeedback, "essay": EssayWorkspace}`. It also creates/refreshes `EssayRevisionTask` rows: an existing `todo` task in the same `category` is updated in place rather than duplicated, while `completed`/`skipped` tasks are left untouched as history. No endpoint generates, writes, or rewrites essay text — every response is feedback and checklist items only.
+
+## Application tracker response shapes
+
+`ApplicationTrackerItem` embeds its `milestones[]`. Creating an application only requires `university`; all status fields (`status`, `essays_status`, `recommendations_status`, `test_scores_status`, `documents_status`, `financial_aid_status`) default to their "not started" equivalents — the API never auto-advances a status. A second `POST` for the same `(user, university)` pair returns 400. `ApplicationMilestone.linked_roadmap_task` is optional and validated to belong to the caller; it lets a milestone point at an existing roadmap task without `application_service` owning or duplicating roadmap data.
 
 ## Error behavior
 
