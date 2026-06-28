@@ -103,6 +103,12 @@ def calculate_university_fit(profile, university: University) -> dict:
         category = CATEGORY_ORDER[index]
         if uni_rate is None and uni_gpa is None and uni_sat is None:
             next_actions.append("verify_university_data")
+        elif uni_rate is None or uni_gpa is None or uni_sat is None:
+            # A category was assigned from whatever verified university stat
+            # is available, but at least one other stat is still unverified.
+            # Flag this explicitly so the UI never presents a partial-data
+            # category as a fully-confident classification.
+            next_actions.append("limited_data_for_category")
 
     source_notes = [
         {

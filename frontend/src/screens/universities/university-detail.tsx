@@ -11,8 +11,14 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import type { UniversityDetails, UniversityFitAnalysis } from "@/entities/university";
+import {
+  formatTuitionAmount,
+  getFieldVerification,
+  type UniversityDetails,
+  type UniversityFitAnalysis
+} from "@/entities/university";
 import { StatValue } from "@/entities/university/ui/stat-value";
+import { VerifiedStat } from "@/entities/university/ui/verified-stat";
 import {
   addToShortlistRequest,
   getUniversityFitRequest,
@@ -124,6 +130,17 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
               {t("universities.institutionType.unknown")}
             </span>
           )}
+          {university.qs_ranking ? (
+            <Badge>
+              {t("universities.fields.qsRanking")} #{university.qs_ranking}
+              {university.qs_ranking_year ? ` (${university.qs_ranking_year})` : ""}
+            </Badge>
+          ) : null}
+          {university.is_demo ? (
+            <span className="rounded-sm border border-warning/35 bg-warning/10 px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-warning">
+              {t("universities.demoDataBadge")}
+            </span>
+          ) : null}
         </div>
         <h1 className="mt-5 max-w-4xl text-3xl font-semibold sm:text-5xl">{university.name}</h1>
         <p className="mt-3 text-sm text-muted-foreground">
@@ -134,6 +151,41 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
             {university.summary}
           </p>
         ) : null}
+        <div className="mt-4 flex flex-wrap gap-4 text-sm">
+          {university.admissions_url ? (
+            <a
+              className="inline-flex items-center gap-1.5 font-semibold text-primary-hover hover:underline"
+              href={university.admissions_url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("universities.fields.admissionsUrl")}
+              <ExternalLink aria-hidden className="size-3.5" />
+            </a>
+          ) : null}
+          {university.financial_aid_url ? (
+            <a
+              className="inline-flex items-center gap-1.5 font-semibold text-primary-hover hover:underline"
+              href={university.financial_aid_url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("universities.fields.financialAidUrl")}
+              <ExternalLink aria-hidden className="size-3.5" />
+            </a>
+          ) : null}
+          {university.application_portal_url ? (
+            <a
+              className="inline-flex items-center gap-1.5 font-semibold text-primary-hover hover:underline"
+              href={university.application_portal_url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("universities.fields.applicationPortalUrl")}
+              <ExternalLink aria-hidden className="size-3.5" />
+            </a>
+          ) : null}
+        </div>
         <Button
           className="mt-5"
           disabled={isShortlistPending}
@@ -158,31 +210,125 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
             <h2 className="text-2xl font-semibold">{t("universities.detail.statistics")}</h2>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2">
               <DetailItem label={t("universities.fields.acceptanceRate")}>
-                <StatValue suffix="%" value={university.acceptance_rate} />
+                <VerifiedStat
+                  suffix="%"
+                  value={university.acceptance_rate}
+                  verification={getFieldVerification(
+                    university.field_verifications,
+                    "acceptance_rate"
+                  )}
+                />
               </DetailItem>
               <DetailItem label={t("universities.fields.gpaAverage")}>
-                <StatValue value={university.gpa_average} />
+                <VerifiedStat
+                  value={university.gpa_average}
+                  verification={getFieldVerification(university.field_verifications, "gpa_average")}
+                />
               </DetailItem>
               <DetailItem label={t("universities.fields.satAverage")}>
-                <StatValue value={university.sat_average} />
+                <VerifiedStat
+                  value={university.sat_average}
+                  verification={getFieldVerification(university.field_verifications, "sat_average")}
+                />
+              </DetailItem>
+              <DetailItem label={t("universities.fields.satRange")}>
+                {university.sat_p25 && university.sat_p75 ? (
+                  <VerifiedStat
+                    value={`${university.sat_p25}–${university.sat_p75}`}
+                    verification={getFieldVerification(university.field_verifications, "sat_p25")}
+                  />
+                ) : (
+                  <StatValue value={null} />
+                )}
+              </DetailItem>
+              <DetailItem label={t("universities.fields.ieltsMinimum")}>
+                <VerifiedStat
+                  value={university.ielts_minimum}
+                  verification={getFieldVerification(
+                    university.field_verifications,
+                    "ielts_minimum"
+                  )}
+                />
+              </DetailItem>
+              <DetailItem label={t("universities.fields.testPolicy")}>
+                {university.test_policy ? (
+                  <VerifiedStat
+                    value={t(
+                      `universities.testPolicy.${university.test_policy}` as TranslationKey
+                    )}
+                    verification={getFieldVerification(
+                      university.field_verifications,
+                      "test_policy"
+                    )}
+                  />
+                ) : (
+                  <StatValue value={null} />
+                )}
               </DetailItem>
               <DetailItem label={t("universities.fields.tuition")}>
-                <StatValue
+                <VerifiedStat
                   suffix={university.tuition_amount ? ` ${university.tuition_currency}` : ""}
-                  value={university.tuition_amount}
+                  value={formatTuitionAmount(university.tuition_amount)}
+                  verification={getFieldVerification(
+                    university.field_verifications,
+                    "tuition_amount"
+                  )}
                 />
               </DetailItem>
               <DetailItem label={t("universities.fields.applicationDeadline")}>
                 {university.application_deadline ? (
-                  formatDate(university.application_deadline, locale)
+                  <VerifiedStat
+                    value={formatDate(university.application_deadline, locale)}
+                    verification={getFieldVerification(
+                      university.field_verifications,
+                      "application_deadline"
+                    )}
+                  />
                 ) : (
                   <StatValue value={null} />
                 )}
               </DetailItem>
               <DetailItem label={t("universities.fields.scholarshipAvailable")}>
-                <StatValue value={university.scholarship_available} />
+                <VerifiedStat
+                  value={university.scholarship_available}
+                  verification={getFieldVerification(
+                    university.field_verifications,
+                    "scholarship_available"
+                  )}
+                />
+              </DetailItem>
+              <DetailItem label={t("universities.fields.qsRanking")}>
+                {university.qs_ranking ? (
+                  <VerifiedStat
+                    value={
+                      university.qs_ranking_year
+                        ? `#${university.qs_ranking} (${university.qs_ranking_year})`
+                        : `#${university.qs_ranking}`
+                    }
+                    verification={getFieldVerification(
+                      university.field_verifications,
+                      "qs_ranking"
+                    )}
+                  />
+                ) : (
+                  <StatValue value={null} />
+                )}
               </DetailItem>
             </dl>
+            {university.essay_requirements ? (
+              <div className="mt-5 border-t pt-4">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("universities.fields.essayRequirements")}
+                </h3>
+                <VerifiedStat
+                  value={university.essay_requirements}
+                  verification={getFieldVerification(
+                    university.field_verifications,
+                    "essay_requirements"
+                  )}
+                />
+              </div>
+            ) : null}
           </Card>
 
           <Card>

@@ -20,7 +20,7 @@ class UniversityViewSet(ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     lookup_field = "slug"
     search_fields = ("name", "city", "country", "programs__name")
-    filterset_fields = ("country", "institution_type", "scholarship_available")
+    filterset_fields = ("country", "institution_type", "scholarship_available", "test_policy")
     ordering_fields = ("name", "country", "created_at", "acceptance_rate")
 
     def get_queryset(self):
@@ -29,11 +29,18 @@ class UniversityViewSet(ModelViewSet):
             "requirements",
             "scholarships",
             "data_sources",
+            "field_verifications",
         )
         user = self.request.user
-        if user.is_authenticated and user.is_admin_role:
-            return queryset
-        return queryset.filter(is_published=True)
+        if not (user.is_authenticated and user.is_admin_role):
+            queryset = queryset.filter(is_published=True)
+
+        if self.action == "list":
+            include_demo = self.request.query_params.get("include_demo", "").lower() == "true"
+            if not include_demo:
+                queryset = queryset.exclude(is_demo=True)
+
+        return queryset
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

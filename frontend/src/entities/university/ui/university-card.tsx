@@ -3,7 +3,7 @@
 import { Building2, MapPin, Star } from "lucide-react";
 import Link from "next/link";
 
-import type { UniversityDetails } from "@/entities/university";
+import { formatTuitionAmount, type UniversityDetails } from "@/entities/university";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -40,6 +40,11 @@ export function UniversityCard({
             {t("universities.institutionType.unknown")}
           </span>
         )}
+        {university.is_demo ? (
+          <span className="rounded-sm border border-warning/35 bg-warning/10 px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-warning">
+            {t("universities.demoDataBadge")}
+          </span>
+        ) : null}
         <Button
           aria-pressed={university.is_shortlisted}
           className="ml-auto"
@@ -84,7 +89,7 @@ export function UniversityCard({
           <dd className="mt-0.5 font-semibold">
             <StatValue
               suffix={university.tuition_amount ? ` ${university.tuition_currency}` : ""}
-              value={university.tuition_amount}
+              value={formatTuitionAmount(university.tuition_amount)}
             />
           </dd>
         </div>

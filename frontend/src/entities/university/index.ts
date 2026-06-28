@@ -31,6 +31,18 @@ export type UniversityDataSourceItem = {
   retrieved_at: string;
 };
 
+export type VerificationStatus = "verified" | "partial" | "estimated";
+
+export type UniversityFieldVerification = {
+  field_name: string;
+  status: VerificationStatus;
+  source_url: string;
+  last_verified_date: string;
+  note: string;
+};
+
+export type TestPolicy = "required" | "optional" | "blind" | "varies" | "";
+
 export type UniversitySummary = {
   id: number;
   name: string;
@@ -38,21 +50,33 @@ export type UniversitySummary = {
   country: string;
   city: string;
   official_website: string;
+  admissions_url: string;
+  financial_aid_url: string;
+  application_portal_url: string;
   summary: string;
   institution_type: InstitutionType;
   is_published: boolean;
+  is_demo: boolean;
   acceptance_rate: string | null;
   gpa_average: string | null;
   sat_average: number | null;
+  sat_p25: number | null;
+  sat_p75: number | null;
+  ielts_minimum: string | null;
+  test_policy: TestPolicy;
   tuition_amount: string | null;
   tuition_currency: string;
   application_deadline: string | null;
   scholarship_available: boolean | null;
+  essay_requirements: string;
+  qs_ranking: number | null;
+  qs_ranking_year: number | null;
   is_shortlisted: boolean;
   programs: UniversityProgram[];
   requirements: UniversityRequirementItem[];
   scholarships: UniversityScholarshipItem[];
   data_sources: UniversityDataSourceItem[];
+  field_verifications: UniversityFieldVerification[];
   created_at: string;
   updated_at: string;
 };
@@ -64,6 +88,7 @@ export type UniversityFilters = {
   country?: string;
   institution_type?: string;
   scholarship_available?: string;
+  include_demo?: string;
 };
 
 export type FitCategory = "reach" | "competitive" | "target" | "safety";
@@ -82,7 +107,8 @@ export type FitMissingFieldCode =
 export type FitNextActionCode =
   | "add_gpa_to_profile"
   | "add_sat_to_profile"
-  | "verify_university_data";
+  | "verify_university_data"
+  | "limited_data_for_category";
 
 export type UniversityFitSourceNote = {
   title: string;
@@ -112,4 +138,26 @@ export type PaginatedResponse<Item> = {
   results: Item[];
 };
 
+export function formatTuitionAmount(amount: string | null): string | null {
+  if (amount === null) {
+    return null;
+  }
+  const numeric = Number.parseFloat(amount);
+  if (Number.isNaN(numeric)) {
+    return amount;
+  }
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0
+  }).format(numeric);
+}
+
+export function getFieldVerification(
+  verifications: UniversityFieldVerification[],
+  fieldName: string
+): UniversityFieldVerification | undefined {
+  return verifications.find((verification) => verification.field_name === fieldName);
+}
+
 export { UniversityCard } from "./ui/university-card";
+export { StatValue } from "./ui/stat-value";
+export { VerifiedStat, VerificationBadge } from "./ui/verified-stat";

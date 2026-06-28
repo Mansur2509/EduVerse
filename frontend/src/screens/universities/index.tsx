@@ -15,7 +15,8 @@ const emptyFilters: UniversityFilters = {
   search: "",
   country: "",
   institution_type: "",
-  scholarship_available: ""
+  scholarship_available: "",
+  include_demo: ""
 };
 
 const MAX_COMPARE = 4;
@@ -200,6 +201,22 @@ export function UniversitiesScreen() {
             />
             <span className="text-sm font-semibold">
               {t("universities.filters.scholarshipAvailable")}
+            </span>
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2.5">
+            <input
+              checked={filters.include_demo === "true"}
+              className="size-4"
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  include_demo: event.target.checked ? "true" : ""
+                }))
+              }
+              type="checkbox"
+            />
+            <span className="text-sm font-semibold">
+              {t("universities.filters.includeDemo")}
             </span>
           </label>
           <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">

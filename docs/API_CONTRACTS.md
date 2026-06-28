@@ -513,8 +513,12 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | POST | `/api/admin/events/{slug}/archive/` | Admin | Archive event |
 | GET | `/api/admin/events/{slug}/logs/` | Admin | Read moderation history |
 | GET | `/health/` | Public | Service health |
-| GET | `/universities/` | Authenticated | University catalog |
-| GET | `/universities/{id}/` | Authenticated | University details and sources |
+| GET | `/api/v1/universities/` | Authenticated | University catalog, search/filter; excludes `is_demo=true` records unless `?include_demo=true` |
+| GET | `/api/v1/universities/{slug}/` | Authenticated | University detail: stats, programs, scholarships, sources, `field_verifications` |
+| GET | `/api/v1/universities/{slug}/fit/` | Authenticated | Admissions fit analysis (Reach/Competitive/Target/Safety) from the caller's profile and this university's verified stats only |
+| POST/DELETE | `/api/v1/universities/{slug}/shortlist/` | Authenticated | Add/remove this university from the caller's shortlist |
+| GET | `/api/v1/universities/shortlist/` | Authenticated | List the caller's shortlisted universities |
+| GET | `/api/v1/universities/compare/?ids=1,2,3` | Authenticated | Side-by-side detail for 2-4 universities by id |
 | GET/PATCH/POST | `/api/v1/events/...` | Role-dependent | Legacy organizer/admin management router |
 | GET/PATCH | `/profiles/me/` | Student | Legacy compatibility route under `/api/v1`; prefer `/api/profile/me/` |
 | GET | `/subscriptions/me/` | Authenticated | Current plan and counters |
@@ -524,13 +528,14 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 
 ## University source fields
 
-Every data-backed requirement should be traceable through:
+University records carry two complementary sourcing mechanisms:
 
-- `source_url`
-- `source_title`
-- `published_at` when known
-- `retrieved_at`
-- `is_official`
+- `data_sources[]` (existing) — page-level citations for the institution as a whole: `source_url`, `source_title`, `published_at` when known, `retrieved_at`, `is_official`. Used as the fit analysis's `source_notes` fallback.
+- `field_verifications[]` (added for real, source-backed universities) — per-field sourcing for any non-null admissions/stat/cost/deadline value: `field_name`, `status` (`verified` | `partial` | `estimated`), `source_url`, `last_verified_date`, `note`. A field with a non-null value but no matching `field_verifications` entry should not occur for real universities (enforced by a seed-data integrity test); demo/fictional universities never carry verification records.
+
+Any University field with no confirmed source is left `null`/blank and rendered client-side as "Not verified yet" — it is never displayed as zero or guessed. `is_demo: true` marks clearly-fictional development records (see `docs/DECISIONS.md`); the default catalog list excludes them.
+
+The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) only ever compares `acceptance_rate`, `gpa_average`, and `sat_average` against the caller's profile. It returns `category: null` when none of those three are verified for either side, and adds a `limited_data_for_category` next-action when a category is assigned from only one of the three. It never uses the words "probability", "chance", or "percentage"; response keys and UI copy use "fit", "category" (`reach`/`competitive`/`target`/`safety`), "strengths", "risks", "missing_fields", and "next_actions" instead.
 
 ## Error behavior
 

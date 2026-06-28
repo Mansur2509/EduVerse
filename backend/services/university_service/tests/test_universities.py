@@ -68,6 +68,68 @@ class UniversityCatalogTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
+class DemoDataSeparationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="student2", email="student2@test.com", password="testpass123"
+        )
+        self.real = create_university("real-university", is_demo=False)
+        self.demo = create_university("demo-university", is_demo=True)
+
+    def test_list_excludes_demo_universities_by_default(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get("/api/v1/universities/")
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertIn("real-university", slugs)
+        self.assertNotIn("demo-university", slugs)
+
+    def test_list_includes_demo_universities_when_requested(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get("/api/v1/universities/", {"include_demo": "true"})
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertIn("real-university", slugs)
+        self.assertIn("demo-university", slugs)
+
+    def test_retrieve_demo_university_still_works_directly(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{self.demo.slug}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_demo"])
+
+
+class FieldVerificationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="student3", email="student3@test.com", password="testpass123"
+        )
+
+    def test_field_verification_is_serialized(self):
+        from services.university_service.models import UniversityFieldVerification
+
+        university = create_university("verified-university", acceptance_rate="12.00")
+        UniversityFieldVerification.objects.create(
+            university=university,
+            field_name="acceptance_rate",
+            status="verified",
+            source_url="https://example.com/source",
+            last_verified_date="2026-06-28",
+            note="Directly fetched from the official admissions page.",
+        )
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/")
+        verifications = response.data["field_verifications"]
+        self.assertEqual(len(verifications), 1)
+        self.assertEqual(verifications[0]["field_name"], "acceptance_rate")
+        self.assertEqual(verifications[0]["status"], "verified")
+        self.assertEqual(verifications[0]["source_url"], "https://example.com/source")
+
+    def test_field_without_verification_record_has_none(self):
+        university = create_university("unverified-university", acceptance_rate="20.00")
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/")
+        self.assertEqual(response.data["field_verifications"], [])
+
+
 class ShortlistTests(APITestCase):
     def setUp(self):
         self.user1 = User.objects.create_user(
@@ -182,6 +244,21 @@ class FitAnalysisTests(APITestCase):
         )
         response2 = self.client.get(f"/api/v1/universities/{university2.slug}/fit/")
         self.assertEqual(response2.data["category"], "safety")
+
+    def test_fit_flags_limited_data_when_category_assigned_from_partial_university_stats(self):
+        # Mirrors a real university like Harvard: acceptance rate is known but
+        # GPA/SAT averages are not published anywhere official.
+        university = create_university(
+            "sparse-real-university",
+            acceptance_rate="4.18",
+            gpa_average=None,
+            sat_average=None,
+        )
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
+        self.assertEqual(response.data["category"], "reach")
+        self.assertIn("limited_data_for_category", response.data["next_actions"])
+        self.assertNotIn("verify_university_data", response.data["next_actions"])
 
     def test_fit_strengths_when_student_above_average(self):
         self.profile.gpa = "5.00"

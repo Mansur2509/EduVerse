@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { UniversityDetails } from "@/entities/university";
+import { formatTuitionAmount, type UniversityDetails } from "@/entities/university";
 import { StatValue } from "@/entities/university/ui/stat-value";
 import {
   addToShortlistRequest,
@@ -122,11 +122,40 @@ export function UniversityCompareScreen({ ids }: { ids: string }) {
       render: (university) => <StatValue value={university.sat_average} />
     },
     {
+      labelKey: "universities.fields.satRange",
+      render: (university) =>
+        university.sat_p25 && university.sat_p75 ? (
+          <span>
+            {university.sat_p25}–{university.sat_p75}
+          </span>
+        ) : (
+          <StatValue value={null} />
+        )
+    },
+    {
+      labelKey: "universities.fields.ieltsMinimum",
+      render: (university) => <StatValue value={university.ielts_minimum} />
+    },
+    {
+      labelKey: "universities.fields.testPolicy",
+      render: (university) =>
+        university.test_policy ? (
+          t(`universities.testPolicy.${university.test_policy}` as TranslationKey)
+        ) : (
+          <StatValue value={null} />
+        )
+    },
+    {
+      labelKey: "universities.fields.qsRanking",
+      render: (university) =>
+        university.qs_ranking ? <span>#{university.qs_ranking}</span> : <StatValue value={null} />
+    },
+    {
       labelKey: "universities.fields.tuition",
       render: (university) => (
         <StatValue
           suffix={university.tuition_amount ? ` ${university.tuition_currency}` : ""}
-          value={university.tuition_amount}
+          value={formatTuitionAmount(university.tuition_amount)}
         />
       )
     },
@@ -169,6 +198,11 @@ export function UniversityCompareScreen({ ids }: { ids: string }) {
                   >
                     {university.name}
                   </Link>
+                  {university.is_demo ? (
+                    <span className="ml-2 rounded-sm border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-warning">
+                      {t("universities.demoDataBadge")}
+                    </span>
+                  ) : null}
                   <p className="mt-1 text-xs font-normal text-muted-foreground">
                     {[university.city, university.country].filter(Boolean).join(", ")}
                   </p>

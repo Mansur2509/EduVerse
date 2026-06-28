@@ -4,6 +4,7 @@ from .models import (
     SavedUniversity,
     University,
     UniversityDataSource,
+    UniversityFieldVerification,
     UniversityProgram,
     UniversityRequirement,
     UniversityScholarship,
@@ -34,11 +35,18 @@ class UniversityScholarshipSerializer(serializers.ModelSerializer):
         exclude = ("university",)
 
 
+class UniversityFieldVerificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UniversityFieldVerification
+        fields = ("field_name", "status", "source_url", "last_verified_date", "note")
+
+
 class UniversitySerializer(serializers.ModelSerializer):
     programs = UniversityProgramSerializer(many=True, read_only=True)
     requirements = UniversityRequirementSerializer(many=True, read_only=True)
     scholarships = UniversityScholarshipSerializer(many=True, read_only=True)
     data_sources = UniversityDataSourceSerializer(many=True, read_only=True)
+    field_verifications = UniversityFieldVerificationSerializer(many=True, read_only=True)
     is_shortlisted = serializers.SerializerMethodField()
 
     class Meta:

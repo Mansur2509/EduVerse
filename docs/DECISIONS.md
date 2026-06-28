@@ -177,3 +177,19 @@ On desktop, the shell occupies one `100dvh` viewport. The fixed-width sidebar an
 The local `seed_demo` command creates fictional student, organizer, and admin accounts with a shared documented demo password so founder review can reliably test each role without manual database setup. These accounts are scoped to the local SQLite preview path and are not production credentials or a production access mechanism.
 
 The seed also creates a registered student event and a pending organizer submission. This keeps `/events/my`, organizer participants, and admin moderation reviewable in a fresh local preview while preserving the real role and moderation rules.
+
+## ADR-023: Real, per-field-verified university data separated from fictional demo records
+
+- **Status:** Accepted
+- **Date:** 2026-06-28
+
+The university catalog previously contained only fictional, clearly-labeled demo institutions (ADR for that infrastructure predates this entry). For the product to look credible, 15 real universities were added with deliberately partial, source-backed data, while the existing fictional records were kept (for infrastructure testing) and marked `is_demo=True` on the `University` model.
+
+Two separation mechanisms were added, both purely additive — no existing field, endpoint shape, or fit-analysis logic was changed:
+
+1. **Catalog separation.** `is_demo` defaults to `False`. `UniversityViewSet`'s default list/search excludes `is_demo=True` records; a `?include_demo=true` query param opts back in for testing. Direct retrieve/shortlist/compare on a demo university still work, since a user may have legitimately interacted with one while testing.
+2. **Per-field verification.** A new `UniversityFieldVerification` model (one row per `(university, field_name)`) records `source_url`, `last_verified_date`, and a `status` of `verified` (directly fetched and verbatim-confirmed this session), `partial` (relayed via a search snippet of an official source, or arithmetically derived from two verified official counts), or `estimated` (reserved, unused by current seed data). Real universities only ever set a statistic when a verification record can accompany it; a seed-data integrity test (`test_seed_data_integrity.py`) enforces this for every future edit to `seed_data.py`. Demo universities never carry verification records.
+
+Many real universities intentionally have most fields `null` (Stanford withholds its acceptance rate until the Common Data Set is released; UBC and Toronto publish tuition per-program rather than as one figure; KAIST's official site could not be reached this session). This is treated as correct, honest output — never backfilled with an estimate — and is exactly what "Not verified yet" communicates in the UI.
+
+The admissions fit analysis was extended with a `limited_data_for_category` next-action: when a category is assigned from only one of the three quantitative signals (acceptance rate, GPA average, SAT average) because the other two are unverified for that university, the response says so explicitly rather than presenting a partial-data classification as a complete one. No fit-analysis terminology uses "probability," "chance," or "percentage" anywhere in code, API responses, or UI copy.

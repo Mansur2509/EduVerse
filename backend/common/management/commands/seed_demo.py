@@ -22,9 +22,11 @@ from services.subscription_service.models import Plan, Subscription, UsageLimit
 from services.university_service.models import (
     University,
     UniversityDataSource,
+    UniversityFieldVerification,
     UniversityProgram,
     UniversityScholarship,
 )
+from services.university_service.seed_data import REAL_UNIVERSITIES, VERIFIED_ON
 from services.user_profile_service.services import ensure_profile_records
 
 User = get_user_model()
@@ -39,6 +41,7 @@ class Command(BaseCommand):
         self.seed_usage_limits()
         demo_users = self.seed_demo_accounts()
         self.seed_university()
+        self.seed_real_universities()
         self.seed_event(demo_users)
         self.seed_question()
         self.stdout.write(self.style.SUCCESS("EduVerse demo data is ready."))
@@ -300,6 +303,7 @@ class Command(BaseCommand):
                     "application_deadline": demo["application_deadline"],
                     "scholarship_available": demo["scholarship_available"],
                     "is_published": True,
+                    "is_demo": True,
                 },
             )
             UniversityDataSource.objects.update_or_create(
@@ -330,6 +334,68 @@ class Command(BaseCommand):
                 "deadline": date(next_year, 1, 5),
             },
         )
+
+    def seed_real_universities(self):
+        """Create/update real, source-backed universities from seed_data.py.
+
+        Every non-null field populated here has a matching
+        UniversityFieldVerification row recording its source_url and
+        confidence; see services/university_service/seed_data.py for the
+        full sourcing notes.
+        """
+        scalar_fields = (
+            "country",
+            "city",
+            "institution_type",
+            "official_website",
+            "admissions_url",
+            "financial_aid_url",
+            "application_portal_url",
+            "summary",
+            "test_policy",
+            "acceptance_rate",
+            "gpa_average",
+            "sat_average",
+            "sat_p25",
+            "sat_p75",
+            "ielts_minimum",
+            "tuition_amount",
+            "tuition_currency",
+            "application_deadline",
+            "scholarship_available",
+            "essay_requirements",
+            "qs_ranking",
+            "qs_ranking_year",
+        )
+        for entry in REAL_UNIVERSITIES:
+            slug = entry["slug"]
+            defaults = {field: entry.get(field) for field in scalar_fields if field in entry}
+            defaults["name"] = entry["name"]
+            defaults["is_published"] = True
+            defaults["is_demo"] = False
+            university, _ = University.objects.update_or_create(slug=slug, defaults=defaults)
+
+            for verification in entry.get("verifications", []):
+                UniversityFieldVerification.objects.update_or_create(
+                    university=university,
+                    field_name=verification["field_name"],
+                    defaults={
+                        "status": verification["status"],
+                        "source_url": verification["source_url"],
+                        "last_verified_date": VERIFIED_ON,
+                        "note": verification.get("note", ""),
+                    },
+                )
+
+            for source in entry.get("data_sources", []):
+                UniversityDataSource.objects.update_or_create(
+                    university=university,
+                    source_url=source["source_url"],
+                    defaults={
+                        "source_title": source["source_title"],
+                        "is_official": source["is_official"],
+                    },
+                )
 
     def seed_event(self, demo_users):
         now = timezone.now()
