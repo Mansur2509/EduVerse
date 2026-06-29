@@ -12,6 +12,8 @@ Organizer API base URL: `/api/organizer`
 
 Event moderation API base URL: `/api/admin/events`
 
+Suggestions API base URL: `/api/suggestions`
+
 This document is an evolving Phase 1 contract. Breaking changes must update this file and the affected client types.
 
 ## Authentication
@@ -534,6 +536,10 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | GET/PATCH/DELETE | `/api/applications/{id}/` | Authenticated, self-only | Read/update/delete an application tracker item (filters: `status`, `university`) |
 | GET/POST | `/api/applications/{id}/milestones/` | Authenticated, self-only | List or add milestones for an application |
 | GET/PATCH | `/api/applications/milestones/{id}/` | Authenticated, self-only | Read/update a milestone, optionally linking to one of the caller's own roadmap tasks |
+| GET | `/api/suggestions/` | Authenticated, self-only | List caller's active suggestions (filters: `status`, `suggestion_type`, `linked_university`, `linked_application`, `linked_essay`) |
+| POST | `/api/suggestions/generate/` | Authenticated, self-only | Generate or refresh source-aware rule-based suggestions; no AI and no invented official dates |
+| POST | `/api/suggestions/{id}/add-to-roadmap/` | Authenticated, self-only | Create or reuse a roadmap task from the suggestion and mark it `added_to_roadmap` |
+| PATCH | `/api/suggestions/{id}/dismiss/` | Authenticated, self-only | Mark a suggestion dismissed without deleting history |
 | GET/PATCH/POST | `/api/v1/events/...` | Role-dependent | Legacy organizer/admin management router |
 | GET/PATCH | `/profiles/me/` | Student | Legacy compatibility route under `/api/v1`; prefer `/api/profile/me/` |
 | GET | `/subscriptions/me/` | Authenticated | Current plan and counters |
@@ -574,6 +580,22 @@ The generator additionally reads (read-only) the caller's own `EssayWorkspace` r
 ## Application tracker response shapes
 
 `ApplicationTrackerItem` embeds its `milestones[]`. Creating an application only requires `university`; all status fields (`status`, `essays_status`, `recommendations_status`, `test_scores_status`, `documents_status`, `financial_aid_status`) default to their "not started" equivalents — the API never auto-advances a status. A second `POST` for the same `(user, university)` pair returns 400. `ApplicationMilestone.linked_roadmap_task` is optional and validated to belong to the caller; it lets a milestone point at an existing roadmap task without `application_service` owning or duplicating roadmap data.
+
+## Suggestions response shapes
+
+`suggestions_service` owns persistent, self-only `SuggestedItem` records under `/api/suggestions/`. Suggestions are deterministic and rule-based; they read the caller's profile, exam plans, shortlist/tracked universities, verified university fields, essays, applications, and existing roadmap context. They never call AI, never estimate admission probability, and never invent official dates.
+
+Each suggestion includes `suggestion_type`, `priority`, `source_type`, optional links (`linked_university`, `linked_application`, `linked_essay`, `linked_roadmap_task`), optional dates (`recommended_start_date`, `recommended_end_date`, `official_deadline`), optional `word_limit`, `source_url`, and `evidence_note`.
+
+`source_type` is the key contract:
+
+- `official` / `verified_university_data`: sourced from stored official scholarship records or `UniversityFieldVerification`.
+- `planning_window`: a suggested checkpoint or exam window; not an official date.
+- `profile_based`: derived from the student's own tracker/profile input and should still be verified externally.
+- `roadmap_based`: explanatory roadmap guidance.
+- `missing_data_warning`: a verification task because official data is not stored.
+
+`POST /api/suggestions/generate/` is idempotent by `(user, dedup_key)`: active suggestions update in place, dismissed suggestions stay dismissed, and suggestions already added to roadmap stay linked rather than reappearing as new active items. `POST /api/suggestions/{id}/add-to-roadmap/` creates a roadmap task with `source_type=planning_window`, `profile_gap`, `university_deadline`, or `generated` according to the suggestion source, then marks the suggestion `added_to_roadmap`.
 
 ## Error behavior
 

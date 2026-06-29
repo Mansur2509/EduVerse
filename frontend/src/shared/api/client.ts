@@ -35,7 +35,8 @@ type ApiOptions = Omit<RequestInit, "body"> & {
     | "moderation"
     | "roadmap"
     | "essays"
-    | "applications";
+    | "applications"
+    | "suggestions";
   retryOnUnauthorized?: boolean;
   timeoutMs?: number;
 };
@@ -247,7 +248,9 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
                   ? env.essaysApiBaseUrl
                   : base === "applications"
                     ? env.applicationsApiBaseUrl
-                    : env.apiBaseUrl;
+                    : base === "suggestions"
+                      ? env.suggestionsApiBaseUrl
+                      : env.apiBaseUrl;
   const init: RequestInit = {
     ...requestOptions,
     body: body === undefined ? undefined : JSON.stringify(body),

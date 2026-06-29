@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Plus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EssayCard, type EssayRevisionTask, type EssayWorkspace } from "@/entities/essay";
+import type { SuggestedItem } from "@/entities/suggestion";
 import type { SavedUniversity } from "@/entities/university";
 import {
   createEssayRequest,
@@ -15,6 +16,13 @@ import {
   updateEssayRevisionTaskRequest
 } from "@/features/essays";
 import { EssayForm, type EssayFormValues } from "@/features/essays/ui/essay-form";
+import {
+  addSuggestionToRoadmapRequest,
+  dismissSuggestionRequest,
+  generateSuggestionsRequest,
+  getSuggestionsRequest,
+  SuggestionPanel
+} from "@/features/suggestions";
 import { getShortlistRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
@@ -46,6 +54,7 @@ const LABEL_STYLES: Record<string, string> = {
 export function EssaysScreen() {
   const { t } = useI18n();
   const [essays, setEssays] = useState<EssayWorkspace[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [shortlist, setShortlist] = useState<SavedUniversity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -59,14 +68,16 @@ export function EssaysScreen() {
   const [actionError, setActionError] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
 
   const loadEssays = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [essaysResponse, shortlistResponse] = await Promise.allSettled([
+      const [essaysResponse, shortlistResponse, suggestionsResponse] = await Promise.allSettled([
         getEssaysRequest(),
-        getShortlistRequest()
+        getShortlistRequest(),
+        getSuggestionsRequest()
       ]);
       if (essaysResponse.status === "rejected") {
         setHasError(true);
@@ -74,6 +85,7 @@ export function EssaysScreen() {
       }
       setEssays(essaysResponse.value.results);
       setShortlist(shortlistResponse.status === "fulfilled" ? shortlistResponse.value.results : []);
+      setSuggestions(suggestionsResponse.status === "fulfilled" ? suggestionsResponse.value.results : []);
     } catch {
       setHasError(true);
     } finally {
@@ -229,6 +241,46 @@ export function EssaysScreen() {
   }
 
   const liveWordCount = draftText.trim() ? draftText.trim().split(/\s+/).length : 0;
+  const essaySuggestions = suggestions.filter((suggestion) => {
+    const isEssaySuggestion =
+      suggestion.suggestion_type === "essay_word_limit" ||
+      suggestion.suggestion_type === "essay_deadline";
+    if (!isEssaySuggestion) return false;
+    return selectedEssay ? suggestion.linked_essay === selectedEssay.id : true;
+  });
+
+  async function handleRefreshSuggestions() {
+    setIsRefreshingSuggestions(true);
+    setActionError(false);
+    try {
+      const response = await generateSuggestionsRequest();
+      setSuggestions(response.suggestions);
+    } catch {
+      setActionError(true);
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(suggestion: SuggestedItem) {
+    setActionError(false);
+    try {
+      await addSuggestionToRoadmapRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    } catch {
+      setActionError(true);
+    }
+  }
+
+  async function handleDismissSuggestion(suggestion: SuggestedItem) {
+    setActionError(false);
+    try {
+      await dismissSuggestionRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    } catch {
+      setActionError(true);
+    }
+  }
 
   if (isLoading) {
     return <LoadingNotice message={t("essays.states.loading")} />;
@@ -294,6 +346,16 @@ export function EssaysScreen() {
           shortlist={shortlist}
         />
       ) : null}
+
+      <SuggestionPanel
+        description={t("essays.suggestions.description")}
+        isRefreshing={isRefreshingSuggestions}
+        onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
+        onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
+        onGenerate={() => void handleRefreshSuggestions()}
+        suggestions={essaySuggestions}
+        title={t("essays.suggestions.title")}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setFilter("all")} size="sm" type="button" variant={filter === "all" ? "primary" : "ghost"}>

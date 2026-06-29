@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApplicationTrackerItem } from "@/entities/application";
 import type { StudentProfileDetails } from "@/entities/profile";
 import type { RoadmapTask } from "@/entities/roadmap";
+import type { SuggestedItem } from "@/entities/suggestion";
 import {
   formatTuitionAmount,
   getFieldVerification,
@@ -29,6 +30,13 @@ import { createApplicationRequest, getApplicationsRequest } from "@/features/app
 import { getEssaysRequest } from "@/features/essays";
 import { getProfileItemsRequest, getProfileRequest } from "@/features/profile";
 import { generateRoadmapRequest, getRoadmapTasksRequest } from "@/features/roadmap";
+import {
+  addSuggestionToRoadmapRequest,
+  dismissSuggestionRequest,
+  generateSuggestionsRequest,
+  getSuggestionsRequest,
+  SuggestionPanel
+} from "@/features/suggestions";
 import {
   addToShortlistRequest,
   getUniversityFitRequest,
@@ -83,10 +91,12 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
   const [profile, setProfile] = useState<StudentProfileDetails | null>(null);
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [roadmapTasks, setRoadmapTasks] = useState<RoadmapTask[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [existingApplication, setExistingApplication] = useState<ApplicationTrackerItem | null>(
     null
   );
   const [isStartingApplication, setIsStartingApplication] = useState(false);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
 
   const loadUniversity = useCallback(async () => {
     setIsLoading(true);
@@ -151,6 +161,9 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
     getApplicationsRequest({ university: String(university.id) })
       .then((response) => setExistingApplication(response.results[0] ?? null))
       .catch(() => setExistingApplication(null));
+    getSuggestionsRequest({ linked_university: String(university.id) })
+      .then((response) => setSuggestions(response.results))
+      .catch(() => setSuggestions([]));
   }, [university]);
 
   async function toggleShortlist() {
@@ -193,6 +206,40 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
         .catch(() => undefined);
     }
     return response;
+  }
+
+  async function handleRefreshSuggestions() {
+    if (!university) return;
+    setIsRefreshingSuggestions(true);
+    try {
+      const response = await generateSuggestionsRequest();
+      setSuggestions(response.suggestions.filter((item) => item.linked_university === university.id));
+    } catch {
+      // Keep the page usable; suggestions can be refreshed again.
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(suggestion: SuggestedItem) {
+    if (!university) return;
+    try {
+      await addSuggestionToRoadmapRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+      const response = await getRoadmapTasksRequest({ linked_university: String(university.id) });
+      setRoadmapTasks(response.results);
+    } catch {
+      // The route already exposes retry through the refresh action.
+    }
+  }
+
+  async function handleDismissSuggestion(suggestion: SuggestedItem) {
+    try {
+      await dismissSuggestionRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    } catch {
+      // Non-blocking; keep the suggestion visible if dismissal fails.
+    }
   }
 
   if (isLoading) {
@@ -796,6 +843,17 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
         </div>
 
         <aside className="space-y-5">
+          <SuggestionPanel
+            description={t("universities.suggestions.description")}
+            isRefreshing={isRefreshingSuggestions}
+            limit={3}
+            onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
+            onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
+            onGenerate={() => void handleRefreshSuggestions()}
+            suggestions={suggestions}
+            title={t("universities.suggestions.title")}
+          />
+
           <Card className="bg-elevated/55">
             <h2 className="text-xl font-semibold">{t("universities.fit.title")}</h2>
             {isFitLoading ? (

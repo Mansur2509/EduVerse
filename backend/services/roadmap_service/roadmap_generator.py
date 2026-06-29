@@ -10,6 +10,7 @@ estimated planning windows rather than presented as real deadlines.
 from datetime import date, timedelta
 from types import SimpleNamespace
 
+from django.db.models import Q
 from django.utils import timezone
 
 from services.application_service.models import ApplicationTrackerItem
@@ -65,7 +66,11 @@ PORTFOLIO_KEYWORDS = (
 TOP_UNIVERSITY_QS_THRESHOLD = 50
 TOP_UNIVERSITY_ACCEPTANCE_THRESHOLD = 15.0
 SAT_SIGNIFICANT_GAP = 100
-DEADLINE_REMINDER_WINDOWS = (60, 30, 7)
+DEADLINE_REMINDER_WINDOWS = (60, 30, 14, 7)
+
+
+def _is_demo_user(user) -> bool:
+    return bool(getattr(user, "email", "").endswith("@eduverse.local"))
 
 
 def _priority_for_due_date(due_date: date | None, today: date, *, blocking: bool = False) -> str:
@@ -150,16 +155,22 @@ class RoadmapBuilder:
         if not profile.test_scores:
             warnings.append("no_test_scores")
 
-        shortlisted = list(
+        shortlisted_qs = (
             SavedUniversity.objects.filter(user=self.user)
             .select_related("university")
             .prefetch_related("university__field_verifications", "university__scholarships")
         )
-        tracked_applications = list(
+        tracked_applications_qs = (
             ApplicationTrackerItem.objects.filter(user=self.user)
             .select_related("university")
             .prefetch_related("university__field_verifications", "university__scholarships")
         )
+        if not _is_demo_user(self.user):
+            shortlisted_qs = shortlisted_qs.exclude(university__is_demo=True)
+            tracked_applications_qs = tracked_applications_qs.exclude(university__is_demo=True)
+
+        shortlisted = list(shortlisted_qs)
+        tracked_applications = list(tracked_applications_qs)
         target_universities = {saved.university_id: saved for saved in shortlisted}
         for application in tracked_applications:
             if application.university_id not in target_universities:
@@ -536,6 +547,8 @@ class RoadmapBuilder:
             user=self.user,
             status__in=(EssayWorkspace.Status.NOT_STARTED, EssayWorkspace.Status.NEEDS_REVISION),
         ).select_related("university")
+        if not _is_demo_user(self.user):
+            essays = essays.filter(Q(university__isnull=True) | Q(university__is_demo=False))
 
         for essay in essays:
             due_date = None
@@ -576,11 +589,16 @@ class RoadmapBuilder:
             EventRegistration.objects.filter(
                 user=self.user, status__in=ACTIVE_REGISTRATION_STATUSES
             )
-            .select_related("event")
+            .select_related("event", "event__source")
             .order_by("event__starts_at")
         )
         for registration in registrations:
             event = registration.event
+            if not _is_demo_user(self.user):
+                source_title = getattr(getattr(event, "source", None), "source_title", "")
+                demo_marker = f"{event.title} {event.short_description} {source_title}".lower()
+                if "demo" in demo_marker or "fictional" in demo_marker:
+                    continue
             if event.deadline is None:
                 continue
             event_deadline_date = event.deadline.date()

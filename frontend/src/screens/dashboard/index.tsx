@@ -27,6 +27,7 @@ import {
   type StudentProfileDetails
 } from "@/entities/profile";
 import type { RoadmapPlan } from "@/entities/roadmap";
+import type { SuggestedItem } from "@/entities/suggestion";
 import { getApplicationsRequest } from "@/features/applications";
 import { useAuth } from "@/features/auth";
 import { getEssaysRequest } from "@/features/essays";
@@ -37,6 +38,12 @@ import {
   getProfileRequest
 } from "@/features/profile";
 import { generateRoadmapRequest, getRoadmapRequest } from "@/features/roadmap";
+import {
+  addSuggestionToRoadmapRequest,
+  dismissSuggestionRequest,
+  generateSuggestionsRequest,
+  SuggestionPanel
+} from "@/features/suggestions";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
@@ -51,10 +58,12 @@ export function DashboardScreen() {
   const [readiness, setReadiness] = useState<ApplicationReadiness | null>(null);
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
   const [roadmapPlan, setRoadmapPlan] = useState<RoadmapPlan | null>(null);
+  const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
   const [essays, setEssays] = useState<EssayWorkspace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [hasPartialError, setHasPartialError] = useState(false);
 
   const loadDashboard = useCallback(async () => {
@@ -66,6 +75,7 @@ export function DashboardScreen() {
       registrationsResult,
       readinessResult,
       roadmapResult,
+      suggestionsResult,
       applicationsResult,
       essaysResult
     ] = await Promise.allSettled([
@@ -74,6 +84,7 @@ export function DashboardScreen() {
       getMyEventRegistrationsRequest(),
       getApplicationReadinessRequest(),
       getRoadmapRequest(),
+      generateSuggestionsRequest(),
       getApplicationsRequest(),
       getEssaysRequest()
     ]);
@@ -103,6 +114,11 @@ export function DashboardScreen() {
     } else {
       setHasPartialError(true);
     }
+    if (suggestionsResult.status === "fulfilled") {
+      setSuggestions(suggestionsResult.value.suggestions);
+    } else {
+      setHasPartialError(true);
+    }
     if (applicationsResult.status === "fulfilled") {
       setApplications(applicationsResult.value.results);
     } else {
@@ -129,6 +145,39 @@ export function DashboardScreen() {
       setHasPartialError(true);
     } finally {
       setIsGeneratingRoadmap(false);
+    }
+  }
+
+  async function handleRefreshSuggestions() {
+    setIsRefreshingSuggestions(true);
+    setHasPartialError(false);
+    try {
+      const response = await generateSuggestionsRequest();
+      setSuggestions(response.suggestions);
+    } catch {
+      setHasPartialError(true);
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(suggestion: SuggestedItem) {
+    try {
+      await addSuggestionToRoadmapRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+      const roadmapResponse = await getRoadmapRequest();
+      setRoadmapPlan(roadmapResponse.plan);
+    } catch {
+      setHasPartialError(true);
+    }
+  }
+
+  async function handleDismissSuggestion(suggestion: SuggestedItem) {
+    try {
+      await dismissSuggestionRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    } catch {
+      setHasPartialError(true);
     }
   }
 
@@ -416,6 +465,16 @@ export function DashboardScreen() {
           </ul>
         )}
       </Card>
+
+      <SuggestionPanel
+        description={t("dashboard.suggestions.description")}
+        isRefreshing={isRefreshingSuggestions}
+        onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
+        onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
+        onGenerate={() => void handleRefreshSuggestions()}
+        suggestions={suggestions}
+        title={t("dashboard.suggestions.title")}
+      />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="p-4">
@@ -714,9 +773,9 @@ export function DashboardScreen() {
               </dd>
             </div>
           </dl>
-          <Button asChild className="mt-4" size="sm" variant="secondary">
-            <Link href="/pricing">{t("dashboard.subscription.action")}</Link>
-          </Button>
+          <p className="mt-4 rounded-sm border bg-elevated/45 px-3 py-2 text-xs font-semibold text-muted-foreground">
+            {t("dashboard.subscription.plansComingSoon")}
+          </p>
         </Card>
       </section>
 

@@ -12,28 +12,33 @@ const plans: Array<{
   id: SubscriptionPlan;
   priceKey: TranslationKey;
   summaryKey: TranslationKey;
+  statusKey: TranslationKey;
   featured?: boolean;
 }> = [
   {
     id: "free",
     priceKey: "pricingPage.plan.free.price",
-    summaryKey: "pricingPage.plan.free.summary"
+    summaryKey: "pricingPage.plan.free.summary",
+    statusKey: "pricingPage.status.freeBeta"
   },
   {
     id: "starter",
     priceKey: "pricingPage.plan.starter.price",
-    summaryKey: "pricingPage.plan.starter.summary"
+    summaryKey: "pricingPage.plan.starter.summary",
+    statusKey: "pricingPage.status.upcoming"
   },
   {
     id: "growth",
     priceKey: "pricingPage.plan.growth.price",
     summaryKey: "pricingPage.plan.growth.summary",
+    statusKey: "pricingPage.status.comingSoon",
     featured: true
   },
   {
     id: "premium",
     priceKey: "pricingPage.plan.premium.price",
-    summaryKey: "pricingPage.plan.premium.summary"
+    summaryKey: "pricingPage.plan.premium.summary",
+    statusKey: "pricingPage.status.notActive"
   }
 ];
 
@@ -65,6 +70,17 @@ export function PricingScreen() {
           <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
             {t("pricingPage.description")}
           </p>
+          <div className="mt-5 grid gap-2 text-sm font-semibold text-muted-foreground sm:grid-cols-3">
+            <p className="rounded-sm border bg-elevated px-3 py-2">
+              {t("pricingPage.betaAccess")}
+            </p>
+            <p className="rounded-sm border bg-elevated px-3 py-2">
+              {t("pricingPage.paidInactive")}
+            </p>
+            <p className="rounded-sm border bg-elevated px-3 py-2">
+              {t("pricingPage.limitsMayChange")}
+            </p>
+          </div>
         </div>
         <div className="border-l-4 border-primary bg-elevated px-5 py-4">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
@@ -95,23 +111,35 @@ export function PricingScreen() {
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   {t(`plans.${plan.id}` as TranslationKey)}
                 </p>
-                {isCurrent ? <Badge>{t("pricingPage.active")}</Badge> : null}
+                <Badge>{isCurrent ? t("pricingPage.active") : t(plan.statusKey)}</Badge>
               </div>
               <p className="mt-4 font-serif text-4xl font-semibold">{t(plan.priceKey)}</p>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {t("pricingPage.perMonth")}
-              </p>
+              {plan.id === "free" ? (
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("pricingPage.betaFree")}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("pricingPage.notActiveDuringBeta")}
+                </p>
+              )}
               <p className="mt-5 min-h-24 text-sm leading-6 text-muted-foreground">
                 {t(plan.summaryKey)}
               </p>
-              <ul className="mt-5 space-y-3 border-t pt-5">
-                {coreFeatures.map((feature) => (
-                  <li className="flex items-start gap-2 text-sm" key={feature}>
-                    <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
-                    <span>{t(feature)}</span>
-                  </li>
-                ))}
-              </ul>
+              {plan.id === "free" ? (
+                <ul className="mt-5 space-y-3 border-t pt-5">
+                  {coreFeatures.map((feature) => (
+                    <li className="flex items-start gap-2 text-sm" key={feature}>
+                      <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+                      <span>{t(feature)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-auto border-t pt-5 text-sm font-semibold text-muted-foreground">
+                  {t("pricingPage.plansComingSoon")}
+                </p>
+              )}
             </Card>
           );
         })}

@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/roadmap/", include("services.roadmap_service.urls")),
     path("api/essays/", include("services.essay_service.urls")),
     path("api/applications/", include("services.application_service.urls")),
+    path("api/suggestions/", include("services.suggestions_service.urls")),
     path("api/organizer/", include("services.event_service.organizer_urls")),
     path("api/admin/events/", include("services.event_service.moderation_urls")),
     path("api/v1/health/", HealthView.as_view(), name="health"),

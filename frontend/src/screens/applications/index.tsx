@@ -15,6 +15,7 @@ import {
   type TestScoresStatus
 } from "@/entities/application";
 import type { RoadmapTask } from "@/entities/roadmap";
+import type { SuggestedItem } from "@/entities/suggestion";
 import type { SavedUniversity } from "@/entities/university";
 import {
   createApplicationMilestoneRequest,
@@ -27,6 +28,13 @@ import {
 import { ApplicationForm, type ApplicationFormValues } from "@/features/applications/ui/application-form";
 import { MilestoneForm } from "@/features/applications/ui/milestone-form";
 import { getRoadmapTasksRequest } from "@/features/roadmap";
+import {
+  addSuggestionToRoadmapRequest,
+  dismissSuggestionRequest,
+  generateSuggestionsRequest,
+  getSuggestionsRequest,
+  SuggestionPanel
+} from "@/features/suggestions";
 import { getShortlistRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
@@ -55,6 +63,7 @@ const ALL_STATUSES: ApplicationStatus[] = [...APPLICATION_BOARD_COLUMNS, ...DECI
 export function ApplicationsScreen() {
   const { locale, t } = useI18n();
   const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [shortlist, setShortlist] = useState<SavedUniversity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -62,14 +71,16 @@ export function ApplicationsScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [actionError, setActionError] = useState(false);
   const [linkedTasks, setLinkedTasks] = useState<RoadmapTask[]>([]);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
 
   const loadApplications = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [applicationsResponse, shortlistResponse] = await Promise.allSettled([
+      const [applicationsResponse, shortlistResponse, suggestionsResponse] = await Promise.allSettled([
         getApplicationsRequest(),
-        getShortlistRequest()
+        getShortlistRequest(),
+        getSuggestionsRequest()
       ]);
       if (applicationsResponse.status === "rejected") {
         setHasError(true);
@@ -77,6 +88,7 @@ export function ApplicationsScreen() {
       }
       setApplications(applicationsResponse.value.results);
       setShortlist(shortlistResponse.status === "fulfilled" ? shortlistResponse.value.results : []);
+      setSuggestions(suggestionsResponse.status === "fulfilled" ? suggestionsResponse.value.results : []);
     } catch {
       setHasError(true);
     } finally {
@@ -178,6 +190,43 @@ export function ApplicationsScreen() {
     }
   }
 
+  async function handleRefreshSuggestions() {
+    setIsRefreshingSuggestions(true);
+    setActionError(false);
+    try {
+      const response = await generateSuggestionsRequest();
+      setSuggestions(response.suggestions);
+    } catch {
+      setActionError(true);
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(suggestion: SuggestedItem) {
+    setActionError(false);
+    try {
+      await addSuggestionToRoadmapRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+      if (selected) {
+        const response = await getRoadmapTasksRequest({ linked_university: String(selected.university) });
+        setLinkedTasks(response.results);
+      }
+    } catch {
+      setActionError(true);
+    }
+  }
+
+  async function handleDismissSuggestion(suggestion: SuggestedItem) {
+    setActionError(false);
+    try {
+      await dismissSuggestionRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    } catch {
+      setActionError(true);
+    }
+  }
+
   const columns = useMemo(() => {
     const grouped = new Map<string, ApplicationTrackerItem[]>();
     ALL_STATUSES.forEach((status) => grouped.set(status, []));
@@ -186,6 +235,16 @@ export function ApplicationsScreen() {
     });
     return grouped;
   }, [applications]);
+
+  const applicationSuggestions = suggestions.filter((suggestion) => {
+    const isApplicationSuggestion =
+      suggestion.suggestion_type === "application_deadline" ||
+      suggestion.suggestion_type === "document_deadline" ||
+      suggestion.suggestion_type === "scholarship_deadline" ||
+      suggestion.suggestion_type === "scholarship_type";
+    if (!isApplicationSuggestion) return false;
+    return selected ? suggestion.linked_application === selected.id : true;
+  });
 
   if (isLoading) {
     return <LoadingNotice message={t("applications.states.loading")} />;
@@ -241,6 +300,16 @@ export function ApplicationsScreen() {
           shortlist={shortlist}
         />
       ) : null}
+
+      <SuggestionPanel
+        description={t("applications.suggestions.description")}
+        isRefreshing={isRefreshingSuggestions}
+        onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
+        onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
+        onGenerate={() => void handleRefreshSuggestions()}
+        suggestions={applicationSuggestions}
+        title={t("applications.suggestions.title")}
+      />
 
       {applications.length === 0 ? (
         <Card>

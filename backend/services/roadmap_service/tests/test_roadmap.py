@@ -118,7 +118,7 @@ class RoadmapGenerationTests(APITestCase):
         plan, _ = generate_roadmap(self.user)
         deadline_tasks = plan.tasks.filter(source_type=RoadmapTask.SourceType.UNIVERSITY_DEADLINE)
 
-        self.assertEqual(deadline_tasks.count(), 4)  # 60/30/7-day reminders + final submission
+        self.assertEqual(deadline_tasks.count(), 5)  # 60/30/14/7-day reminders + final submission
         for task in deadline_tasks:
             self.assertEqual(task.source_url, "https://example.com/deadline-university/official-deadline")
             self.assertEqual(task.linked_university_id, university.id)

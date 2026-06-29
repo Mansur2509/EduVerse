@@ -13,6 +13,20 @@ function priceLabelKey(event: EventDetails): TranslationKey {
   return `events.price.${event.price_type}` as TranslationKey;
 }
 
+function isDemoEvent(event: EventDetails) {
+  const marker = [
+    event.title,
+    event.short_description,
+    event.organizer_name,
+    event.eligibility,
+    event.source?.source_title
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return marker.includes("demo") || marker.includes("fictional");
+}
+
 export function EventCard({ event }: { event: EventDetails }) {
   const { locale, t } = useI18n();
   const registrationKey = event.registration_status
@@ -29,6 +43,11 @@ export function EventCard({ event }: { event: EventDetails }) {
         <span className="rounded-sm border bg-elevated/55 px-2.5 py-1 text-xs text-muted-foreground">
           {t(priceLabelKey(event))}
         </span>
+        {isDemoEvent(event) ? (
+          <span className="rounded-sm border border-warning/35 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
+            {t("events.demoBadge")}
+          </span>
+        ) : null}
         {registrationKey ? (
           <span className="rounded-sm border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
             {t(registrationKey)}

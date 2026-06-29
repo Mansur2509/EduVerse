@@ -3,7 +3,9 @@
 import {
   AlertTriangle,
   CalendarClock,
+  ChevronDown,
   CheckCircle2,
+  HelpCircle,
   ListTodo,
   Plus,
   RefreshCw,
@@ -18,6 +20,7 @@ import {
   type RoadmapPlan,
   type RoadmapTask
 } from "@/entities/roadmap";
+import type { SuggestedItem } from "@/entities/suggestion";
 import {
   completeRoadmapTaskRequest,
   createRoadmapTaskRequest,
@@ -28,6 +31,13 @@ import {
   updateRoadmapTaskRequest
 } from "@/features/roadmap";
 import { RoadmapTaskForm, type RoadmapTaskFormValues } from "@/features/roadmap/ui/roadmap-task-form";
+import {
+  addSuggestionToRoadmapRequest,
+  dismissSuggestionRequest,
+  generateSuggestionsRequest,
+  getSuggestionsRequest,
+  SuggestionPanel
+} from "@/features/suggestions";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
@@ -44,6 +54,7 @@ const emptyFilters = { category: "", priority: "", status: "", university: "" };
 export function RoadmapScreen() {
   const { locale, t } = useI18n();
   const [plan, setPlan] = useState<RoadmapPlan | null>(null);
+  const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -54,13 +65,25 @@ export function RoadmapScreen() {
   const [editingTask, setEditingTask] = useState<RoadmapTask | null>(null);
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
   const [actionError, setActionError] = useState(false);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(true);
 
   const loadRoadmap = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const response = await getRoadmapRequest();
-      setPlan(response.plan);
+      const [roadmapResponse, suggestionsResponse] = await Promise.allSettled([
+        getRoadmapRequest(),
+        getSuggestionsRequest()
+      ]);
+      if (roadmapResponse.status === "fulfilled") {
+        setPlan(roadmapResponse.value.plan);
+      } else {
+        setHasError(true);
+      }
+      if (suggestionsResponse.status === "fulfilled") {
+        setSuggestions(suggestionsResponse.value.results);
+      }
     } catch {
       setHasError(true);
     } finally {
@@ -72,17 +95,70 @@ export function RoadmapScreen() {
     void loadRoadmap();
   }, [loadRoadmap]);
 
+  useEffect(() => {
+    if (window.localStorage.getItem("eduverse.roadmap.instructions.viewed") === "true") {
+      setInstructionsOpen(false);
+    }
+  }, []);
+
   async function handleGenerate() {
     setIsGenerating(true);
     setActionError(false);
     try {
       const response = await generateRoadmapRequest();
       setPlan(response.plan);
+      const suggestionResponse = await generateSuggestionsRequest();
+      setSuggestions(suggestionResponse.suggestions);
     } catch {
       setActionError(true);
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleRefreshSuggestions() {
+    setIsRefreshingSuggestions(true);
+    setActionError(false);
+    try {
+      const response = await generateSuggestionsRequest();
+      setSuggestions(response.suggestions);
+    } catch {
+      setActionError(true);
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(suggestion: SuggestedItem) {
+    setActionError(false);
+    try {
+      await addSuggestionToRoadmapRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+      const response = await getRoadmapRequest();
+      setPlan(response.plan);
+    } catch {
+      setActionError(true);
+    }
+  }
+
+  async function handleDismissSuggestion(suggestion: SuggestedItem) {
+    setActionError(false);
+    try {
+      await dismissSuggestionRequest(suggestion.id);
+      setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
+    } catch {
+      setActionError(true);
+    }
+  }
+
+  function toggleInstructions() {
+    setInstructionsOpen((current) => {
+      const next = !current;
+      if (!next) {
+        window.localStorage.setItem("eduverse.roadmap.instructions.viewed", "true");
+      }
+      return next;
+    });
   }
 
   function updateTaskInPlan(updated: RoadmapTask) {
@@ -308,6 +384,40 @@ export function RoadmapScreen() {
         </Card>
       ) : null}
 
+      <Card className="p-5">
+        <button
+          className="flex w-full items-center justify-between gap-3 text-left"
+          onClick={toggleInstructions}
+          type="button"
+        >
+          <span className="flex items-center gap-3">
+            <HelpCircle aria-hidden className="size-4 shrink-0 text-accent" />
+            <span>
+              <span className="block text-sm font-semibold">
+                {t("roadmap.instructions.title")}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {t("roadmap.instructions.summary")}
+              </span>
+            </span>
+          </span>
+          <ChevronDown
+            aria-hidden
+            className={`size-4 shrink-0 transition-transform ${instructionsOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+        {instructionsOpen ? (
+          <div className="mt-4 grid gap-3 border-t pt-4 text-xs leading-5 text-muted-foreground md:grid-cols-2">
+            <p>{t("roadmap.instructions.generatedFrom")}</p>
+            <p>{t("roadmap.instructions.officialVsPlanning")}</p>
+            <p>{t("roadmap.instructions.completeSkip")}</p>
+            <p>{t("roadmap.instructions.refresh")}</p>
+            <p>{t("roadmap.instructions.duplicates")}</p>
+            <p>{t("roadmap.instructions.missingData")}</p>
+          </div>
+        ) : null}
+      </Card>
+
       {plan && plan.readiness_snapshot.missing_data_warnings.length > 0 ? (
         <Card className="border-warning/30 bg-warning/10">
           <div className="flex items-start gap-3">
@@ -414,6 +524,16 @@ export function RoadmapScreen() {
               </ul>
             </Card>
           ) : null}
+
+          <SuggestionPanel
+            description={t("roadmap.suggestions.description")}
+            isRefreshing={isRefreshingSuggestions}
+            onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
+            onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
+            onGenerate={() => void handleRefreshSuggestions()}
+            suggestions={suggestions}
+            title={t("roadmap.suggestions.title")}
+          />
 
           <Card>
             <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

@@ -315,13 +315,45 @@ function formPayload(
   if (toList(form.apScores).length) testScores.ap = toList(form.apScores);
 
   const planned = [
-    { name: "SAT", date: form.satDate, target_score: form.satTarget },
-    { name: "IELTS", date: form.ieltsDate, target_score: form.ieltsTarget },
-    { name: "AP", date: form.apDate, target_score: form.apTarget },
+    {
+      name: "SAT",
+      exam_type: "SAT",
+      current_score: form.satScore,
+      date: form.satDate,
+      target_score: form.satTarget,
+      planned_retake: Boolean(form.satDate || form.satTarget),
+      planned_retake_month: form.satDate ? form.satDate.slice(0, 7) : "",
+      test_status: form.satDate || form.satTarget ? "preparing" : "not_started"
+    },
+    {
+      name: "IELTS",
+      exam_type: "IELTS",
+      current_score: form.ieltsScore,
+      date: form.ieltsDate,
+      target_score: form.ieltsTarget,
+      planned_retake: Boolean(form.ieltsDate || form.ieltsTarget),
+      planned_retake_month: form.ieltsDate ? form.ieltsDate.slice(0, 7) : "",
+      test_status: form.ieltsDate || form.ieltsTarget ? "preparing" : "not_started"
+    },
+    {
+      name: "AP",
+      exam_type: "AP",
+      current_score: form.apScores,
+      date: form.apDate,
+      target_score: form.apTarget,
+      planned_retake: Boolean(form.apDate || form.apTarget),
+      planned_retake_month: form.apDate ? form.apDate.slice(0, 7) : "",
+      test_status: form.apDate || form.apTarget ? "preparing" : "not_started"
+    },
     {
       name: form.otherExamName,
+      exam_type: form.otherExamName,
+      current_score: "",
       date: form.otherExamDate,
-      target_score: form.otherExamTarget
+      target_score: form.otherExamTarget,
+      planned_retake: Boolean(form.otherExamDate || form.otherExamTarget),
+      planned_retake_month: form.otherExamDate ? form.otherExamDate.slice(0, 7) : "",
+      test_status: form.otherExamDate || form.otherExamTarget ? "preparing" : "not_started"
     }
   ].filter((exam) => exam.name && (exam.date || exam.target_score));
 

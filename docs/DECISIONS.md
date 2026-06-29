@@ -225,3 +225,18 @@ Revision tasks use an update-in-place dedup strategy distinct from roadmap's `de
 `ApplicationMilestone.linked_roadmap_task` is the one new cross-service foreign key added in this phase (`application_service` → `roadmap_service`), validated so a milestone can only link to a roadmap task the same user owns. This is additive only — no field or migration was added to `roadmap_service` itself. The university detail page's Deadlines/Roadmap tabs and the applications screen instead reuse the existing `linked_university` filter on `/api/roadmap/tasks/` (already present from `ROADMAP-GENERATOR-001`) plus a newly added `university` filter on `/api/applications/`, so "show me everything tied to this university" needed zero new aggregate endpoints.
 
 Two new `University` fields, `international_office_url` and `virtual_info_session_url`, were added for the detail page's Contact tab. Like `admissions_url`/`financial_aid_url`/`application_portal_url`, they are identity-ish contact links exempt from the `UniversityFieldVerification` requirement (ADR-023) — they are simply blank, never guessed, when not on file.
+
+## ADR-026: Persistent source-aware suggestions and inactive beta pricing
+
+- **Status:** Accepted
+- **Date:** 2026-06-29
+
+EduVerse will deepen the existing admissions workflow through a persistent, rule-based suggestions layer instead of adding a broad new module. `suggestions_service` owns `SuggestedItem` records that can be dismissed or added to the roadmap, while reading existing profile, university, roadmap, essay, and application data as context. This preserves user intent (dismissed items do not immediately reappear) and makes "add to roadmap" an explicit action rather than an automatic mutation.
+
+Suggestions follow the same evidence policy as university data and roadmap tasks. Official deadlines are only shown when backed by stored source data. Student-entered tracker dates are labeled `profile_based`; computed exam windows, essay checkpoints, and document preparation dates are labeled `planning_window`; missing official data becomes a verification suggestion. No suggestion estimates admission probability, award probability, or guaranteed outcomes. No AI is used.
+
+Onboarding exam plans remain in the existing flexible `StudentProfile.exam_plans` JSON rather than introducing a new exam schema before the exam product exists. The frontend now writes richer planned-retake metadata (`exam_type`, `current_score`, `target_score`, `planned_retake`, `planned_retake_month`, `test_status`) so suggestions can generate meaningful exam planning without a migration-heavy model split.
+
+Beta pricing is explicitly inactive. The plans page may show future tiers for positioning, but paid cards are labeled Upcoming/Coming soon/Not active during beta, no checkout or upgrade CTA is shown, and all currently available beta features remain free for beta users. This supersedes any UI copy that implied active paid restrictions during beta.
+
+Demo cleanup is handled by hiding demo universities from normal suggestion/roadmap generation and labeling demo events when seeded demo data is visible. Demo accounts can keep local demo data for founder review, but normal users should see clean empty states, real university data, and source-aware suggestions.

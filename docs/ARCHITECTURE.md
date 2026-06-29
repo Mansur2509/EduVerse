@@ -78,6 +78,7 @@ Desktop navigation exposes the complete workspace in the sidebar. Mobile keeps f
 - subscriptions and usage
 - universities and sources
 - moderated events
+- source-aware admissions suggestions
 - original exam content
 - AI gateway placeholder
 
@@ -150,6 +151,16 @@ Every `RoadmapTask` is self-only (filtered by `user` in the viewset queryset, mi
 The frontend roadmap feature owns `/api/roadmap/` calls and typed roadmap data. The roadmap screen buckets the already-loaded task list into This week / This month / Later / Completed client-side rather than issuing separate paginated requests per bucket; the dedicated `/api/roadmap/tasks/` endpoint with `status`/`category`/`priority`/`linked_university`/`due_before`/`due_after` filters exists for API consumers and tests, not as the screen's primary data path.
 
 `roadmap_generator.py` also reads (read-only) `essay_service.EssayWorkspace`: an essay with status `not_started` or `needs_revision` produces a `category=essays`/`source_type=essay_status` task. This is a plain cross-service query with no new model field on either side, consistent with the synthesis-layer boundary above.
+
+## Suggestions boundary
+
+`suggestions_service` owns persistent `SuggestedItem` records under `/api/suggestions/`. It is a narrow, rule-based synthesis layer that deepens existing admissions workflows rather than adding a new destination module: the frontend renders suggestions inside Dashboard, Roadmap, Essays, Applications, and University detail pages.
+
+The service reads from `user_profile_service`, `university_service`, `roadmap_service`, `essay_service`, and `application_service`, but it does not own their data. Each suggestion carries a stable `dedup_key`, `source_type`, `evidence_note`, and optional links back to the relevant university, application, essay, or roadmap task. Dismissing and adding to roadmap are persistent state transitions on the suggestion itself.
+
+Date honesty follows the university/roadmap policy. Official deadlines are populated only from stored source-backed university or scholarship records. Student-entered tracker dates are `profile_based`, and computed exam/checkpoint dates are `planning_window`. Missing official data becomes a verification suggestion instead of a guessed deadline.
+
+`POST /api/suggestions/{id}/add-to-roadmap/` creates or reuses a self-owned `RoadmapTask` and maps the suggestion's source to the closest roadmap source type (`planning_window`, `profile_gap`, `university_deadline`, or `generated`). The suggestions layer contains no AI call, no admissions probability language, and no scholarship/admission promise.
 
 ## Essay workspace boundary
 
