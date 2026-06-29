@@ -4,7 +4,8 @@ import type {
   UniversityFilters,
   UniversityFitAnalysis
 } from "@/entities/university";
-import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
+import { ApiError, apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
+import { env } from "@/shared/config/env";
 
 function buildQuery(filters: Record<string, string | undefined>) {
   const query = new URLSearchParams();
@@ -18,11 +19,29 @@ function buildQuery(filters: Record<string, string | undefined>) {
 }
 
 export async function getUniversitiesRequest(filters: UniversityFilters = {}) {
-  const response = await apiRequest<unknown>(
-    `/universities/${buildQuery(filters)}`,
-    { base: "api" }
-  );
-  return normalizePaginatedResponse<UniversityDetails>(response, "universities");
+  const path = `/universities/${buildQuery(filters)}`;
+  try {
+    const response = await apiRequest<unknown>(path, { base: "api" });
+    // The catalog endpoint may return a bare array or a DRF `{ results: [...] }`
+    // page; normalize both. An empty list yields `{ results: [] }` so the screen
+    // shows its empty state rather than an error.
+    return normalizePaginatedResponse<UniversityDetails>(response, "universities");
+  } catch (error) {
+    // Dev-only diagnostics for the most failure-prone call (it is the first
+    // `base: "api"` request and the one that broke when the API base URL was
+    // misconfigured). Never logs auth tokens.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[universities-api] catalog load failed", {
+        requestUrl: `${env.apiBaseUrl}${path}`,
+        status: error instanceof ApiError ? error.status : undefined,
+        message: error instanceof ApiError ? error.message : String(error),
+        // `data` carries the response body preview / content-type that
+        // `parseResponse` attaches for non-JSON (e.g. a 404 HTML page).
+        responsePreview: error instanceof ApiError ? error.data : undefined
+      });
+    }
+    throw error;
+  }
 }
 
 export function getUniversityRequest(slug: string) {

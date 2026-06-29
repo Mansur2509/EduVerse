@@ -1,5 +1,30 @@
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+// The DRF default router (universities, exams, profiles, subscriptions) is
+// mounted under `/api/v1/`, so `apiBaseUrl` MUST end with `/api/v1`. A real
+// production incident came from setting NEXT_PUBLIC_API_BASE_URL to the bare
+// backend origin (e.g. `https://eduverse-vvw2.onrender.com`) without that
+// suffix: every `base: "api"` call (e.g. the university catalog) then hit
+// `<origin>/universities/` and 404'd, while auth/events/roadmap/essays/etc kept
+// working because they are rebuilt from `new URL(apiBaseUrl).origin` below.
+// Normalize defensively so the catalog loads regardless of how the env var is
+// set: keep a value that already ends with `/api/v1`, otherwise force the
+// origin + `/api/v1`.
+function normalizeApiBaseUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (/\/api\/v1$/.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    return `${new URL(trimmed).origin}/api/v1`;
+  } catch {
+    // Not an absolute URL (shouldn't happen in practice) — fall back to the
+    // documented local default rather than throwing at module load.
+    return "http://localhost:8000/api/v1";
+  }
+}
+
+const apiBaseUrl = normalizeApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1"
+);
 
 export const env = {
   apiBaseUrl,
