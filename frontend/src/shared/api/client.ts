@@ -7,13 +7,21 @@ import {
 
 // The backend runs on Render's free tier, which spins the service down after a
 // period of inactivity. The first request after a spin-down is a "cold start"
-// and can take up to ~60-90s while the container boots. Without a timeout a
-// cold start would leave the browser's fetch pending indefinitely, which is
-// what produced the "infinite spinner that never resolves" bug. We therefore
-// cap every request at REQUEST_TIMEOUT_MS: long enough to let a cold start
-// finish, but bounded so a genuinely unreachable backend surfaces a clear,
-// retryable error instead of hanging forever.
-export const REQUEST_TIMEOUT_MS = 90_000;
+// and can take ~60-90s while the container boots. Without a timeout a cold
+// start would leave the browser's fetch pending indefinitely, which is what
+// produced the "infinite spinner that never resolves" bug. We cap every
+// request at REQUEST_TIMEOUT_MS: long enough to let a cold start finish, but
+// bounded so a genuinely unreachable backend surfaces a clear, retryable error
+// instead of hanging forever.
+export const REQUEST_TIMEOUT_MS = 60_000;
+
+// A failed first request is also what *triggers* the Render wake-up. So for
+// safe, idempotent GET reads we automatically retry once on a timeout/network
+// error after a short delay: by the retry, the container is usually booting or
+// already warm, so the page self-heals through a cold start instead of forcing
+// the user to hit "Try again". Non-GET requests are never auto-retried.
+const NETWORK_RETRY_DELAY_MS = 2_500;
+const MAX_GET_NETWORK_RETRIES = 1;
 
 type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -184,20 +192,38 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
                   : base === "applications"
                     ? env.applicationsApiBaseUrl
                     : env.apiBaseUrl;
-  const response = await fetchWithTimeout(
-    `${baseUrl}${path}`,
-    {
-      ...requestOptions,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(tokens ? { Authorization: `Bearer ${tokens.access}` } : {}),
-        ...requestOptions.headers
+  const init: RequestInit = {
+    ...requestOptions,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(tokens ? { Authorization: `Bearer ${tokens.access}` } : {}),
+      ...requestOptions.headers
+    }
+  };
+  const method = (requestOptions.method ?? "GET").toUpperCase();
+  const maxNetworkRetries = method === "GET" ? MAX_GET_NETWORK_RETRIES : 0;
+
+  let response: Response;
+  let networkAttempt = 0;
+  for (;;) {
+    try {
+      response = await fetchWithTimeout(`${baseUrl}${path}`, init, timeoutMs);
+      break;
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.isNetworkError &&
+        networkAttempt < maxNetworkRetries
+      ) {
+        networkAttempt += 1;
+        await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_DELAY_MS));
+        continue;
       }
-    },
-    timeoutMs
-  );
+      throw error;
+    }
+  }
 
   if (response.status === 401 && auth && retryOnUnauthorized) {
     refreshPromise ??= refreshTokens().finally(() => {

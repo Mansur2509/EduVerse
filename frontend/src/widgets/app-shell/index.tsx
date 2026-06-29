@@ -51,8 +51,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen lg:flex lg:h-dvh lg:overflow-hidden">
-      <aside className="scrollbar-quiet hidden h-dvh w-[17rem] shrink-0 overflow-y-auto border-r border-white/10 bg-navy px-4 py-6 text-navy-foreground lg:flex lg:flex-col">
-        <Link className="mb-8 flex items-center gap-3 px-2" href="/dashboard">
+      <aside className="hidden h-dvh w-[17rem] shrink-0 flex-col border-r border-white/10 bg-navy px-4 py-6 text-navy-foreground lg:flex">
+        <Link className="mb-8 flex shrink-0 items-center gap-3 px-2" href="/dashboard">
           <span className="grid size-10 place-items-center rounded-sm border border-white/20 bg-primary font-serif text-xl font-bold text-primary-foreground">
             E
           </span>
@@ -62,50 +62,55 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
-        <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
-          {t("shell.workspaceNavigation")}
-        </p>
-        <nav aria-label={t("shell.primaryNavigation")} className="space-y-1">
-          {primaryNavigation.map((item) => (
-            <NavLink inverse item={item} key={item.href} />
-          ))}
-        </nav>
+        {/* Scrollable nav region: flex-1 + min-h-0 lets the nav scroll within the
+            sidebar when the list is taller than the viewport, while the footer
+            below stays pinned to the bottom with no dead space. */}
+        <div className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto">
+          <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
+            {t("shell.workspaceNavigation")}
+          </p>
+          <nav aria-label={t("shell.primaryNavigation")} className="space-y-1">
+            {primaryNavigation.map((item) => (
+              <NavLink inverse item={item} key={item.href} />
+            ))}
+          </nav>
 
-        {roleNavigation.length ? (
-          <>
-            <div className="my-5 border-t border-white/10" />
-            <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
-              {t("shell.roleSection")}
-            </p>
-            <nav aria-label={t("shell.roleNavigation")} className="space-y-1">
-              {roleNavigation.map((item) => (
-                <NavLink inverse item={item} key={item.href} />
-              ))}
-            </nav>
-          </>
-        ) : null}
+          {roleNavigation.length ? (
+            <>
+              <div className="my-5 border-t border-white/10" />
+              <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
+                {t("shell.roleSection")}
+              </p>
+              <nav aria-label={t("shell.roleNavigation")} className="space-y-1">
+                {roleNavigation.map((item) => (
+                  <NavLink inverse item={item} key={item.href} />
+                ))}
+              </nav>
+            </>
+          ) : null}
 
-        <div className="my-5 border-t border-white/10" />
+          <div className="my-5 border-t border-white/10" />
 
-        <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
-          {t("shell.accountSection")}
-        </p>
-        <nav aria-label={t("shell.accountNavigation")} className="space-y-1">
-          {accountNavigation.map((item) => (
-            <NavLink inverse item={item} key={item.href} />
-          ))}
-          <button
-            aria-label={t("a11y.logout")}
-            className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-            onClick={() => void logout()}
-            type="button"
-          >
-            <LogOut aria-hidden className="size-4 shrink-0" />
-            <span>{t("navigation.logout")}</span>
-          </button>
-        </nav>
+          <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
+            {t("shell.accountSection")}
+          </p>
+          <nav aria-label={t("shell.accountNavigation")} className="space-y-1">
+            {accountNavigation.map((item) => (
+              <NavLink inverse item={item} key={item.href} />
+            ))}
+            <button
+              aria-label={t("a11y.logout")}
+              className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              onClick={() => void logout()}
+              type="button"
+            >
+              <LogOut aria-hidden className="size-4 shrink-0" />
+              <span>{t("navigation.logout")}</span>
+            </button>
+          </nav>
+        </div>
 
-        <div className="mt-auto space-y-3 pt-6">
+        <div className="shrink-0 space-y-3 pt-6">
           <LanguageSwitcher inverse />
           <div className="border-t border-white/10 pt-4">
             <div className="flex items-center justify-between gap-3">

@@ -40,3 +40,6 @@ db.sqlite3
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local Claude Code preview/tooling config
+.claude/

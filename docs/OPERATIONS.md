@@ -61,10 +61,13 @@ inactivity. For a stronger free guarantee, point an external monitor
 Even with keep-alive, a cold start can still happen (e.g. first visit of the
 day). The frontend now degrades gracefully instead of hanging or going blank:
 
-- **Request timeout** — `apiRequest` caps every call at `REQUEST_TIMEOUT_MS`
-  (90s, chosen to let a cold start finish while still bounding a truly
-  unreachable backend). On timeout it throws a typed `ApiError` flagged as a
-  network error rather than hanging forever.
+- **Request timeout + auto-retry** — `apiRequest` caps every call at
+  `REQUEST_TIMEOUT_MS` (60s) and converts a timeout/network failure into a
+  typed `ApiError` rather than hanging forever. Because the first failed request
+  is also what *triggers* the Render wake-up, safe idempotent GET reads are
+  automatically retried once after ~2.5s, so a page self-heals through a cold
+  start instead of forcing the user to press "Try again". Non-GET requests are
+  never auto-retried.
 - **"Waking up" messaging** — if any load takes longer than 5s, the loading
   state adds: *"The server may be waking up. The first load after a period of
   inactivity can take up to a minute."* Applied to the auth/session gate (the
