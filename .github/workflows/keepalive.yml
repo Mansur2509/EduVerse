@@ -29,10 +29,14 @@ jobs:
       - name: Ping health endpoint
         run: |
           echo "Pinging backend health endpoint..."
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 \
-            https://eduverse-vvw2.onrender.com/api/v1/health/)
+          # Measured cold starts have taken up to ~145s, so --max-time must clear
+          # that with margin. The job's purpose is to send the wake-up request;
+          # a slow-but-eventual 200 is success, so failures here are swallowed
+          # (`|| true`) to avoid noisy false-alarm run failures on a real cold start.
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 170 \
+            https://eduverse-vvw2.onrender.com/api/v1/health/ || echo "000")
           echo "Health endpoint returned HTTP $code"
-          # Accept 200; a cold start may take a while but should still resolve.
           if [ "$code" != "200" ]; then
             echo "Warning: unexpected status $code (the service may have been cold-starting)."
           fi
+          true
