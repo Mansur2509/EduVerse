@@ -67,12 +67,16 @@ export function ApplicationsScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [applicationsResponse, shortlistResponse] = await Promise.all([
+      const [applicationsResponse, shortlistResponse] = await Promise.allSettled([
         getApplicationsRequest(),
         getShortlistRequest()
       ]);
-      setApplications(applicationsResponse.results);
-      setShortlist(shortlistResponse.results);
+      if (applicationsResponse.status === "rejected") {
+        setHasError(true);
+        return;
+      }
+      setApplications(applicationsResponse.value.results);
+      setShortlist(shortlistResponse.status === "fulfilled" ? shortlistResponse.value.results : []);
     } catch {
       setHasError(true);
     } finally {

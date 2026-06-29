@@ -4,7 +4,7 @@ import type {
   StudentProfileDetails,
   UpdateStudentProfileInput
 } from "@/entities/profile";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
 export function getProfileRequest() {
   return apiRequest<StudentProfileDetails>("/me/", {
@@ -48,10 +48,11 @@ interface ProfileItem {
   updated_at: string;
 }
 
-export function getProfileItemsRequest<T extends ProfileItem>(itemType: ItemType) {
-  return apiRequest<{ results: T[] }>(`/${itemType}/`, {
+export async function getProfileItemsRequest<T extends ProfileItem>(itemType: ItemType) {
+  const response = await apiRequest<unknown>(`/${itemType}/`, {
     base: "profile"
   });
+  return normalizePaginatedResponse<T>(response, `profile ${itemType}`);
 }
 
 export function createProfileItemRequest<T extends Partial<ProfileItem>>(itemType: ItemType, data: T) {

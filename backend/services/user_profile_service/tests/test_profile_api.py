@@ -228,7 +228,7 @@ class ProfileApiTests(APITestCase):
         self.assertEqual(gpa_response.status_code, 400)
         self.assertIn("gpa", gpa_response.data)
 
-    def test_readiness_returns_stars_without_admission_probability(self):
+    def test_readiness_returns_stars_without_outcome_estimate(self):
         self.client.force_authenticate(self.user)
         self.client.patch(
             reverse("profile:me"),
@@ -245,7 +245,7 @@ class ProfileApiTests(APITestCase):
             ("foundation", "developing", "competitive", "strong", "outstanding"),
         )
         self.assertEqual(response.data["comparison_status"], "official_data_needed")
-        self.assertNotIn("probability", response.data)
+        self.assertNotIn("admissions_outcome_estimate", response.data)
 
     def test_invalid_profile_values_are_rejected(self):
         self.client.force_authenticate(self.user)

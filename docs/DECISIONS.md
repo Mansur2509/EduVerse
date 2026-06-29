@@ -21,7 +21,7 @@ Routing and framework concerns live in `src/app`; product composition uses FSD l
 
 OpenRouter credentials and calls remain in `ai_gateway_service`. The gateway will enforce safety policy, routing, quotas, and logs.
 
-## ADR-004: Evidence categories instead of admission probability
+## ADR-004: Evidence categories instead of admissions outcome odds
 
 - **Status:** Accepted
 - **Date:** 2026-06-22
@@ -113,7 +113,7 @@ Publication requires an admin action, and moderators cannot approve or reject ev
 
 The beta shell treats the dashboard as the product command center and uses real profile completion, registration, authentication, organizer, and moderation workflows where they exist. Unfinished modules share one localized preview pattern that describes intended capabilities, the next planned feature, relevant guardrails, and a working link to an adjacent completed workflow.
 
-Preview pages must not fabricate admissions chances, university statistics, exam outcomes, activity impact, or subscription functionality. Event Map remains visibly available on the Free plan. AI appears only as a small supporting card. The `preview:beta` frontend script provides a stable local command for founder review without changing production behavior.
+Preview pages must not fabricate admissions outcome odds, university statistics, exam outcomes, activity impact, or subscription functionality. Event Map remains visibly available on the Free plan. AI appears only as a small supporting card. The `preview:beta` frontend script provides a stable local command for founder review without changing production behavior.
 
 ## ADR-016: Backend-confirmed global application gate
 
@@ -192,7 +192,7 @@ Two separation mechanisms were added, both purely additive — no existing field
 
 Many real universities intentionally have most fields `null` (Stanford withholds its acceptance rate until the Common Data Set is released; UBC and Toronto publish tuition per-program rather than as one figure; KAIST's official site could not be reached this session). This is treated as correct, honest output — never backfilled with an estimate — and is exactly what "Not verified yet" communicates in the UI.
 
-The admissions fit analysis was extended with a `limited_data_for_category` next-action: when a category is assigned from only one of the three quantitative signals (acceptance rate, GPA average, SAT average) because the other two are unverified for that university, the response says so explicitly rather than presenting a partial-data classification as a complete one. No fit-analysis terminology uses "probability," "chance," or "percentage" anywhere in code, API responses, or UI copy.
+The admissions fit analysis was extended with a `limited_data_for_category` next-action: when a category is assigned from only one of the three quantitative signals (acceptance rate, GPA average, SAT average) because the other two are unverified for that university, the response says so explicitly rather than presenting a partial-data classification as a complete one. Fit-analysis terminology uses categorical readiness language throughout code, API responses, and UI copy.
 
 ## ADR-024: Deterministic, source-aware roadmap generation with no AI
 
@@ -206,6 +206,8 @@ Generation is idempotent by design. Each generated task is assigned a stable `de
 Two date-honesty rules mirror the university-data policy in ADR-023. First, a task's `due_date` is either backed by a real source (a verified `application_deadline`/scholarship deadline, or the student's own planned exam date from their profile) or it is left null — generation never invents an official date. Second, the one controlled exception (a soft planning anchor for research/portfolio profile-gap suggestions, derived from the student's expected graduation year) is explicitly labeled `source_type=generated` with an `evidence_note` stating it is an estimated planning window, so the frontend can never present it as an official deadline. Priority similarly follows a fixed function of days-until-due (urgent ≤14, high ≤60, medium otherwise) rather than being inferred or invented.
 
 When a category is assigned to a reach-classified university but the fit analysis only had one verified statistic to work with, the roadmap surfaces a `fit_missing` task to verify the gap rather than fabricating a weak-dimension claim — the same "do not overclassify" discipline as the fit analysis itself (ADR-023) carries through to the tasks generated from it.
+
+PRODUCTION-RESCUE-004 clarified two roadmap production rules. First, a tracked application counts as a target university for generation even when the university is not separately shortlisted, so the UI does not warn the student to shortlist when their application tracker already provides target context. Second, SAT, IELTS/TOEFL, and AP suggestions created from missing or low scores use `source_type=planning_window` and evidence text that explicitly tells the student to verify official test dates; they are planning prompts, not official exam dates.
 
 ## ADR-025: Rule-based essay feedback with no ghostwriting, and a self-contained application tracker
 

@@ -59,6 +59,7 @@ class RoadmapTask(models.Model):
         FIT_ANALYSIS = "fit_analysis", "Fit analysis"
         ESSAY_STATUS = "essay_status", "Essay status"
         EXAM_PLAN = "exam_plan", "Exam plan"
+        PLANNING_WINDOW = "planning_window", "Planning window"
         EVENT = "event", "Event"
 
     user = models.ForeignKey(

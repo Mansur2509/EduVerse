@@ -79,7 +79,7 @@ export const onboardingEn = {
   "onboarding.recommendation.title": "Explore broad major clusters from your interests.",
   "onboarding.recommendation.description": "Select the subjects and working styles that feel natural. This local guide does not use AI and does not predict career outcomes.",
   "onboarding.recommendation.results": "Suggested clusters",
-  "onboarding.recommendation.disclaimer": "These are exploration prompts, not aptitude judgments or guaranteed career outcomes.",
+  "onboarding.recommendation.disclaimer": "These are exploration prompts, not aptitude judgments or certain career outcomes.",
   "onboarding.recommendation.useSelection": "Use selected majors",
   "onboarding.signal.math": "Mathematics and quantitative problems",
   "onboarding.signal.science": "Science and experiments",

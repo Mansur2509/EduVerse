@@ -1,11 +1,10 @@
 import type {
-  PaginatedResponse,
   SavedUniversity,
   UniversityDetails,
   UniversityFilters,
   UniversityFitAnalysis
 } from "@/entities/university";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
 function buildQuery(filters: Record<string, string | undefined>) {
   const query = new URLSearchParams();
@@ -18,11 +17,12 @@ function buildQuery(filters: Record<string, string | undefined>) {
   return queryString ? `?${queryString}` : "";
 }
 
-export function getUniversitiesRequest(filters: UniversityFilters = {}) {
-  return apiRequest<PaginatedResponse<UniversityDetails>>(
+export async function getUniversitiesRequest(filters: UniversityFilters = {}) {
+  const response = await apiRequest<unknown>(
     `/universities/${buildQuery(filters)}`,
     { base: "api" }
   );
+  return normalizePaginatedResponse<UniversityDetails>(response, "universities");
 }
 
 export function getUniversityRequest(slug: string) {
@@ -59,8 +59,9 @@ export function removeFromShortlistRequest(slug: string) {
   });
 }
 
-export function getShortlistRequest() {
-  return apiRequest<PaginatedResponse<SavedUniversity>>("/universities/shortlist/", {
+export async function getShortlistRequest() {
+  const response = await apiRequest<unknown>("/universities/shortlist/", {
     base: "api"
   });
+  return normalizePaginatedResponse<SavedUniversity>(response, "university shortlist");
 }

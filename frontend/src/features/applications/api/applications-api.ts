@@ -2,12 +2,11 @@ import type {
   ApplicationMilestone,
   ApplicationMilestoneInput,
   ApplicationTrackerItem,
-  ApplicationTrackerItemInput,
-  PaginatedResponse
+  ApplicationTrackerItemInput
 } from "@/entities/application";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
-export function getApplicationsRequest(filters: { status?: string; university?: string } = {}) {
+export async function getApplicationsRequest(filters: { status?: string; university?: string } = {}) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value?.trim()) {
@@ -15,9 +14,10 @@ export function getApplicationsRequest(filters: { status?: string; university?: 
     }
   }
   const queryString = query.toString();
-  return apiRequest<PaginatedResponse<ApplicationTrackerItem>>(`/${queryString ? `?${queryString}` : ""}`, {
+  const response = await apiRequest<unknown>(`/${queryString ? `?${queryString}` : ""}`, {
     base: "applications"
   });
+  return normalizePaginatedResponse<ApplicationTrackerItem>(response, "applications");
 }
 
 export function getApplicationRequest(id: number) {

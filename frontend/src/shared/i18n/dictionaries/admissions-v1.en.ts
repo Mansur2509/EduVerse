@@ -146,7 +146,7 @@ export const admissionsV1En = {
   "admissions.country.title": "Target countries",
   "admissions.country.description": "Select every destination you are seriously considering.",
   "admissions.readiness.title": "Application readiness",
-  "admissions.readiness.description": "A structured review of available profile evidence—not an admission chance.",
+  "admissions.readiness.description": "A structured review of available profile evidence, not an admissions outcome prediction.",
   "admissions.readiness.stars": "{{count}} of 5 readiness stars",
   "admissions.readiness.level.foundation": "Foundation",
   "admissions.readiness.level.developing": "Developing",

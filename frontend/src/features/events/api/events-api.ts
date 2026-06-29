@@ -1,10 +1,9 @@
 import type {
   EventDetails,
   EventFilters,
-  EventRegistration,
-  PaginatedResponse
+  EventRegistration
 } from "@/entities/event";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
 function buildEventQuery(filters: EventFilters) {
   const query = new URLSearchParams();
@@ -17,11 +16,12 @@ function buildEventQuery(filters: EventFilters) {
   return queryString ? `?${queryString}` : "";
 }
 
-export function getEventsRequest(filters: EventFilters = {}) {
-  return apiRequest<PaginatedResponse<EventDetails>>(
+export async function getEventsRequest(filters: EventFilters = {}) {
+  const response = await apiRequest<unknown>(
     `/${buildEventQuery(filters)}`,
     { base: "events" }
   );
+  return normalizePaginatedResponse<EventDetails>(response, "events");
 }
 
 export function getEventRequest(slug: string) {
@@ -47,9 +47,9 @@ export function cancelEventRegistrationRequest(slug: string) {
   );
 }
 
-export function getMyEventRegistrationsRequest() {
-  return apiRequest<PaginatedResponse<EventRegistration>>("/my-registrations/", {
+export async function getMyEventRegistrationsRequest() {
+  const response = await apiRequest<unknown>("/my-registrations/", {
     base: "events"
   });
+  return normalizePaginatedResponse<EventRegistration>(response, "event registrations");
 }
-

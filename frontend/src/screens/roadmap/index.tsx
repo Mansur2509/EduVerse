@@ -35,6 +35,9 @@ import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 
 const BUCKETS: RoadmapBucket[] = ["this_week", "this_month", "later", "completed"];
+type TaskBucketFilter = RoadmapBucket | "all";
+
+const BUCKET_FILTERS: TaskBucketFilter[] = ["all", ...BUCKETS];
 
 const emptyFilters = { category: "", priority: "", status: "", university: "" };
 
@@ -44,7 +47,7 @@ export function RoadmapScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [bucket, setBucket] = useState<RoadmapBucket>("this_week");
+  const [bucket, setBucket] = useState<TaskBucketFilter>("all");
   const [timelineMode, setTimelineMode] = useState(false);
   const [filters, setFilters] = useState(emptyFilters);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -187,7 +190,10 @@ export function RoadmapScreen() {
   }, [plan, filters]);
 
   const bucketedTasks = useMemo(
-    () => filteredTasks.filter((task) => bucketForTask(task, today) === bucket),
+    () =>
+      bucket === "all"
+        ? filteredTasks
+        : filteredTasks.filter((task) => bucketForTask(task, today) === bucket),
     [filteredTasks, bucket, today]
   );
 
@@ -219,6 +225,20 @@ export function RoadmapScreen() {
     ).length;
     return { total: tasks.length, urgent, upcoming, completed, profileGaps };
   }, [plan, today]);
+
+  const examPlanningTasks = useMemo(
+    () =>
+      (plan?.tasks ?? [])
+        .filter(
+          (task) =>
+            task.category === "exams" &&
+            task.source_type === "planning_window" &&
+            task.status !== "completed" &&
+            task.status !== "skipped"
+        )
+        .slice(0, 3),
+    [plan]
+  );
 
   if (isLoading) {
     return (
@@ -356,6 +376,45 @@ export function RoadmapScreen() {
             />
           </section>
 
+          {examPlanningTasks.length > 0 ? (
+            <Card className="p-5">
+              <div className="flex items-start gap-3">
+                <CalendarClock aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+                    {t("roadmap.examPlanning.eyebrow")}
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold">{t("roadmap.examPlanning.title")}</h2>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {t("roadmap.examPlanning.description")}
+                  </p>
+                </div>
+              </div>
+              <ul className="mt-4 grid gap-3 md:grid-cols-3">
+                {examPlanningTasks.map((task) => (
+                  <li className="rounded-sm border bg-surface p-3 text-sm" key={task.id}>
+                    <p className="font-semibold">{task.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {task.due_date
+                        ? t("roadmap.examPlanning.window", {
+                            date: formatDate(task.due_date, locale)
+                          })
+                        : t("roadmap.examPlanning.windowMissing")}
+                    </p>
+                    {task.evidence_note ? (
+                      <p className="mt-2 border-t pt-2 text-xs leading-5 text-muted-foreground">
+                        {task.evidence_note}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs font-semibold text-primary-hover">
+                      {t("roadmap.examPlanning.kept")}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           <Card>
             <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <label className="block">
@@ -452,7 +511,7 @@ export function RoadmapScreen() {
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              {BUCKETS.map((value) => (
+              {BUCKET_FILTERS.map((value) => (
                 <Button
                   key={value}
                   onClick={() => setBucket(value)}

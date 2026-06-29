@@ -64,12 +64,16 @@ export function EssaysScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [essaysResponse, shortlistResponse] = await Promise.all([
+      const [essaysResponse, shortlistResponse] = await Promise.allSettled([
         getEssaysRequest(),
         getShortlistRequest()
       ]);
-      setEssays(essaysResponse.results);
-      setShortlist(shortlistResponse.results);
+      if (essaysResponse.status === "rejected") {
+        setHasError(true);
+        return;
+      }
+      setEssays(essaysResponse.value.results);
+      setShortlist(shortlistResponse.status === "fulfilled" ? shortlistResponse.value.results : []);
     } catch {
       setHasError(true);
     } finally {

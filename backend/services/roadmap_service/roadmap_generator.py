@@ -8,9 +8,11 @@ estimated planning windows rather than presented as real deadlines.
 """
 
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 from django.utils import timezone
 
+from services.application_service.models import ApplicationTrackerItem
 from services.essay_service.models import EssayWorkspace
 from services.event_service.models import EventRegistration
 from services.event_service.services import ACTIVE_REGISTRATION_STATUSES
@@ -153,14 +155,27 @@ class RoadmapBuilder:
             .select_related("university")
             .prefetch_related("university__field_verifications", "university__scholarships")
         )
-        if not shortlisted:
+        tracked_applications = list(
+            ApplicationTrackerItem.objects.filter(user=self.user)
+            .select_related("university")
+            .prefetch_related("university__field_verifications", "university__scholarships")
+        )
+        target_universities = {saved.university_id: saved for saved in shortlisted}
+        for application in tracked_applications:
+            if application.university_id not in target_universities:
+                target_universities[application.university_id] = SimpleNamespace(
+                    university=application.university
+                )
+        targets = list(target_universities.values())
+
+        if not targets:
             warnings.append("no_shortlisted_universities")
 
-        self._profile_gaps(profile, shortlisted)
-        self._exam_gaps(profile, preferences)
-        self._university_deadlines(shortlisted)
-        self._scholarships(profile, shortlisted)
-        self._fit_analysis(profile, shortlisted)
+        self._profile_gaps(profile, targets)
+        self._exam_gaps(profile, preferences, targets)
+        self._university_deadlines(targets)
+        self._scholarships(profile, targets)
+        self._fit_analysis(profile, targets)
         self._events()
         self._essay_workspace_tasks()
 
@@ -257,14 +272,11 @@ class RoadmapBuilder:
                 evidence_note=universities_needing_essays[0].essay_requirements[:280],
             )
 
-    def _exam_gaps(self, profile, preferences):
+    def _exam_gaps(self, profile, preferences, target_universities):
         student_sat = best_sat_score(profile.test_scores)
         student_ielts = profile.test_scores.get("ielts") if isinstance(profile.test_scores, dict) else None
 
-        shortlisted_universities = [
-            s.university
-            for s in SavedUniversity.objects.filter(user=self.user).select_related("university")
-        ]
+        shortlisted_universities = [target.university for target in target_universities]
         sat_targets = [
             u.sat_p75 or u.sat_average for u in shortlisted_universities if (u.sat_p75 or u.sat_average)
         ]
@@ -276,21 +288,23 @@ class RoadmapBuilder:
                     title="Add your SAT score",
                     description="Your shortlisted universities publish SAT ranges, but your profile has no SAT score yet.",
                     category=Category.EXAMS,
+                    due_date=self.estimated_anchor(lead_days=120),
                     priority=Priority.HIGH,
-                    source_type=SourceType.PROFILE_GAP,
+                    source_type=SourceType.PLANNING_WINDOW,
                     generated_reason="No SAT score recorded while shortlisted universities publish SAT data.",
-                    evidence_note="Add your SAT score in your profile to compare against shortlisted universities.",
+                    evidence_note="Planning window only: add or schedule an SAT score check; this is not an official test date.",
                 )
             elif student_sat < strongest_target - SAT_SIGNIFICANT_GAP:
                 self.add(
                     "exam_gap:sat_improve",
-                    title="Plan to improve your SAT score",
+                    title="Plan an SAT retake window",
                     description="Your current SAT score is below the range your shortlisted universities report.",
                     category=Category.EXAMS,
+                    due_date=self.estimated_anchor(lead_days=120),
                     priority=Priority.HIGH,
-                    source_type=SourceType.FIT_ANALYSIS,
+                    source_type=SourceType.PLANNING_WINDOW,
                     generated_reason="Your SAT score is more than 100 points below a shortlisted university's reported range.",
-                    evidence_note=f"Your SAT score ({student_sat}) is below the strongest verified target ({strongest_target}) among your shortlisted universities.",
+                    evidence_note=f"Planning window only: your SAT score ({student_sat}) is below the strongest verified target ({strongest_target}) among your shortlisted universities; verify official SAT dates separately.",
                 )
 
         ielts_targets = [
@@ -304,23 +318,25 @@ class RoadmapBuilder:
                     title="Add your IELTS score",
                     description="A shortlisted university publishes a minimum IELTS requirement.",
                     category=Category.EXAMS,
+                    due_date=self.estimated_anchor(lead_days=100),
                     priority=Priority.HIGH,
-                    source_type=SourceType.PROFILE_GAP,
+                    source_type=SourceType.PLANNING_WINDOW,
                     generated_reason="No IELTS score recorded while a shortlisted university publishes a minimum requirement.",
-                    evidence_note=f"At least one shortlisted university requires a minimum IELTS score of {required}.",
+                    evidence_note=f"Planning window only: at least one shortlisted university requires a minimum IELTS score of {required}; verify official IELTS or TOEFL test dates separately.",
                 )
             else:
                 try:
                     if float(student_ielts) < required:
                         self.add(
                             "exam_gap:ielts_improve",
-                            title="Plan to improve your IELTS score",
+                            title="Plan an English exam retake window",
                             description="Your current IELTS score is below a shortlisted university's published minimum.",
                             category=Category.EXAMS,
+                            due_date=self.estimated_anchor(lead_days=100),
                             priority=Priority.HIGH,
-                            source_type=SourceType.FIT_ANALYSIS,
+                            source_type=SourceType.PLANNING_WINDOW,
                             generated_reason="Your IELTS score is below the verified minimum for a shortlisted university.",
-                            evidence_note=f"Your IELTS score ({student_ielts}) is below the required minimum ({required}).",
+                            evidence_note=f"Planning window only: your IELTS score ({student_ielts}) is below the required minimum ({required}); verify official IELTS or TOEFL test dates separately.",
                         )
                 except (TypeError, ValueError):
                     pass
@@ -331,10 +347,11 @@ class RoadmapBuilder:
                 title="Plan your AP exams",
                 description="Schedule preparation for the AP subjects you noted interest in.",
                 category=Category.EXAMS,
+                due_date=self.estimated_anchor(lead_days=150),
                 priority=Priority.MEDIUM,
-                source_type=SourceType.PROFILE_GAP,
+                source_type=SourceType.PLANNING_WINDOW,
                 generated_reason="Your profile lists AP subject interests with no associated plan yet.",
-                evidence_note=f"AP interests on file: {', '.join(preferences.ap_interests[:6])}.",
+                evidence_note=f"Planning window only: AP interests on file: {', '.join(preferences.ap_interests[:6])}. Verify official AP exam dates separately.",
             )
 
         for planned in profile.exam_plans.get("planned", []) if isinstance(profile.exam_plans, dict) else []:

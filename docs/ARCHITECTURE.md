@@ -105,13 +105,13 @@ The frontend auth feature owns login/register/logout actions and in-memory user 
 
 `user_profile_service` owns the student/applicant profile aggregate and its self-only API under `/api/profile/`. `StudentProfile` stores identity-adjacent academic context, while `UserPreference` stores reusable interests. Email and role remain owned by `auth_service` and are read-only in profile responses.
 
-Profile completion is computed from documented data-readiness dimensions instead of stored as a mutable percentage. This avoids stale derived state and keeps the meaning explicit: completion describes available profile data, not admission probability or personal merit.
+Profile completion is computed from documented data-readiness dimensions instead of stored as a mutable completion score. This avoids stale derived state and keeps the meaning explicit: completion describes available profile data, not admissions outcome likelihood or personal merit.
 
-Application readiness is computed on request from bounded profile, academic, exam, activity, essay, and timeline evidence. University-specific comparison is used only when matching published requirements and official source records exist; otherwise the API reports that official data is needed. The frontend must never convert readiness into an admission probability.
+Application readiness is computed on request from bounded profile, academic, exam, activity, essay, and timeline evidence. University-specific comparison is used only when matching published requirements and official source records exist; otherwise the API reports that official data is needed. The frontend must never convert readiness into an admissions outcome estimate.
 
 The dependency-free frontend admissions engine contains the structured major catalog, forty-question interest assessment, class suggestions, and event-type proposals. Session storage protects unfinished assessment answers, while the backend profile remains authoritative for selected majors and classes.
 
-ONBOARDING-GATE-001 expands the completion contract to required identity, academic direction, exam, preparation, activity-review, and support dimensions. The percentage remains derived, while the explicit completion timestamp records that the user reviewed and finalized the current onboarding version.
+ONBOARDING-GATE-001 expands the completion contract to required identity, academic direction, exam, preparation, activity-review, and support dimensions. The completion value remains derived, while the explicit completion timestamp records that the user reviewed and finalized the current onboarding version.
 
 Test scores use a bounded JSON object because exam systems have different score shapes and AP results can contain multiple subjects. Known SAT, IELTS, and TOEFL numeric ranges are validated; future exam-specific services may normalize these records into dedicated models when practice and scoring workflows require it.
 

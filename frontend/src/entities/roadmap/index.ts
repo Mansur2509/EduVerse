@@ -23,6 +23,7 @@ export type RoadmapSourceType =
   | "fit_analysis"
   | "essay_status"
   | "exam_plan"
+  | "planning_window"
   | "event";
 
 export type RoadmapTask = {

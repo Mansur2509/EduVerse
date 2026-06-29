@@ -1,13 +1,12 @@
 import type {
   GenerateRoadmapResponse,
   ManualRoadmapTaskInput,
-  PaginatedResponse,
   RoadmapPlanResponse,
   RoadmapTask,
   RoadmapTaskFilters,
   RoadmapTaskUpdateInput
 } from "@/entities/roadmap";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
 function buildQuery(filters: Record<string, string | undefined>) {
   const query = new URLSearchParams();
@@ -31,10 +30,11 @@ export function generateRoadmapRequest() {
   });
 }
 
-export function getRoadmapTasksRequest(filters: RoadmapTaskFilters = {}) {
-  return apiRequest<PaginatedResponse<RoadmapTask>>(`/tasks/${buildQuery(filters)}`, {
+export async function getRoadmapTasksRequest(filters: RoadmapTaskFilters = {}) {
+  const response = await apiRequest<unknown>(`/tasks/${buildQuery(filters)}`, {
     base: "roadmap"
   });
+  return normalizePaginatedResponse<RoadmapTask>(response, "roadmap tasks");
 }
 
 export function createRoadmapTaskRequest(input: ManualRoadmapTaskInput) {

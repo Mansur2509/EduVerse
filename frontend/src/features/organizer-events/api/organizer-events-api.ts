@@ -3,10 +3,9 @@ import type {
   EventModerationLog,
   OrganizerEvent,
   OrganizerEventInput,
-  OrganizerParticipant,
-  PaginatedResponse
+  OrganizerParticipant
 } from "@/entities/event";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
 export function getOrganizerEventCategoriesRequest() {
   return apiRequest<EventCategory[]>("/event-categories/", {
@@ -14,10 +13,11 @@ export function getOrganizerEventCategoriesRequest() {
   });
 }
 
-export function getOrganizerEventsRequest() {
-  return apiRequest<PaginatedResponse<OrganizerEvent>>("/events/", {
+export async function getOrganizerEventsRequest() {
+  const response = await apiRequest<unknown>("/events/", {
     base: "organizer"
   });
+  return normalizePaginatedResponse<OrganizerEvent>(response, "organizer events");
 }
 
 export function createOrganizerEventRequest(input: OrganizerEventInput) {
@@ -67,17 +67,19 @@ export function cancelOrganizerEventRequest(slug: string) {
   return postOrganizerEventAction(slug, "cancel");
 }
 
-export function getOrganizerEventParticipantsRequest(slug: string) {
-  return apiRequest<PaginatedResponse<OrganizerParticipant>>(
+export async function getOrganizerEventParticipantsRequest(slug: string) {
+  const response = await apiRequest<unknown>(
     `/events/${encodeURIComponent(slug)}/registrations/`,
     { base: "organizer" }
   );
+  return normalizePaginatedResponse<OrganizerParticipant>(response, "event participants");
 }
 
-export function getPendingEventsRequest() {
-  return apiRequest<PaginatedResponse<OrganizerEvent>>("/pending/", {
+export async function getPendingEventsRequest() {
+  const response = await apiRequest<unknown>("/pending/", {
     base: "moderation"
   });
+  return normalizePaginatedResponse<OrganizerEvent>(response, "moderation events");
 }
 
 export function approveEventRequest(slug: string) {

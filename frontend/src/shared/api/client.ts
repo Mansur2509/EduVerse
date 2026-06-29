@@ -58,6 +58,13 @@ export class ApiError extends Error {
 
 let refreshPromise: Promise<AuthTokens | null> | null = null;
 
+export type PaginatedListResponse<Item> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Item[];
+};
+
 function getErrorMessage(data: unknown, fallback: string) {
   if (typeof data === "object" && data !== null) {
     const detail = Reflect.get(data, "detail");
@@ -76,16 +83,65 @@ function getErrorMessage(data: unknown, fallback: string) {
   return fallback;
 }
 
+function summarizePayload(data: unknown): string {
+  if (data === undefined) return "empty";
+  if (data === null) return "null";
+  if (Array.isArray(data)) return `array(${data.length})`;
+  if (typeof data === "object") {
+    const keys = Object.keys(data as Record<string, unknown>).slice(0, 8);
+    return `object(${keys.join(",")})`;
+  }
+  return typeof data;
+}
+
+function logApiDiagnostic(url: string, status: number, data: unknown) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+  console.info("[eduverse-api]", {
+    url,
+    status,
+    payload: summarizePayload(data)
+  });
+}
+
 async function parseResponse(response: Response): Promise<unknown> {
   if (response.status === 204) {
     return undefined;
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    return response.json();
+  const text = await response.text();
+  if (!text.trim()) {
+    return undefined;
   }
-  return response.text();
+
+  if (!contentType.includes("application/json")) {
+    throw new ApiError(
+      `EduVerse API returned ${contentType || "an unknown content type"} instead of JSON.`,
+      response.status,
+      {
+        contentType,
+        body: text.slice(0, 500)
+      }
+    );
+  }
+
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new ApiError(
+        "EduVerse API returned invalid JSON.",
+        response.status,
+        {
+          contentType,
+          body: text.slice(0, 500)
+        }
+      );
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -94,7 +150,7 @@ async function parseResponse(response: Response): Promise<unknown> {
  * caller gets a consistent, retryable error shape instead of a raw TypeError or
  * an indefinite hang.
  */
-async function fetchWithTimeout(
+export async function withTimeout(
   input: string,
   init: RequestInit,
   timeoutMs: number
@@ -131,7 +187,7 @@ async function refreshTokens(): Promise<AuthTokens | null> {
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(
+    response = await withTimeout(
       `${env.authApiBaseUrl}/token/refresh/`,
       {
         method: "POST",
@@ -204,12 +260,13 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   };
   const method = (requestOptions.method ?? "GET").toUpperCase();
   const maxNetworkRetries = method === "GET" ? MAX_GET_NETWORK_RETRIES : 0;
+  const url = `${baseUrl}${path}`;
 
   let response: Response;
   let networkAttempt = 0;
   for (;;) {
     try {
-      response = await fetchWithTimeout(`${baseUrl}${path}`, init, timeoutMs);
+      response = await withTimeout(url, init, timeoutMs);
       break;
     } catch (error) {
       if (
@@ -239,6 +296,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   }
 
   const data = await parseResponse(response);
+  logApiDiagnostic(url, response.status, data);
   if (!response.ok) {
     if (response.status === 401 && auth) {
       authStorage.clear();
@@ -273,4 +331,48 @@ export function getApiErrorMessage(
 
 export function isNetworkError(error: unknown): boolean {
   return error instanceof ApiError && error.isNetworkError;
+}
+
+export function isPaginatedResponse<Item>(
+  data: unknown
+): data is PaginatedListResponse<Item> {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    Array.isArray(Reflect.get(data, "results")) &&
+    typeof Reflect.get(data, "count") === "number"
+  );
+}
+
+export function normalizeListResponse<Item>(
+  data: unknown,
+  endpointName = "list endpoint"
+): Item[] {
+  if (Array.isArray(data)) {
+    return data as Item[];
+  }
+  if (isPaginatedResponse<Item>(data)) {
+    return data.results;
+  }
+  throw new ApiError(
+    `EduVerse API payload mismatch for ${endpointName}: expected an array or a paginated results object.`,
+    0,
+    data
+  );
+}
+
+export function normalizePaginatedResponse<Item>(
+  data: unknown,
+  endpointName = "list endpoint"
+): PaginatedListResponse<Item> {
+  if (isPaginatedResponse<Item>(data)) {
+    return data;
+  }
+  const results = normalizeListResponse<Item>(data, endpointName);
+  return {
+    count: results.length,
+    next: null,
+    previous: null,
+    results
+  };
 }

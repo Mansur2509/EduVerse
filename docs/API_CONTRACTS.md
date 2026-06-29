@@ -235,7 +235,7 @@ The response also includes mandatory onboarding state:
 
 ### GET `/api/profile/readiness/`
 
-Authenticated. Returns a computed evidence summary, never an admission chance:
+Authenticated. Returns a computed evidence summary, never an admissions outcome estimate:
 
 ```json
 {
@@ -494,7 +494,7 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | GET/PATCH | `/api/auth/me/` | Authenticated | Current user, basic profile, and plan |
 | GET/PATCH | `/api/profile/me/` | Authenticated | Current user's full student profile |
 | GET | `/api/profile/completion/` | Authenticated | Computed profile data completion |
-| GET | `/api/profile/readiness/` | Authenticated | Evidence-based 1–5 readiness summary; never an admission probability |
+| GET | `/api/profile/readiness/` | Authenticated | Evidence-based 1-5 readiness summary; never an admissions outcome estimate |
 | POST | `/api/profile/complete-onboarding/` | Authenticated | Finalize mandatory onboarding when requirements are satisfied |
 | GET | `/api/events/` | Authenticated | Published public event catalog |
 | GET | `/api/events/{slug}/` | Authenticated | Published public event detail |
@@ -552,7 +552,7 @@ Any University field with no confirmed source is left `null`/blank and rendered 
 
 `international_office_url` and `virtual_info_session_url` are identity-ish contact links (same exemption as `admissions_url`/`financial_aid_url`/`application_portal_url`) shown on the university detail page's Contact tab; they do not require a `field_verifications` entry and are simply blank when unknown.
 
-The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) only ever compares `acceptance_rate`, `gpa_average`, and `sat_average` against the caller's profile. It returns `category: null` when none of those three are verified for either side, and adds a `limited_data_for_category` next-action when a category is assigned from only one of the three. It never uses the words "probability", "chance", or "percentage"; response keys and UI copy use "fit", "category" (`reach`/`competitive`/`target`/`safety`), "strengths", "risks", "missing_fields", and "next_actions" instead.
+The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) only ever compares `acceptance_rate`, `gpa_average`, and `sat_average` against the caller's profile. It returns `category: null` when none of those three are verified for either side, and adds a `limited_data_for_category` next-action when a category is assigned from only one of the three. Response keys and UI copy use "fit", "category" (`reach`/`competitive`/`target`/`safety`), "strengths", "risks", "missing_fields", and "next_actions" instead of admissions-odds language.
 
 ## Roadmap response shapes
 

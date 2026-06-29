@@ -3,13 +3,13 @@ import type {
   EssayRevisionTask,
   EssayRevisionTaskInput,
   EssayWorkspace,
-  EssayWorkspaceInput,
-  PaginatedResponse
+  EssayWorkspaceInput
 } from "@/entities/essay";
-import { apiRequest } from "@/shared/api/client";
+import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
-export function getEssaysRequest() {
-  return apiRequest<PaginatedResponse<EssayWorkspace>>("/", { base: "essays" });
+export async function getEssaysRequest() {
+  const response = await apiRequest<unknown>("/", { base: "essays" });
+  return normalizePaginatedResponse<EssayWorkspace>(response, "essays");
 }
 
 export function getEssayRequest(id: number) {

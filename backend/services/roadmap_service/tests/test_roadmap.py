@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from services.application_service.models import ApplicationTrackerItem
 from services.roadmap_service.models import RoadmapPlan, RoadmapTask
 from services.roadmap_service.roadmap_generator import generate_roadmap
 from services.university_service.models import (
@@ -123,6 +124,40 @@ class RoadmapGenerationTests(APITestCase):
             self.assertEqual(task.linked_university_id, university.id)
         final_task = deadline_tasks.get(dedup_key=f"university_deadline:{university.id}:final")
         self.assertEqual(final_task.due_date, deadline)
+
+    def test_application_tracker_counts_as_target_for_roadmap_generation(self):
+        deadline = self.today + timedelta(days=90)
+        university = create_university(
+            "tracked-deadline-university",
+            application_deadline=deadline,
+        )
+        ApplicationTrackerItem.objects.create(user=self.user, university=university)
+
+        plan, warnings = generate_roadmap(self.user)
+
+        self.assertNotIn("no_shortlisted_universities", warnings)
+        self.assertTrue(
+            plan.tasks.filter(
+                dedup_key=f"university_deadline:{university.id}:final",
+                linked_university=university,
+            ).exists()
+        )
+
+    def test_sat_gap_uses_planning_window_not_official_date(self):
+        profile, _ = ensure_profile_records(self.user)
+        profile.expected_graduation_year = self.today.year + 2
+        profile.test_scores = {"sat": 1200}
+        profile.save()
+        university = create_university("sat-target-university", sat_p75=1500)
+        SavedUniversity.objects.create(user=self.user, university=university)
+
+        plan, _ = generate_roadmap(self.user)
+        task = plan.tasks.get(dedup_key="exam_gap:sat_improve")
+
+        self.assertEqual(task.source_type, RoadmapTask.SourceType.PLANNING_WINDOW)
+        self.assertIsNotNone(task.due_date)
+        self.assertEqual(task.source_url, "")
+        self.assertIn("Planning window only", task.evidence_note)
 
     def test_no_invented_deadline_when_university_deadline_missing(self):
         university = create_university("no-deadline-university", application_deadline=None)
