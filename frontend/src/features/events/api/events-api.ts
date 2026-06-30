@@ -5,20 +5,29 @@ import type {
 } from "@/entities/event";
 import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
-function buildEventQuery(filters: EventFilters) {
+type PaginationParams = {
+  page?: number;
+  page_size?: number;
+};
+
+function buildEventQuery(filters: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (value?.trim()) {
-      query.set(key, value.trim());
+    const normalized = typeof value === "number" ? String(value) : value?.trim();
+    if (normalized) {
+      query.set(key, normalized);
     }
   }
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
 
-export async function getEventsRequest(filters: EventFilters = {}) {
+export async function getEventsRequest(
+  filters: EventFilters = {},
+  pagination: PaginationParams = {}
+) {
   const response = await apiRequest<unknown>(
-    `/${buildEventQuery(filters)}`,
+    `/${buildEventQuery({ ...filters, ...pagination })}`,
     { base: "events" }
   );
   return normalizePaginatedResponse<EventDetails>(response, "events");
@@ -47,8 +56,8 @@ export function cancelEventRegistrationRequest(slug: string) {
   );
 }
 
-export async function getMyEventRegistrationsRequest() {
-  const response = await apiRequest<unknown>("/my-registrations/", {
+export async function getMyEventRegistrationsRequest(pagination: PaginationParams = {}) {
+  const response = await apiRequest<unknown>(`/my-registrations/${buildEventQuery(pagination)}`, {
     base: "events"
   });
   return normalizePaginatedResponse<EventRegistration>(response, "event registrations");

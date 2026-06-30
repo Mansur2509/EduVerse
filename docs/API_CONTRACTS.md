@@ -272,6 +272,7 @@ Authenticated. Marks onboarding complete only when `can_complete=true`. Returns 
 - JSON fields use `snake_case`.
 - Timestamps use ISO 8601 UTC.
 - List endpoints use `count`, `next`, `previous`, and `results`.
+- Paginated list endpoints accept `page` and `page_size`; the shared backend cap remains `max_page_size=100`. The frontend uses `page_size=21` for standard card/list pages so desktop grids show up to 3 columns x 7 rows per page.
 - Product reads require authentication, including published universities, events, exams, and questions.
 - Writes are denied unless the endpoint and role explicitly allow them.
 

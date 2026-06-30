@@ -43,6 +43,7 @@ import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { DEFAULT_PAGE_SIZE, PaginatedGrid, PaginatedList } from "@/shared/ui/pagination";
 
 const BUCKETS: RoadmapBucket[] = ["this_week", "this_month", "later", "completed"];
 type TaskBucketFilter = RoadmapBucket | "all";
@@ -60,6 +61,7 @@ export function RoadmapScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [bucket, setBucket] = useState<TaskBucketFilter>("all");
   const [timelineMode, setTimelineMode] = useState(false);
+  const [taskPage, setTaskPage] = useState(1);
   const [filters, setFilters] = useState(emptyFilters);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<RoadmapTask | null>(null);
@@ -285,6 +287,26 @@ export function RoadmapScreen() {
         }),
     [filteredTasks]
   );
+  const activeTaskList = timelineMode ? timelineTasks : bucketedTasks;
+  const totalTaskPages = Math.max(1, Math.ceil(activeTaskList.length / DEFAULT_PAGE_SIZE));
+  const visibleTimelineTasks = timelineTasks.slice(
+    (taskPage - 1) * DEFAULT_PAGE_SIZE,
+    taskPage * DEFAULT_PAGE_SIZE
+  );
+  const visibleBucketedTasks = bucketedTasks.slice(
+    (taskPage - 1) * DEFAULT_PAGE_SIZE,
+    taskPage * DEFAULT_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setTaskPage(1);
+  }, [filters, bucket, timelineMode]);
+
+  useEffect(() => {
+    if (taskPage > totalTaskPages) {
+      setTaskPage(totalTaskPages);
+    }
+  }, [taskPage, totalTaskPages]);
 
   const overview = useMemo(() => {
     const tasks = plan?.tasks ?? [];
@@ -661,16 +683,23 @@ export function RoadmapScreen() {
               {timelineTasks.length === 0 ? (
                 <p className="mt-3 text-sm text-muted-foreground">{t("roadmap.states.emptyFilter")}</p>
               ) : (
-                <ol className="mt-3 space-y-2">
-                  {timelineTasks.map((task) => (
-                    <li className="flex items-center gap-3 border-l-2 border-primary pl-3 text-sm" key={task.id}>
+                <PaginatedList
+                  className="mt-3"
+                  currentPage={taskPage}
+                  getItemKey={(task) => task.id}
+                  items={visibleTimelineTasks}
+                  onPageChange={setTaskPage}
+                  totalCount={timelineTasks.length}
+                  totalPages={totalTaskPages}
+                  renderItem={(task) => (
+                    <div className="flex items-center gap-3 border-l-2 border-primary pl-3 text-sm">
                       <span className="w-24 shrink-0 text-xs text-muted-foreground">
                         {task.due_date ? formatDate(task.due_date, locale) : t("roadmap.timeline.noDate")}
                       </span>
                       <span className="font-semibold">{task.title}</span>
-                    </li>
-                  ))}
-                </ol>
+                    </div>
+                  )}
+                />
               )}
             </Card>
           ) : bucketedTasks.length === 0 ? (
@@ -678,19 +707,24 @@ export function RoadmapScreen() {
               <p className="text-sm text-muted-foreground">{t("roadmap.states.emptyFilter")}</p>
             </Card>
           ) : (
-            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {bucketedTasks.map((task) => (
+            <PaginatedGrid
+              currentPage={taskPage}
+              getItemKey={(task) => task.id}
+              items={visibleBucketedTasks}
+              onPageChange={setTaskPage}
+              totalCount={bucketedTasks.length}
+              totalPages={totalTaskPages}
+              renderItem={(task) => (
                 <RoadmapTaskCardWithDelete
                   isPending={pendingTaskId === task.id}
-                  key={task.id}
                   onComplete={(item) => void handleComplete(item)}
                   onDelete={(item) => void handleDelete(item)}
                   onEdit={openEditForm}
                   onSkip={(item) => void handleSkip(item)}
                   task={task}
                 />
-              ))}
-            </section>
+              )}
+            />
           )}
         </>
       )}

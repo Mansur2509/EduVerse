@@ -19,10 +19,13 @@ import { useI18n } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 
 export function OrganizerEventsScreen() {
   const { locale, t } = useI18n();
   const [events, setEvents] = useState<OrganizerEvent[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [actionSlug, setActionSlug] = useState<string | null>(null);
@@ -33,14 +36,15 @@ export function OrganizerEventsScreen() {
     setHasError(false);
     try {
       const response: PaginatedResponse<OrganizerEvent> =
-        await getOrganizerEventsRequest();
+        await getOrganizerEventsRequest({ page: currentPage, page_size: DEFAULT_PAGE_SIZE });
       setEvents(response.results);
+      setTotalCount(response.count);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => {
     void loadEvents();
@@ -53,6 +57,9 @@ export function OrganizerEventsScreen() {
       ["draft", "rejected"].includes(event.status)
     ).length
   };
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
+  const pageStart = totalCount ? (currentPage - 1) * DEFAULT_PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(pageStart + Math.max(events.length, 1) - 1, totalCount);
 
   async function runAction(
     event: OrganizerEvent,
@@ -122,7 +129,7 @@ export function OrganizerEventsScreen() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              [t("organizer.statusSummary.total"), events.length],
+              [t("organizer.statusSummary.total"), totalCount],
               [t("organizer.statusSummary.pending"), statusCounts.pending],
               [t("organizer.statusSummary.published"), statusCounts.published],
               [t("organizer.statusSummary.needsAction"), statusCounts.needsAction]
@@ -161,12 +168,20 @@ export function OrganizerEventsScreen() {
           </p>
         </Card>
       ) : (
-        <section
-          aria-label={t("organizer.list.results")}
-          className="grid gap-5 xl:grid-cols-2"
-        >
-          {events.map((event) => (
-            <Card className="flex flex-col" key={event.id}>
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-muted-foreground">
+            {t("pagination.showingRange", {
+              start: pageStart,
+              end: pageEnd,
+              total: totalCount
+            })}
+          </p>
+          <section
+            aria-label={t("organizer.list.results")}
+            className="grid gap-5 xl:grid-cols-2"
+          >
+            {events.map((event) => (
+              <Card className="flex flex-col" key={event.id}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <ModerationStatusBadge status={event.status} />
                 <span className="text-xs text-muted-foreground">
@@ -258,9 +273,19 @@ export function OrganizerEventsScreen() {
                   </Button>
                 ) : null}
               </div>
-            </Card>
-          ))}
-        </section>
+              </Card>
+            ))}
+          </section>
+          {totalPages > 1 ? (
+            <PaginationControls
+              currentPage={currentPage}
+              onNext={() => setCurrentPage((page) => page + 1)}
+              onPageSelect={setCurrentPage}
+              onPrevious={() => setCurrentPage((page) => page - 1)}
+              totalPages={totalPages}
+            />
+          ) : null}
+        </div>
       )}
     </div>
   );

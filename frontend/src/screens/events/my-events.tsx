@@ -8,10 +8,13 @@ import { getMyEventRegistrationsRequest } from "@/features/events";
 import { useI18n } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
 
 export function MyEventsScreen() {
   const { t } = useI18n();
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -19,18 +22,24 @@ export function MyEventsScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const response = await getMyEventRegistrationsRequest();
+      const response = await getMyEventRegistrationsRequest({
+        page: currentPage,
+        page_size: DEFAULT_PAGE_SIZE
+      });
       setRegistrations(response.results);
+      setTotalCount(response.count);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => {
     void loadRegistrations();
   }, [loadRegistrations]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -68,11 +77,15 @@ export function MyEventsScreen() {
           </Button>
         </Card>
       ) : (
-        <section aria-label={t("events.my.results")} className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {registrations.map((registration) => (
-            <EventCard event={registration.event} key={registration.id} />
-          ))}
-        </section>
+        <PaginatedGrid
+          currentPage={currentPage}
+          getItemKey={(registration) => registration.id}
+          items={registrations}
+          onPageChange={setCurrentPage}
+          renderItem={(registration) => <EventCard event={registration.event} />}
+          totalCount={totalCount}
+          totalPages={totalPages}
+        />
       )}
     </div>
   );

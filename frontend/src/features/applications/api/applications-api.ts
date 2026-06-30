@@ -6,11 +6,19 @@ import type {
 } from "@/entities/application";
 import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
-export async function getApplicationsRequest(filters: { status?: string; university?: string } = {}) {
+type ApplicationListParams = {
+  status?: string;
+  university?: string;
+  page?: number;
+  page_size?: number;
+};
+
+export async function getApplicationsRequest(filters: ApplicationListParams = {}) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (value?.trim()) {
-      query.set(key, value.trim());
+    const normalized = typeof value === "number" ? String(value) : value?.trim();
+    if (normalized) {
+      query.set(key, normalized);
     }
   }
   const queryString = query.toString();

@@ -17,11 +17,14 @@ import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 
 export function OrganizerParticipantsScreen({ slug }: { slug: string }) {
   const { locale, t } = useI18n();
   const [event, setEvent] = useState<OrganizerEvent | null>(null);
   const [participants, setParticipants] = useState<OrganizerParticipant[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -31,18 +34,22 @@ export function OrganizerParticipantsScreen({ slug }: { slug: string }) {
     try {
       const [eventResponse, participantResponse] = await Promise.all([
         getOrganizerEventRequest(slug),
-        getOrganizerEventParticipantsRequest(slug)
+        getOrganizerEventParticipantsRequest(slug, {
+          page: currentPage,
+          page_size: DEFAULT_PAGE_SIZE
+        })
       ]);
       setEvent(eventResponse);
       setParticipants(
         (participantResponse as PaginatedResponse<OrganizerParticipant>).results
       );
+      setTotalCount((participantResponse as PaginatedResponse<OrganizerParticipant>).count);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [slug]);
+  }, [slug, currentPage]);
 
   useEffect(() => {
     void load();
@@ -71,6 +78,10 @@ export function OrganizerParticipantsScreen({ slug }: { slug: string }) {
     );
   }
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
+  const pageStart = totalCount ? (currentPage - 1) * DEFAULT_PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(pageStart + Math.max(participants.length, 1) - 1, totalCount);
+
   return (
     <div className="space-y-6">
       <section className="rounded-sm border bg-card p-6 shadow-card sm:p-9">
@@ -82,7 +93,7 @@ export function OrganizerParticipantsScreen({ slug }: { slug: string }) {
             <h1 className="text-3xl font-semibold sm:text-5xl">{event.title}</h1>
             <p className="mt-4 text-muted-foreground">
               {t("organizer.participants.count", {
-                count: participants.length
+                count: totalCount
               })}
             </p>
           </div>
@@ -109,9 +120,17 @@ export function OrganizerParticipantsScreen({ slug }: { slug: string }) {
           </p>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-sm border bg-card shadow-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[48rem] text-left text-sm">
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-muted-foreground">
+            {t("pagination.showingRange", {
+              start: pageStart,
+              end: pageEnd,
+              total: totalCount
+            })}
+          </p>
+          <div className="overflow-hidden rounded-sm border bg-card shadow-card">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[48rem] text-left text-sm">
               <thead className="border-b bg-elevated/65 text-xs uppercase tracking-[0.1em] text-muted-foreground">
                 <tr>
                   <th className="px-5 py-4">{t("organizer.participants.name")}</th>
@@ -144,8 +163,18 @@ export function OrganizerParticipantsScreen({ slug }: { slug: string }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
+          {totalPages > 1 ? (
+            <PaginationControls
+              currentPage={currentPage}
+              onNext={() => setCurrentPage((page) => page + 1)}
+              onPageSelect={setCurrentPage}
+              onPrevious={() => setCurrentPage((page) => page - 1)}
+              totalPages={totalPages}
+            />
+          ) : null}
         </div>
       )}
 

@@ -17,6 +17,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
 
 const emptyFilters: EventFilters = {
   search: "",
@@ -33,6 +34,8 @@ export function EventsScreen() {
   const [filters, setFilters] = useState<EventFilters>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<EventFilters>(emptyFilters);
   const [events, setEvents] = useState<EventDetails[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -40,14 +43,18 @@ export function EventsScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const response = await getEventsRequest(appliedFilters);
+      const response = await getEventsRequest(appliedFilters, {
+        page: currentPage,
+        page_size: DEFAULT_PAGE_SIZE
+      });
       setEvents(response.results);
+      setTotalCount(response.count);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, currentPage]);
 
   useEffect(() => {
     void loadEvents();
@@ -55,13 +62,17 @@ export function EventsScreen() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCurrentPage(1);
     setAppliedFilters(filters);
   }
 
   function clearFilters() {
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    setCurrentPage(1);
   }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -231,11 +242,15 @@ export function EventsScreen() {
           </p>
         </Card>
       ) : (
-        <section aria-label={t("events.list.results")} className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {events.map((event) => (
-            <EventCard event={event} key={event.id} />
-          ))}
-        </section>
+        <PaginatedGrid
+          currentPage={currentPage}
+          getItemKey={(event) => event.id}
+          items={events}
+          onPageChange={setCurrentPage}
+          renderItem={(event) => <EventCard event={event} />}
+          totalCount={totalCount}
+          totalPages={totalPages}
+        />
       )}
 
       <p className="text-xs leading-5 text-muted-foreground">{t("events.disclaimer")}</p>

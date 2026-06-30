@@ -7,8 +7,24 @@ import type {
 } from "@/entities/essay";
 import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
-export async function getEssaysRequest() {
-  const response = await apiRequest<unknown>("/", { base: "essays" });
+type EssayListParams = {
+  page?: number;
+  page_size?: number;
+};
+
+function buildQuery(params: EssayListParams) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      query.set(key, String(value));
+    }
+  }
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
+export async function getEssaysRequest(params: EssayListParams = {}) {
+  const response = await apiRequest<unknown>(`/${buildQuery(params)}`, { base: "essays" });
   return normalizePaginatedResponse<EssayWorkspace>(response, "essays");
 }
 

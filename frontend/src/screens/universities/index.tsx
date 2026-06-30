@@ -11,6 +11,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
 
 const emptyFilters: UniversityFilters = {
   search: "",
@@ -29,6 +30,8 @@ export function UniversitiesScreen() {
   const [filters, setFilters] = useState<UniversityFilters>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<UniversityFilters>(emptyFilters);
   const [universities, setUniversities] = useState<UniversityDetails[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [shortlistOnly, setShortlistOnly] = useState(false);
@@ -39,14 +42,18 @@ export function UniversitiesScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const response = await getUniversitiesRequest(appliedFilters);
+      const response = await getUniversitiesRequest(appliedFilters, {
+        page: currentPage,
+        page_size: DEFAULT_PAGE_SIZE
+      });
       setUniversities(response.results);
+      setTotalCount(response.count);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, currentPage]);
 
   useEffect(() => {
     void loadUniversities();
@@ -54,12 +61,14 @@ export function UniversitiesScreen() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCurrentPage(1);
     setAppliedFilters(filters);
   }
 
   function clearFilters() {
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    setCurrentPage(1);
     setShortlistOnly(false);
   }
 
@@ -102,6 +111,7 @@ export function UniversitiesScreen() {
   const visibleUniversities = shortlistOnly
     ? universities.filter((university) => university.is_shortlisted)
     : universities;
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -250,11 +260,14 @@ export function UniversitiesScreen() {
           </p>
         </Card>
       ) : (
-        <section
-          aria-label={t("universities.list.results")}
-          className="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
-        >
-          {visibleUniversities.map((university) => (
+        <PaginatedGrid
+          currentPage={currentPage}
+          getItemKey={(university) => university.id}
+          items={visibleUniversities}
+          onPageChange={setCurrentPage}
+          totalCount={shortlistOnly ? visibleUniversities.length : totalCount}
+          totalPages={shortlistOnly ? 1 : totalPages}
+          renderItem={(university) => (
             <UniversityCard
               canSelectCompare={compareIds.length < MAX_COMPARE}
               isCompareSelected={compareIds.includes(university.id)}
@@ -264,8 +277,8 @@ export function UniversitiesScreen() {
               onToggleShortlist={(item) => void toggleShortlist(item)}
               university={university}
             />
-          ))}
-        </section>
+          )}
+        />
       )}
 
       <p className="text-xs leading-5 text-muted-foreground">{t("universities.disclaimer")}</p>

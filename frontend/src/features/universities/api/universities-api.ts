@@ -7,19 +7,28 @@ import type {
 import { ApiError, apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 import { env } from "@/shared/config/env";
 
-function buildQuery(filters: Record<string, string | undefined>) {
+type PaginationParams = {
+  page?: number;
+  page_size?: number;
+};
+
+function buildQuery(filters: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (value?.trim()) {
-      query.set(key, value.trim());
+    const normalized = typeof value === "number" ? String(value) : value?.trim();
+    if (normalized) {
+      query.set(key, normalized);
     }
   }
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
 
-export async function getUniversitiesRequest(filters: UniversityFilters = {}) {
-  const path = `/universities/${buildQuery(filters)}`;
+export async function getUniversitiesRequest(
+  filters: UniversityFilters = {},
+  pagination: PaginationParams = {}
+) {
+  const path = `/universities/${buildQuery({ ...filters, ...pagination })}`;
   try {
     const response = await apiRequest<unknown>(path, { base: "api" });
     // The catalog endpoint may return a bare array or a DRF `{ results: [...] }`

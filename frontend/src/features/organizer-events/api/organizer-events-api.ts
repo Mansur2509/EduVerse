@@ -7,14 +7,30 @@ import type {
 } from "@/entities/event";
 import { apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
+type PaginationParams = {
+  page?: number;
+  page_size?: number;
+};
+
+function buildQuery(params: PaginationParams) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      query.set(key, String(value));
+    }
+  }
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
 export function getOrganizerEventCategoriesRequest() {
   return apiRequest<EventCategory[]>("/event-categories/", {
     base: "organizer"
   });
 }
 
-export async function getOrganizerEventsRequest() {
-  const response = await apiRequest<unknown>("/events/", {
+export async function getOrganizerEventsRequest(params: PaginationParams = {}) {
+  const response = await apiRequest<unknown>(`/events/${buildQuery(params)}`, {
     base: "organizer"
   });
   return normalizePaginatedResponse<OrganizerEvent>(response, "organizer events");
@@ -67,16 +83,19 @@ export function cancelOrganizerEventRequest(slug: string) {
   return postOrganizerEventAction(slug, "cancel");
 }
 
-export async function getOrganizerEventParticipantsRequest(slug: string) {
+export async function getOrganizerEventParticipantsRequest(
+  slug: string,
+  params: PaginationParams = {}
+) {
   const response = await apiRequest<unknown>(
-    `/events/${encodeURIComponent(slug)}/registrations/`,
+    `/events/${encodeURIComponent(slug)}/registrations/${buildQuery(params)}`,
     { base: "organizer" }
   );
   return normalizePaginatedResponse<OrganizerParticipant>(response, "event participants");
 }
 
-export async function getPendingEventsRequest() {
-  const response = await apiRequest<unknown>("/pending/", {
+export async function getPendingEventsRequest(params: PaginationParams = {}) {
+  const response = await apiRequest<unknown>(`/pending/${buildQuery(params)}`, {
     base: "moderation"
   });
   return normalizePaginatedResponse<OrganizerEvent>(response, "moderation events");

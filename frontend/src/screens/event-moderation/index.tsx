@@ -20,10 +20,13 @@ import { formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 
 export function EventModerationScreen() {
   const { locale, t } = useI18n();
   const [events, setEvents] = useState<OrganizerEvent[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [logs, setLogs] = useState<Record<string, EventModerationLog[]>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -36,14 +39,15 @@ export function EventModerationScreen() {
     setHasError(false);
     try {
       const response: PaginatedResponse<OrganizerEvent> =
-        await getPendingEventsRequest();
+        await getPendingEventsRequest({ page: currentPage, page_size: DEFAULT_PAGE_SIZE });
       setEvents(response.results);
+      setTotalCount(response.count);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => {
     void loadEvents();
@@ -97,6 +101,10 @@ export function EventModerationScreen() {
     }
   }
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
+  const pageStart = totalCount ? (currentPage - 1) * DEFAULT_PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(pageStart + Math.max(events.length, 1) - 1, totalCount);
+
   return (
     <div className="space-y-6">
       <section className="rounded-sm border bg-card p-6 shadow-card sm:p-9">
@@ -132,9 +140,17 @@ export function EventModerationScreen() {
           </p>
         </Card>
       ) : (
-        <section aria-label={t("moderation.results")} className="space-y-5">
-          {events.map((event) => (
-            <Card key={event.id}>
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-muted-foreground">
+            {t("pagination.showingRange", {
+              start: pageStart,
+              end: pageEnd,
+              total: totalCount
+            })}
+          </p>
+          <section aria-label={t("moderation.results")} className="space-y-5">
+            {events.map((event) => (
+              <Card key={event.id}>
               <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
                 <div>
                   <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -268,9 +284,19 @@ export function EventModerationScreen() {
                   )}
                 </div>
               ) : null}
-            </Card>
-          ))}
-        </section>
+              </Card>
+            ))}
+          </section>
+          {totalPages > 1 ? (
+            <PaginationControls
+              currentPage={currentPage}
+              onNext={() => setCurrentPage((page) => page + 1)}
+              onPageSelect={setCurrentPage}
+              onPrevious={() => setCurrentPage((page) => page - 1)}
+              totalPages={totalPages}
+            />
+          ) : null}
+        </div>
       )}
     </div>
   );

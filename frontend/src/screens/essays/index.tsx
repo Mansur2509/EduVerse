@@ -30,6 +30,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { DEFAULT_PAGE_SIZE, PaginatedList } from "@/shared/ui/pagination";
 
 const SCORE_FIELDS: Array<{
   key: "structure_score" | "clarity_score" | "authenticity_score" | "specificity_score" | "grammar_score" | "prompt_fit_score";
@@ -54,6 +55,7 @@ const LABEL_STYLES: Record<string, string> = {
 export function EssaysScreen() {
   const { t } = useI18n();
   const [essays, setEssays] = useState<EssayWorkspace[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [shortlist, setShortlist] = useState<SavedUniversity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,7 +77,7 @@ export function EssaysScreen() {
     setHasError(false);
     try {
       const [essaysResponse, shortlistResponse, suggestionsResponse] = await Promise.allSettled([
-        getEssaysRequest(),
+        getEssaysRequest({ page_size: 100 }),
         getShortlistRequest(),
         getSuggestionsRequest()
       ]);
@@ -129,6 +131,17 @@ export function EssaysScreen() {
     const universityId = Number(filter);
     return essays.filter((essay) => essay.university === universityId);
   }, [essays, filter]);
+  const totalEssayPages = Math.max(1, Math.ceil(filteredEssays.length / DEFAULT_PAGE_SIZE));
+  const visibleEssays = filteredEssays.slice(
+    (currentPage - 1) * DEFAULT_PAGE_SIZE,
+    currentPage * DEFAULT_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (currentPage > totalEssayPages) {
+      setCurrentPage(totalEssayPages);
+    }
+  }, [currentPage, totalEssayPages]);
 
   async function handleFormSubmit(values: EssayFormValues) {
     const payload = {
@@ -358,11 +371,22 @@ export function EssaysScreen() {
       />
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setFilter("all")} size="sm" type="button" variant={filter === "all" ? "primary" : "ghost"}>
+        <Button
+          onClick={() => {
+            setFilter("all");
+            setCurrentPage(1);
+          }}
+          size="sm"
+          type="button"
+          variant={filter === "all" ? "primary" : "ghost"}
+        >
           {t("essays.filters.all")}
         </Button>
         <Button
-          onClick={() => setFilter("common_app")}
+          onClick={() => {
+            setFilter("common_app");
+            setCurrentPage(1);
+          }}
           size="sm"
           type="button"
           variant={filter === "common_app" ? "primary" : "ghost"}
@@ -372,7 +396,10 @@ export function EssaysScreen() {
         {universityFilters.map(([id, name]) => (
           <Button
             key={id}
-            onClick={() => setFilter(String(id))}
+            onClick={() => {
+              setFilter(String(id));
+              setCurrentPage(1);
+            }}
             size="sm"
             type="button"
             variant={filter === String(id) ? "primary" : "ghost"}
@@ -388,16 +415,21 @@ export function EssaysScreen() {
         </Card>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            {filteredEssays.map((essay) => (
+          <PaginatedList
+            currentPage={currentPage}
+            getItemKey={(essay) => essay.id}
+            items={visibleEssays}
+            onPageChange={setCurrentPage}
+            totalCount={filteredEssays.length}
+            totalPages={totalEssayPages}
+            renderItem={(essay) => (
               <EssayCard
                 essay={essay}
                 isSelected={essay.id === selectedEssayId}
-                key={essay.id}
                 onSelect={(item) => setSelectedEssayId(item.id)}
               />
-            ))}
-          </div>
+            )}
+          />
 
           <div>
             {!selectedEssay ? (

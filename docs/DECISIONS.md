@@ -267,3 +267,12 @@ EduVerse therefore exposes a protected admin/staff-only upload workflow under `/
 The workflow reuses `services/university_service/xlsx_import.py` for file reading, parsing, normalization, and upsert behavior. Dry-run is a true read-only planner: it parses the workbook and performs a bulk slug lookup to estimate created/updated/skipped rows without calling `save()`, `get_or_create()`, or `update_or_create()`. Execute writes one university per short transaction and preserves the existing safety policy: idempotent upsert by slug/name, no deletes, no invented data, placeholder SAT quarantining, raw text preservation, and curated verification rows preserved unless the importer policy changes deliberately.
 
 Because there is no dedicated production queue yet, job processing uses a beta-only daemon thread after the job row is created. This is intentionally narrow: it avoids startup imports and long blocking requests without adding Celery/RQ/managed queue infrastructure prematurely. The job row is the operational truth: it now stores row progress, current row/university, and a heartbeat while running; an old running job with no heartbeat beyond the configured stale window is marked failed with an explicit timeout message when an admin reads it. If import volume or reliability needs grow, a real queue should replace the thread and this ADR should be amended.
+
+## ADR-029: Page-based grids and lists for repeated content
+
+- **Status:** Accepted
+- **Date:** 2026-06-30
+
+Repeated item surfaces use explicit page controls instead of infinite scroll, endless "load more", or first-page-only rendering. The default dense catalog pattern is 21 items per page (3 columns x 7 rows on desktop), backed by DRF `page` + `page_size` when the API is paginated. Backend pagination remains enabled and capped by `DefaultPagination.max_page_size=100`; the frontend requests `page_size=21` for normal catalog/list screens.
+
+The shared frontend primitives are `PaginationControls`, `PaginatedGrid`, and `PaginatedList` under `frontend/src/shared/ui/pagination.tsx`. Grids are used for catalog/card surfaces such as universities and events; list or board pages such as roadmap, applications, moderation, and participant tables keep their domain layout but still expose previous/next, page number, total pages, and range summaries. Local pagination is used only after the full relevant client-side filtered set is already loaded, such as essay tab filters and roadmap task buckets.

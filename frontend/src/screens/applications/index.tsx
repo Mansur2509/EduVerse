@@ -42,6 +42,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 
 const ESSAYS_STATUSES = ["not_started", "drafting", "needs_revision", "ready", "submitted"];
 const RECOMMENDATIONS_STATUSES: RecommendationsStatus[] = [
@@ -63,6 +64,8 @@ const ALL_STATUSES: ApplicationStatus[] = [...APPLICATION_BOARD_COLUMNS, ...DECI
 export function ApplicationsScreen() {
   const { locale, t } = useI18n();
   const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [shortlist, setShortlist] = useState<SavedUniversity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +81,7 @@ export function ApplicationsScreen() {
     setHasError(false);
     try {
       const [applicationsResponse, shortlistResponse, suggestionsResponse] = await Promise.allSettled([
-        getApplicationsRequest(),
+        getApplicationsRequest({ page: currentPage, page_size: DEFAULT_PAGE_SIZE }),
         getShortlistRequest(),
         getSuggestionsRequest()
       ]);
@@ -87,6 +90,10 @@ export function ApplicationsScreen() {
         return;
       }
       setApplications(applicationsResponse.value.results);
+      setTotalCount(applicationsResponse.value.count);
+      setSelectedId((current) =>
+        applicationsResponse.value.results.some((item) => item.id === current) ? current : null
+      );
       setShortlist(shortlistResponse.status === "fulfilled" ? shortlistResponse.value.results : []);
       setSuggestions(suggestionsResponse.status === "fulfilled" ? suggestionsResponse.value.results : []);
     } catch {
@@ -94,7 +101,7 @@ export function ApplicationsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => {
     void loadApplications();
@@ -123,6 +130,8 @@ export function ApplicationsScreen() {
       deadline: values.deadline || null
     });
     setApplications((current) => [created, ...current]);
+    setTotalCount((current) => current + 1);
+    setCurrentPage(1);
     setSelectedId(created.id);
     setIsFormOpen(false);
   }
@@ -153,6 +162,7 @@ export function ApplicationsScreen() {
     try {
       await deleteApplicationRequest(application.id);
       setApplications((current) => current.filter((item) => item.id !== application.id));
+      setTotalCount((current) => Math.max(0, current - 1));
       if (selectedId === application.id) setSelectedId(null);
     } catch {
       setActionError(true);
@@ -245,6 +255,9 @@ export function ApplicationsScreen() {
     if (!isApplicationSuggestion) return false;
     return selected ? suggestion.linked_application === selected.id : true;
   });
+  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
+  const pageStart = totalCount ? (currentPage - 1) * DEFAULT_PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(pageStart + Math.max(applications.length, 1) - 1, totalCount);
 
   if (isLoading) {
     return <LoadingNotice message={t("applications.states.loading")} />;
@@ -316,29 +329,47 @@ export function ApplicationsScreen() {
           <p className="text-sm text-muted-foreground">{t("applications.states.empty")}</p>
         </Card>
       ) : (
-        <div className="grid gap-3 overflow-x-auto pb-2 lg:grid-cols-7">
-          {[...APPLICATION_BOARD_COLUMNS, "decisions"].map((column) => (
-            <div className="min-w-[14rem] space-y-2" key={column}>
-              <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                {column === "decisions"
-                  ? t("applications.column.decisions")
-                  : t(`applications.status.${column}` as TranslationKey)}
-              </h2>
-              <div className="space-y-2">
-                {(column === "decisions"
-                  ? DECISION_STATUSES.flatMap((status) => columns.get(status) ?? [])
-                  : columns.get(column) ?? []
-                ).map((application) => (
-                  <ApplicationCard
-                    application={application}
-                    isSelected={application.id === selectedId}
-                    key={application.id}
-                    onSelect={(item) => setSelectedId(item.id)}
-                  />
-                ))}
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-muted-foreground">
+            {t("pagination.showingRange", {
+              start: pageStart,
+              end: pageEnd,
+              total: totalCount
+            })}
+          </p>
+          <div className="grid gap-3 overflow-x-auto pb-2 lg:grid-cols-7">
+            {[...APPLICATION_BOARD_COLUMNS, "decisions"].map((column) => (
+              <div className="min-w-[14rem] space-y-2" key={column}>
+                <h2 className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                  {column === "decisions"
+                    ? t("applications.column.decisions")
+                    : t(`applications.status.${column}` as TranslationKey)}
+                </h2>
+                <div className="space-y-2">
+                  {(column === "decisions"
+                    ? DECISION_STATUSES.flatMap((status) => columns.get(status) ?? [])
+                    : columns.get(column) ?? []
+                  ).map((application) => (
+                    <ApplicationCard
+                      application={application}
+                      isSelected={application.id === selectedId}
+                      key={application.id}
+                      onSelect={(item) => setSelectedId(item.id)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          {totalPages > 1 ? (
+            <PaginationControls
+              currentPage={currentPage}
+              onNext={() => setCurrentPage((page) => page + 1)}
+              onPageSelect={setCurrentPage}
+              onPrevious={() => setCurrentPage((page) => page - 1)}
+              totalPages={totalPages}
+            />
+          ) : null}
         </div>
       )}
 
