@@ -5,6 +5,7 @@ from statistics import mean
 
 from services.university_service.models import University
 
+from .academic_normalization import normalize_profile_academics
 from .models import StudentProfile, UserPreference
 from .services import calculate_profile_completion
 
@@ -42,16 +43,17 @@ def _number(value):
 
 
 def _score_gpa(profile):
-    if profile.gpa is None or profile.gpa_scale is None or profile.gpa_scale <= 0:
+    normalization = normalize_profile_academics(profile)
+    if normalization.normalized_gpa_4 is None:
         return 1
-    ratio = float(profile.gpa / profile.gpa_scale)
-    if ratio >= 0.95:
+    gpa = float(normalization.normalized_gpa_4)
+    if gpa >= 3.8:
         return 5
-    if ratio >= 0.88:
+    if gpa >= 3.5:
         return 4
-    if ratio >= 0.78:
+    if gpa >= 3.1:
         return 3
-    if ratio >= 0.68:
+    if gpa >= 2.7:
         return 2
     return 1
 
@@ -137,8 +139,11 @@ def _published_comparison(profile):
     comparisons = []
     sources = []
     names = []
+    normalization = normalize_profile_academics(profile)
     profile_values = {
-        "gpa": float(profile.gpa) if profile.gpa is not None else None,
+        "gpa": float(normalization.normalized_gpa_4)
+        if normalization.normalized_gpa_4 is not None
+        else None,
         "sat": _number(profile.test_scores.get("sat")),
         "ielts": _number(profile.test_scores.get("ielts")),
         "toefl": _number(profile.test_scores.get("toefl")),

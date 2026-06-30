@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    ExchangeRate,
     SavedUniversity,
     University,
     UniversityDataSource,
@@ -37,6 +38,13 @@ class UniversityAdmin(admin.ModelAdmin):
     search_fields = ("name", "city")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [UniversityFieldVerificationInline, UniversityDataSourceInline]
+
+
+@admin.register(ExchangeRate)
+class ExchangeRateAdmin(admin.ModelAdmin):
+    list_display = ("currency_code", "usd_rate", "effective_date", "source", "confidence")
+    list_filter = ("currency_code", "confidence", "effective_date")
+    search_fields = ("currency_code", "source")
 
 
 @admin.register(SavedUniversity)

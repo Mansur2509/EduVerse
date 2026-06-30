@@ -18,7 +18,8 @@ const emptyFilters: UniversityFilters = {
   country: "",
   institution_type: "",
   scholarship_available: "",
-  include_demo: ""
+  include_demo: "",
+  ordering: ""
 };
 
 const MAX_COMPARE = 4;
@@ -229,6 +230,22 @@ export function UniversitiesScreen() {
             <span className="text-sm font-semibold">
               {t("universities.filters.includeDemo")}
             </span>
+          </label>
+          <label className="block">
+            <span className="text-sm font-semibold">{t("universities.filters.sort")}</span>
+            <select
+              className={fieldClassName}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, ordering: event.target.value }))
+              }
+              value={filters.ordering}
+            >
+              <option value="">{t("universities.filters.defaultSort")}</option>
+              <option value="tuition_usd_amount">{t("universities.filters.tuitionUsdLowHigh")}</option>
+              <option value="-tuition_usd_amount">{t("universities.filters.tuitionUsdHighLow")}</option>
+              <option value="total_cost_usd_amount">{t("universities.filters.totalUsdLowHigh")}</option>
+              <option value="-total_cost_usd_amount">{t("universities.filters.totalUsdHighLow")}</option>
+            </select>
           </label>
           <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">
             <Button type="submit">{t("universities.actions.applyFilters")}</Button>

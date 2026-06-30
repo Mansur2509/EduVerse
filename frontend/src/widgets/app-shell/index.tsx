@@ -8,6 +8,7 @@ import { useAuth } from "@/features/auth/model/auth-context";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { LanguageSwitcher } from "@/shared/ui/language-switcher";
+import { SupportLink } from "@/shared/ui/support-link";
 
 import { NavLink } from "./nav-link";
 import {
@@ -112,6 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="shrink-0 space-y-3 pt-6">
           <LanguageSwitcher inverse />
+          <SupportLink className="w-full justify-center border-white/15 bg-white/5 text-white/70 hover:border-white/35 hover:bg-white/10 hover:text-white" />
           <div className="border-t border-white/10 pt-4">
             <div className="flex items-center justify-between gap-3">
               <p className="truncate text-sm font-semibold">{user.full_name || user.email}</p>
@@ -136,6 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="block lg:hidden">
               <LanguageSwitcher compact />
             </div>
+            <SupportLink className="hidden sm:inline-flex lg:hidden" />
             <button
               aria-label={t("a11y.logout")}
               className="hidden items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground sm:flex lg:hidden"

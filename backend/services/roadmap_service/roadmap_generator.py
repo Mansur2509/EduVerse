@@ -17,6 +17,7 @@ from services.application_service.models import ApplicationTrackerItem
 from services.essay_service.models import EssayWorkspace
 from services.event_service.models import EventRegistration
 from services.event_service.services import ACTIVE_REGISTRATION_STATUSES
+from services.exam_content_service.models import OfficialExamDate
 from services.university_service.models import SavedUniversity
 from services.university_service.services import best_sat_score, calculate_university_fit
 from services.user_profile_service.models import (
@@ -108,6 +109,29 @@ def _verified_source_url(university, field_name: str) -> str:
     if verification:
         return verification.source_url
     return university.admissions_url or university.official_website
+
+
+def _planned_exam_type(plan: dict) -> str:
+    raw_name = str(plan.get("exam_type") or plan.get("name") or "").upper()
+    if "SAT" in raw_name:
+        return "SAT"
+    if "AP" in raw_name:
+        return "AP"
+    return ""
+
+
+def _next_official_exam_date(exam_type: str, today: date) -> OfficialExamDate | None:
+    if exam_type not in {"SAT", "AP"}:
+        return None
+    return (
+        OfficialExamDate.objects.filter(
+            exam_type=exam_type,
+            test_date__gte=today,
+            verification_status=OfficialExamDate.VerificationStatus.VERIFIED,
+        )
+        .order_by("test_date")
+        .first()
+    )
 
 
 class RoadmapBuilder:
@@ -365,11 +389,31 @@ class RoadmapBuilder:
                 evidence_note=f"Planning window only: AP interests on file: {', '.join(preferences.ap_interests[:6])}. Verify official AP exam dates separately.",
             )
 
+        nearest_application_deadline = min(
+            [
+                university.application_deadline
+                for university in shortlisted_universities
+                if university.application_deadline
+            ],
+            default=None,
+        )
         for planned in profile.exam_plans.get("planned", []) if isinstance(profile.exam_plans, dict) else []:
             exam_name = planned.get("name")
             exam_date_str = planned.get("date")
             if not exam_name or not exam_date_str:
+                exam_type = _planned_exam_type(planned)
+                if exam_type:
+                    self._official_exam_date_task(
+                        exam_type,
+                        nearest_application_deadline,
+                    )
                 continue
+            exam_type = _planned_exam_type(planned)
+            if exam_type:
+                self._official_exam_date_task(
+                    exam_type,
+                    nearest_application_deadline,
+                )
             try:
                 exam_date = date.fromisoformat(exam_date_str)
             except ValueError:
@@ -387,6 +431,55 @@ class RoadmapBuilder:
                 generated_reason=f"You have a planned exam date for {exam_name} in your profile.",
                 evidence_note=f"Planned exam date from your profile: {exam_date_str}.",
             )
+
+    def _official_exam_date_task(
+        self,
+        exam_type: str,
+        nearest_application_deadline: date | None,
+    ) -> None:
+        official_date = _next_official_exam_date(exam_type, self.today)
+        if official_date is None:
+            self.add(
+                f"official_exam_date_missing:{exam_type}",
+                title=f"Verify official {exam_type} dates",
+                description=(
+                    f"No verified College Board {exam_type} date is stored yet. "
+                    "Check the official source before booking or planning around it."
+                ),
+                category=Category.EXAMS,
+                priority=Priority.HIGH,
+                source_type=SourceType.PROFILE_GAP,
+                generated_reason=f"You plan to take {exam_type}, but no verified official date is on file.",
+                evidence_note="Official SAT/AP dates must come from College Board sources only.",
+            )
+            return
+
+        due_date = official_date.registration_deadline or official_date.test_date
+        deadline_note = ""
+        priority = _priority_for_due_date(due_date, self.today)
+        if nearest_application_deadline and official_date.test_date > nearest_application_deadline:
+            deadline_note = (
+                f" Warning: test date {official_date.test_date.isoformat()} is after "
+                f"your nearest application deadline {nearest_application_deadline.isoformat()}."
+            )
+            priority = Priority.HIGH
+        self.add(
+            f"official_exam_date:{official_date.id}",
+            title=f"{official_date.name}: confirm registration",
+            description=(
+                f"Use the official College Board {exam_type} date record for planning."
+            ),
+            category=Category.EXAMS,
+            due_date=due_date,
+            priority=priority,
+            source_type=SourceType.EXAM_PLAN,
+            source_url=official_date.source_url,
+            generated_reason=f"You plan to take {exam_type}, and a verified College Board date is on file.",
+            evidence_note=(
+                f"Official {exam_type} test date: {official_date.test_date.isoformat()}."
+                f"{deadline_note}"
+            ),
+        )
 
     def _university_deadlines(self, shortlisted):
         for saved in shortlisted:

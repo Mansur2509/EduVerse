@@ -276,3 +276,16 @@ Because there is no dedicated production queue yet, job processing uses a beta-o
 Repeated item surfaces use explicit page controls instead of infinite scroll, endless "load more", or first-page-only rendering. The default dense catalog pattern is 21 items per page (3 columns x 7 rows on desktop), backed by DRF `page` + `page_size` when the API is paginated. Backend pagination remains enabled and capped by `DefaultPagination.max_page_size=100`; the frontend requests `page_size=21` for normal catalog/list screens.
 
 The shared frontend primitives are `PaginationControls`, `PaginatedGrid`, and `PaginatedList` under `frontend/src/shared/ui/pagination.tsx`. Grids are used for catalog/card surfaces such as universities and events; list or board pages such as roadmap, applications, moderation, and participant tables keep their domain layout but still expose previous/next, page number, total pages, and range summaries. Local pagination is used only after the full relevant client-side filtered set is already loaded, such as essay tab filters and roadmap task buckets.
+
+## ADR-030: Normalized academics, sourced costs, and fit score foundation
+
+- **Status:** Accepted
+- **Date:** 2026-06-30
+
+EduVerse stores a student's raw academic record and derived comparison values separately. `StudentProfile.original_gpa_value`, `original_gpa_scale`, `original_gpa_scale_type`, curriculum fields, and normalization confidence preserve the source context; `normalized_gpa_4` is the comparable value used by readiness and university fit. A raw 5-point GPA is never compared directly to a 4-point university range. Unsupported curricula keep a low-confidence note instead of a forced conversion.
+
+University affordability comparisons also separate source values from comparable values. Tuition and total cost preserve original amount/currency, and USD fields are populated only from native USD amounts or a stored `ExchangeRate`. EduVerse does not hardcode live exchange rates, fetch rates at request time, or silently treat non-USD values as USD.
+
+The university fit response is an evidence-based 1-100 `fit_score` with categorical labels (`dream`, `reach`, `competitive`, `target`, `safety`), component subscores, risks, missing data, confidence, and a disclaimer. It is not an admission probability and must not be described as odds, chance, likelihood of acceptance, or a guarantee. Planned retakes may be shown as conditional context only; current IELTS/SAT gaps still remain visible.
+
+Official SAT/AP dates are modeled through `OfficialExamDate` and can be marked verified only with a `collegeboard.org` source. Roadmap generation reads that model when available; otherwise it creates a verification task instead of inventing official exam deadlines.

@@ -55,6 +55,27 @@ class University(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     tuition_currency = models.CharField(max_length=10, blank=True, default="USD")
+    tuition_original_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
+    tuition_original_currency = models.CharField(max_length=10, blank=True)
+    tuition_usd_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True, db_index=True
+    )
+    total_cost_original_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
+    total_cost_original_currency = models.CharField(max_length=10, blank=True)
+    total_cost_usd_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True, db_index=True
+    )
+    currency_conversion_rate = models.DecimalField(
+        max_digits=12, decimal_places=6, null=True, blank=True
+    )
+    currency_conversion_date = models.DateField(null=True, blank=True)
+    currency_conversion_source = models.CharField(max_length=240, blank=True)
+    currency_conversion_confidence = models.CharField(max_length=20, blank=True)
+    cost_notes = models.TextField(blank=True)
     application_deadline = models.DateField(null=True, blank=True)
     scholarship_available = models.BooleanField(null=True, blank=True)
     essay_requirements = models.TextField(blank=True)
@@ -91,6 +112,45 @@ class University(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class ExchangeRate(models.Model):
+    class Confidence(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+
+    currency_code = models.CharField(max_length=10, db_index=True)
+    usd_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=6,
+        help_text="USD value of one unit of currency_code.",
+    )
+    effective_date = models.DateField(db_index=True)
+    source = models.CharField(max_length=240)
+    confidence = models.CharField(
+        max_length=12,
+        choices=Confidence.choices,
+        default=Confidence.MEDIUM,
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-effective_date", "currency_code")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("currency_code", "effective_date", "source"),
+                name="unique_exchange_rate_source_date",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.currency_code = self.currency_code.strip().upper()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.currency_code} -> USD ({self.effective_date})"
 
 
 class UniversityProgram(models.Model):

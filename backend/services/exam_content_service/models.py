@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -46,3 +47,54 @@ class Explanation(models.Model):
     question = models.OneToOneField(Question, on_delete=models.CASCADE, related_name="explanation")
     text = models.TextField()
 
+
+class OfficialExamDate(models.Model):
+    class ExamType(models.TextChoices):
+        SAT = "SAT", "SAT"
+        AP = "AP", "AP"
+
+    class VerificationStatus(models.TextChoices):
+        VERIFIED = "verified", "Verified"
+        PARTIAL = "partial", "Partial"
+        OUTDATED = "outdated", "Outdated"
+
+    exam_type = models.CharField(max_length=8, choices=ExamType.choices, db_index=True)
+    name = models.CharField(max_length=160)
+    test_date = models.DateField()
+    registration_deadline = models.DateField(null=True, blank=True)
+    late_registration_deadline = models.DateField(null=True, blank=True)
+    score_release_window = models.CharField(max_length=160, blank=True)
+    academic_year = models.CharField(max_length=20)
+    region = models.CharField(max_length=120, blank=True)
+    source_url = models.URLField()
+    last_verified_date = models.DateField()
+    verification_status = models.CharField(
+        max_length=20,
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.PARTIAL,
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("test_date", "exam_type")
+        indexes = [
+            models.Index(fields=("exam_type", "test_date")),
+            models.Index(fields=("verification_status", "last_verified_date")),
+        ]
+
+    def clean(self):
+        super().clean()
+        if (
+            self.verification_status == self.VerificationStatus.VERIFIED
+            and "collegeboard.org" not in self.source_url.lower()
+        ):
+            raise ValidationError(
+                {"source_url": "Verified SAT/AP dates must use an official College Board URL."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.exam_type} {self.name} ({self.test_date})"

@@ -17,6 +17,7 @@ import {
   type ActivityProfile,
   type ApplicationReadiness,
   type OnboardingSection,
+  type PlannedExam,
   type StudentProfileDetails,
   type TestScores
 } from "@/entities/profile";
@@ -34,6 +35,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LanguageSwitcher } from "@/shared/ui/language-switcher";
+import { SupportLink } from "@/shared/ui/support-link";
 
 import { AdmissionsProposals } from "./admissions-proposals";
 import { MajorAssessment } from "./major-assessment";
@@ -314,10 +316,10 @@ function formPayload(
   });
   if (toList(form.apScores).length) testScores.ap = toList(form.apScores);
 
-  const planned = [
+  const planned: PlannedExam[] = [
     {
       name: "SAT",
-      exam_type: "SAT",
+      exam_type: "SAT" as const,
       current_score: form.satScore,
       date: form.satDate,
       target_score: form.satTarget,
@@ -327,7 +329,7 @@ function formPayload(
     },
     {
       name: "IELTS",
-      exam_type: "IELTS",
+      exam_type: "IELTS" as const,
       current_score: form.ieltsScore,
       date: form.ieltsDate,
       target_score: form.ieltsTarget,
@@ -337,7 +339,7 @@ function formPayload(
     },
     {
       name: "AP",
-      exam_type: "AP",
+      exam_type: "AP" as const,
       current_score: form.apScores,
       date: form.apDate,
       target_score: form.apTarget,
@@ -347,7 +349,6 @@ function formPayload(
     },
     {
       name: form.otherExamName,
-      exam_type: form.otherExamName,
       current_score: "",
       date: form.otherExamDate,
       target_score: form.otherExamTarget,
@@ -572,6 +573,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <SupportLink className="hidden border-white/15 bg-white/5 text-white/70 hover:border-white/35 hover:bg-white/10 hover:text-white sm:inline-flex" />
             <LanguageSwitcher compact inverse />
             <button
               aria-label={t("a11y.logout")}

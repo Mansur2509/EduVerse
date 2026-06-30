@@ -8,6 +8,7 @@ import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { HelpTooltip } from "@/shared/ui/help-tooltip";
 
 const PRIORITY_STYLES: Record<string, string> = {
   low: "border-muted-foreground/30 bg-surface text-muted-foreground",
@@ -39,9 +40,10 @@ export function RoadmapTaskCard({
           {t(`roadmap.category.${task.category}` as TranslationKey)}
         </span>
         <span
-          className={`rounded-sm border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${PRIORITY_STYLES[task.priority]}`}
+          className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${PRIORITY_STYLES[task.priority]}`}
         >
           {t(`roadmap.priority.${task.priority}` as TranslationKey)}
+          <HelpTooltip label={t("help.roadmapPriority")} />
         </span>
         {task.status === "completed" ? (
           <span className="rounded-sm border border-success/35 bg-success/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-success">

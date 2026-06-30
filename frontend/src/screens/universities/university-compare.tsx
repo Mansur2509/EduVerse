@@ -153,10 +153,27 @@ export function UniversityCompareScreen({ ids }: { ids: string }) {
     {
       labelKey: "universities.fields.tuition",
       render: (university) => (
-        <StatValue
-          suffix={university.tuition_amount ? ` ${university.tuition_currency}` : ""}
-          value={formatTuitionAmount(university.tuition_amount)}
-        />
+        <div>
+          <StatValue
+            suffix={
+              university.tuition_original_amount
+                ? ` ${university.tuition_original_currency || university.tuition_currency}`
+                : university.tuition_amount
+                  ? ` ${university.tuition_currency}`
+                  : ""
+            }
+            value={formatTuitionAmount(
+              university.tuition_original_amount ?? university.tuition_amount
+            )}
+          />
+          {university.tuition_usd_amount ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("universities.cost.approxUsd", {
+                amount: formatTuitionAmount(university.tuition_usd_amount) ?? "-"
+              })}
+            </p>
+          ) : null}
+        </div>
       )
     },
     {

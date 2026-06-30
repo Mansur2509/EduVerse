@@ -69,6 +69,17 @@ export type UniversitySummary = {
   test_policy: TestPolicy;
   tuition_amount: string | null;
   tuition_currency: string;
+  tuition_original_amount: string | null;
+  tuition_original_currency: string;
+  tuition_usd_amount: string | null;
+  total_cost_original_amount: string | null;
+  total_cost_original_currency: string;
+  total_cost_usd_amount: string | null;
+  currency_conversion_rate: string | null;
+  currency_conversion_date: string | null;
+  currency_conversion_source: string;
+  currency_conversion_confidence: "" | "low" | "medium" | "high";
+  cost_notes: string;
   application_deadline: string | null;
   scholarship_available: boolean | null;
   essay_requirements: string;
@@ -98,26 +109,59 @@ export type UniversityFilters = {
   institution_type?: string;
   scholarship_available?: string;
   include_demo?: string;
+  ordering?: string;
 };
 
-export type FitCategory = "reach" | "competitive" | "target" | "safety";
+export type FitCategory = "dream" | "reach" | "competitive" | "target" | "safety";
 
-export type FitStrengthCode = "gpa_above_average" | "sat_above_average";
+export type FitStrengthCode =
+  | "gpa_above_average"
+  | "sat_above_average"
+  | "sat_competitive"
+  | "sat_above_p75"
+  | "ielts_meets_competitive"
+  | "curriculum_context_available"
+  | "major_matches_program"
+  | "profile_depth";
 
-export type FitRiskCode = "gpa_below_average" | "sat_below_average";
+export type FitRiskCode =
+  | "gpa_below_average"
+  | "sat_below_average"
+  | "sat_below_p25"
+  | "sat_partial_fit"
+  | "ielts_below_minimum"
+  | "ielts_below_competitive"
+  | "gpa_scale_not_confirmed"
+  | "deadline_passed"
+  | "deadline_close"
+  | "cost_conversion_missing"
+  | "aid_data_missing";
 
 export type FitMissingFieldCode =
   | "profile_gpa"
   | "profile_sat"
+  | "profile_ielts"
+  | "profile_curriculum"
+  | "profile_intended_major"
+  | "profile_activities"
+  | "profile_essays"
   | "university_gpa_average"
   | "university_sat_average"
-  | "university_acceptance_rate";
+  | "university_acceptance_rate"
+  | "university_programs"
+  | "university_application_deadline"
+  | "university_cost"
+  | "currency_conversion";
 
 export type FitNextActionCode =
   | "add_gpa_to_profile"
   | "add_sat_to_profile"
+  | "add_ielts_to_profile"
+  | "add_curriculum_context"
   | "verify_university_data"
-  | "limited_data_for_category";
+  | "limited_data_for_category"
+  | "plan_exam_retake"
+  | "verify_exam_date_before_deadline";
 
 export type UniversityFitSourceNote = {
   title: string;
@@ -126,12 +170,47 @@ export type UniversityFitSourceNote = {
 };
 
 export type UniversityFitAnalysis = {
+  fit_score: number;
   category: FitCategory | null;
+  confidence: "low" | "medium" | "high";
+  academic_subscore: number;
+  program_subscore: number;
+  profile_subscore: number;
+  essay_subscore: number;
+  deadline_subscore: number;
+  cost_subscore: number;
   strengths: FitStrengthCode[];
   risks: FitRiskCode[];
   missing_fields: FitMissingFieldCode[];
+  missing_data: FitMissingFieldCode[];
   next_actions: FitNextActionCode[];
+  conditional_notes: string[];
+  student_academic_context: {
+    original_gpa_value: string | number | null;
+    original_gpa_scale: string | number | null;
+    original_gpa_scale_type: string;
+    normalized_gpa_4: string | number | null;
+    normalized_percentage: string | number | null;
+    confidence: "low" | "medium" | "high";
+    note: string;
+    curriculum_type: string;
+    curriculum_country: string;
+  };
+  cost_context: {
+    tuition_original_amount: string | number | null;
+    tuition_original_currency: string;
+    tuition_usd_amount: string | number | null;
+    total_cost_original_amount: string | number | null;
+    total_cost_original_currency: string;
+    total_cost_usd_amount: string | number | null;
+    conversion_rate: string | number | null;
+    conversion_date: string | null;
+    conversion_source: string;
+    conversion_confidence: "" | "low" | "medium" | "high";
+    cost_notes: string;
+  };
   source_notes: UniversityFitSourceNote[];
+  disclaimer: string;
 };
 
 export type SavedUniversity = {
@@ -147,13 +226,13 @@ export type PaginatedResponse<Item> = {
   results: Item[];
 };
 
-export function formatTuitionAmount(amount: string | null): string | null {
+export function formatTuitionAmount(amount: string | number | null): string | null {
   if (amount === null) {
     return null;
   }
-  const numeric = Number.parseFloat(amount);
+  const numeric = typeof amount === "number" ? amount : Number.parseFloat(amount);
   if (Number.isNaN(numeric)) {
-    return amount;
+    return String(amount);
   }
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0

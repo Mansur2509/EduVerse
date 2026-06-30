@@ -87,10 +87,27 @@ export function UniversityCard({
         <div>
           <dt className="text-xs text-muted-foreground">{t("universities.fields.tuition")}</dt>
           <dd className="mt-0.5 font-semibold">
-            <StatValue
-              suffix={university.tuition_amount ? ` ${university.tuition_currency}` : ""}
-              value={formatTuitionAmount(university.tuition_amount)}
-            />
+            <span className="block">
+              <StatValue
+                suffix={
+                  university.tuition_original_amount
+                    ? ` ${university.tuition_original_currency || university.tuition_currency}`
+                    : university.tuition_amount
+                      ? ` ${university.tuition_currency}`
+                      : ""
+                }
+                value={formatTuitionAmount(
+                  university.tuition_original_amount ?? university.tuition_amount
+                )}
+              />
+            </span>
+            {university.tuition_usd_amount ? (
+              <span className="block text-xs text-muted-foreground">
+                {t("universities.cost.approxUsd", {
+                  amount: formatTuitionAmount(university.tuition_usd_amount) ?? "-"
+                })}
+              </span>
+            ) : null}
           </dd>
         </div>
       </dl>

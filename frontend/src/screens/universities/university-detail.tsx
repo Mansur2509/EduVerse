@@ -48,8 +48,10 @@ import { formatDate } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { HelpTooltip } from "@/shared/ui/help-tooltip";
 
 const CATEGORY_STYLES: Record<string, string> = {
+  dream: "border-danger/45 bg-danger/15 text-danger",
   reach: "border-danger/35 bg-danger/10 text-danger",
   competitive: "border-warning/35 bg-warning/10 text-warning",
   target: "border-accent/35 bg-accent/10 text-accent",
@@ -275,13 +277,24 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
   }
 
   const currentUniversity = university;
-  const studentGpa = profile?.gpa ?? null;
+  const studentGpa = profile?.original_gpa_value ?? profile?.gpa ?? null;
+  const studentGpaScale = profile?.original_gpa_scale ?? profile?.gpa_scale ?? null;
+  const normalizedGpa = fit?.student_academic_context.normalized_gpa_4 ?? profile?.normalized_gpa_4 ?? null;
   const studentSat = profile?.test_scores?.sat != null ? String(profile.test_scores.sat) : null;
   const studentIelts = profile?.test_scores?.ielts != null ? String(profile.test_scores.ielts) : null;
+  const gpaDisplay =
+    studentGpa !== null && studentGpaScale !== null
+      ? `${studentGpa} / ${studentGpaScale}`
+      : t("universities.requirements.addToProfile");
+  const normalizedGpaDisplay =
+    normalizedGpa !== null
+      ? t("universities.requirements.normalizedGpa", { value: String(normalizedGpa) })
+      : t("universities.requirements.gpaScaleNotConfirmed");
 
   function gpaStatus(): string {
     if (studentGpa === null) return "missing";
     if (currentUniversity.gpa_average === null) return "not_verified";
+    if (fit?.risks.includes("gpa_scale_not_confirmed")) return "gap";
     if (fit?.risks.includes("gpa_below_average")) return "gap";
     if (fit?.strengths.includes("gpa_above_average")) return "strong";
     return "on_track";
@@ -289,15 +302,38 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
 
   function satStatus(): string {
     if (studentSat === null) return "missing";
-    if (currentUniversity.sat_average === null) return "not_verified";
-    if (fit?.risks.includes("sat_below_average")) return "gap";
-    if (fit?.strengths.includes("sat_above_average")) return "strong";
+    if (
+      currentUniversity.sat_average === null &&
+      currentUniversity.sat_p25 === null &&
+      currentUniversity.sat_p75 === null
+    ) {
+      return "not_verified";
+    }
+    if (
+      fit?.risks.includes("sat_below_average") ||
+      fit?.risks.includes("sat_below_p25") ||
+      fit?.risks.includes("sat_partial_fit")
+    ) return "gap";
+    if (
+      fit?.strengths.includes("sat_above_average") ||
+      fit?.strengths.includes("sat_above_p75") ||
+      fit?.strengths.includes("sat_competitive")
+    ) return "strong";
     return "on_track";
   }
 
   function ieltsStatus(): string {
     if (studentIelts === null) return "missing";
-    if (currentUniversity.ielts_minimum === null) return "not_verified";
+    if (currentUniversity.ielts_minimum === null && currentUniversity.ielts_competitive === null) {
+      return "not_verified";
+    }
+    if (
+      fit?.risks.includes("ielts_below_minimum") ||
+      fit?.risks.includes("ielts_below_competitive")
+    ) {
+      return "gap";
+    }
+    if (fit?.strengths.includes("ielts_meets_competitive")) return "strong";
     return Number(studentIelts) >= Number(currentUniversity.ielts_minimum) ? "on_track" : "gap";
   }
 
@@ -507,10 +543,27 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                   </thead>
                   <tbody>
                     <RequirementRow
-                      label={t("universities.fields.gpaAverage")}
+                      label={
+                        <span className="inline-flex items-center gap-1">
+                          {t("universities.fields.gpaAverage")}
+                          <HelpTooltip label={t("help.normalizedGpa")} />
+                        </span>
+                      }
                       status={gpaStatus()}
                       universityValue={university.gpa_average ?? t("universities.notVerifiedYet")}
-                      yourValue={studentGpa ?? t("universities.requirements.addToProfile")}
+                      yourValue={
+                        <div>
+                          <p>{gpaDisplay}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {normalizedGpaDisplay}
+                          </p>
+                          {fit?.student_academic_context.note ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {fit.student_academic_context.note}
+                            </p>
+                          ) : null}
+                        </div>
+                      }
                     />
                     <RequirementRow
                       label={t("universities.fields.satAverage")}
@@ -610,11 +663,40 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                 <h2 className="text-2xl font-semibold">{t("universities.detail.financialAid")}</h2>
                 <dl className="mt-5 grid gap-5 sm:grid-cols-2">
                   <DetailItem label={t("universities.fields.tuition")}>
-                    <VerifiedStat
-                      suffix={university.tuition_amount ? ` ${university.tuition_currency}` : ""}
-                      value={formatTuitionAmount(university.tuition_amount)}
-                      verification={getFieldVerification(university.field_verifications, "tuition_amount")}
-                    />
+                    <div className="space-y-1">
+                      <VerifiedStat
+                        suffix={
+                          university.tuition_original_amount
+                            ? ` ${university.tuition_original_currency || university.tuition_currency}`
+                            : university.tuition_amount
+                              ? ` ${university.tuition_currency}`
+                              : ""
+                        }
+                        value={formatTuitionAmount(
+                          university.tuition_original_amount ?? university.tuition_amount
+                        )}
+                        verification={getFieldVerification(university.field_verifications, "tuition_amount")}
+                      />
+                      {university.tuition_usd_amount ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("universities.cost.approxUsd", {
+                            amount: formatTuitionAmount(university.tuition_usd_amount) ?? "-"
+                          })}
+                          <HelpTooltip className="ml-1" label={t("help.currencyConversion")} />
+                        </p>
+                      ) : university.tuition_original_amount ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("universities.cost.usdUnavailable")}
+                        </p>
+                      ) : null}
+                      {university.currency_conversion_source ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("universities.cost.rateSource", {
+                            source: university.currency_conversion_source
+                          })}
+                        </p>
+                      ) : null}
+                    </div>
                   </DetailItem>
                   <DetailItem label={t("universities.fields.scholarshipAvailable")}>
                     <VerifiedStat
@@ -790,7 +872,10 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                 </ul>
               </Card>
               <Card>
-                <h2 className="text-2xl font-semibold">{t("universities.sourcesTab.fieldVerifications")}</h2>
+                <h2 className="flex items-center gap-2 text-2xl font-semibold">
+                  {t("universities.sourcesTab.fieldVerifications")}
+                  <HelpTooltip label={t("help.sourceConfidence")} />
+                </h2>
                 {university.field_verifications.length === 0 ? (
                   <p className="mt-3 text-sm italic text-muted-foreground">
                     {t("universities.notVerifiedYet")}
@@ -908,7 +993,10 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
           />
 
           <Card className="bg-elevated/55">
-            <h2 className="text-xl font-semibold">{t("universities.fit.title")}</h2>
+            <h2 className="flex items-center gap-2 text-xl font-semibold">
+              {t("universities.fit.title")}
+              <HelpTooltip label={t("help.fitScore")} />
+            </h2>
             {isFitLoading ? (
               <p className="mt-3 text-sm text-muted-foreground">
                 {t("universities.states.loading")}
@@ -924,17 +1012,37 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
               </>
             ) : (
               <div className="mt-3 space-y-4">
-                <span
-                  className={`inline-flex items-center rounded-sm border px-3 py-1.5 text-sm font-semibold ${
-                    fit.category
-                      ? CATEGORY_STYLES[fit.category]
-                      : "border-muted-foreground/30 bg-surface text-muted-foreground"
-                  }`}
-                >
-                  {fit.category
-                    ? t(`universities.fit.category.${fit.category}` as TranslationKey)
-                    : t("universities.fit.category.unknown")}
-                </span>
+                <div className="rounded-sm border bg-card p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    {t("universities.fit.scoreLabel")}
+                  </p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <p className="text-4xl font-semibold">{fit.fit_score}</p>
+                    <span
+                      className={`inline-flex items-center rounded-sm border px-3 py-1.5 text-sm font-semibold ${
+                        fit.category
+                          ? CATEGORY_STYLES[fit.category]
+                          : "border-muted-foreground/30 bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      {fit.category
+                        ? t(`universities.fit.category.${fit.category}` as TranslationKey)
+                        : t("universities.fit.category.unknown")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {t("universities.fit.confidence", {
+                      value: t(`universities.fit.confidence.${fit.confidence}` as TranslationKey)
+                    })}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <FitSubscore label={t("universities.fit.subscore.academic")} value={fit.academic_subscore} />
+                  <FitSubscore label={t("universities.fit.subscore.program")} value={fit.program_subscore} />
+                  <FitSubscore label={t("universities.fit.subscore.profile")} value={fit.profile_subscore} />
+                  <FitSubscore label={t("universities.fit.subscore.cost")} value={fit.cost_subscore} />
+                </div>
 
                 <FitList
                   emptyKey={null}
@@ -944,6 +1052,21 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                   prefix="universities.fit.strengths"
                   title={t("universities.fit.strengthsTitle")}
                 />
+                {fit.conditional_notes.length ? (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      {t("universities.fit.conditionalNotesTitle")}
+                    </h3>
+                    <ul className="mt-2 space-y-1.5 text-sm">
+                      {fit.conditional_notes.map((note) => (
+                        <li className="flex items-start gap-2" key={note}>
+                          <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0 text-warning" />
+                          <span>{note}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 <FitList
                   emptyKey={null}
                   icon={AlertTriangle}
@@ -991,7 +1114,7 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                 </div>
 
                 <p className="text-xs leading-5 text-muted-foreground">
-                  {t("universities.fit.disclaimer")}
+                  {fit.disclaimer || t("universities.fit.disclaimer")}
                 </p>
               </div>
             )}
@@ -1051,9 +1174,9 @@ function RequirementRow({
   yourValue,
   status
 }: {
-  label: string;
+  label: React.ReactNode;
   universityValue: string | number;
-  yourValue: string | number;
+  yourValue: React.ReactNode;
   status: string;
 }) {
   return (
@@ -1087,6 +1210,15 @@ function ContactLink({ label, url }: { label: string; url: string }) {
         <span className="text-xs italic text-muted-foreground">{t("universities.notVerifiedYet")}</span>
       )}
     </li>
+  );
+}
+
+function FitSubscore({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-sm border bg-card px-3 py-2">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
+    </div>
   );
 }
 

@@ -53,6 +53,7 @@ Parsing/normalization lives in `services/university_service/xlsx_import.py`; the
 - **Never invent data.** Anything that cannot be parsed confidently is preserved as raw text (`deadlines_text`, `application_requirements`, `ap_recommendations`, `financial_aid_notes`, `scholarships_text`, `essay_requirements`) and the row is flagged in the JSON import report. Missing fields stay `null`/blank.
 - **Acceptance rate** is stored as a percentage number (e.g. `0.038` → `3.80`, `"28.0%"` → `28.00`), matching the existing catalog convention.
 - **Tuition**: numeric amount + currency. Currency is read from a `$ £ € ¥` symbol first, otherwise inferred from the country. When the source writes a `$` figure for a non-US institution, the currency is kept as the source's USD-equivalent and a note is added to `data_quality_notes`.
+- **USD cost normalization**: source amounts are preserved in `*_original_amount` / `*_original_currency`. Comparable `*_usd_amount` fields are populated only when the source currency is already USD or a stored `ExchangeRate` exists. EduVerse does not invent exchange rates; missing rates produce a low-confidence note and leave USD values blank until an official/source-reviewed rate is added.
 - **Excel serial dates** (e.g. `45565`) and ISO/`Mon D, YYYY` strings are both parsed for `Last Verified Date` and deadlines.
 - **Placeholder SAT detection.** Identical SAT 25/50/75 percentiles (e.g. the `550/550/550` rows) are treated as placeholders: by default they are *not* stored as statistics, are flagged in the report, and a `data_quality_notes` caveat is written. `--include-questionable-stats` stores them but marks the verification `estimated`, so admissions-fit never treats them as trustworthy.
 - **Textual GPA** (A-Level / IB grade strings) is never forced into the numeric `gpa_average`; it is preserved in `data_quality_notes`.
@@ -73,6 +74,8 @@ Community submissions remain `pending` until moderation. A source link is mandat
 ## Exams
 
 Official specifications may inform learning objectives, timing, structure, and question format. Questions, answer options, explanations, and lessons stored by EduVerse must be original or explicitly licensed.
+
+Official SAT/AP date guidance is stored in `exam_content_service.OfficialExamDate`. A date can be marked `verified` only when its `source_url` is on `collegeboard.org`; non-College Board sources may be stored as unverified research notes but must not power official-date roadmap claims. When no verified SAT/AP date exists, roadmap generation creates a verification task instead of inventing a deadline.
 
 ## Seed data
 

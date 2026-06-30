@@ -1,8 +1,13 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from services.university_service.models import SavedUniversity, University
+from services.university_service.currency import normalize_university_costs
+from services.university_service.models import ExchangeRate, SavedUniversity, University
+from services.university_service.services import calculate_university_fit
 from services.user_profile_service.services import ensure_profile_records
 
 User = get_user_model()
@@ -256,7 +261,7 @@ class FitAnalysisTests(APITestCase):
         )
         self.client.force_authenticate(self.user)
         response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
-        self.assertEqual(response.data["category"], "reach")
+        self.assertEqual(response.data["category"], "dream")
         self.assertIn("limited_data_for_category", response.data["next_actions"])
         self.assertNotIn("verify_university_data", response.data["next_actions"])
 
@@ -313,6 +318,117 @@ class FitAnalysisTests(APITestCase):
         response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
         self.assertIn("gpa_below_average", response.data["risks"])
 
+    def test_fit_uses_normalized_gpa_not_raw_scale(self):
+        self.profile.gpa = "4.80"
+        self.profile.gpa_scale = "5.00"
+        self.profile.save()
+
+        university = create_university(
+            "normalized-gpa-university",
+            acceptance_rate="45.00",
+            gpa_average="4.00",
+        )
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
+
+        self.assertNotIn("gpa_above_average", response.data["strengths"])
+        self.assertEqual(
+            Decimal(str(response.data["student_academic_context"]["original_gpa_value"])),
+            Decimal("4.80"),
+        )
+        self.assertEqual(
+            Decimal(str(response.data["student_academic_context"]["normalized_gpa_4"])),
+            Decimal("3.84"),
+        )
+
+    def test_ielts_below_competitive_is_gap(self):
+        self.profile.test_scores = {"ielts": 6.0}
+        self.profile.save()
+        university = create_university(
+            "ielts-competitive-university",
+            ielts_minimum="6.0",
+            ielts_competitive="7.5",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn("ielts_below_competitive", fit["risks"])
+
+    def test_ielts_below_minimum_is_blocking_gap(self):
+        self.profile.test_scores = {"ielts": 6.0}
+        self.profile.save()
+        university = create_university(
+            "ielts-minimum-university",
+            ielts_minimum="6.5",
+            ielts_competitive="7.5",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn("ielts_below_minimum", fit["risks"])
+        self.assertLessEqual(fit["fit_score"], 55)
+
+    def test_sat_below_25th_percentile_is_academic_risk(self):
+        self.profile.test_scores = {"sat": 1200}
+        self.profile.save()
+        university = create_university(
+            "sat-risk-university",
+            sat_p25=1400,
+            sat_p75=1550,
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn("sat_below_p25", fit["risks"])
+        self.assertLessEqual(fit["fit_score"], 55)
+
+    def test_planned_retake_is_conditional_not_current_score_boost(self):
+        self.profile.test_scores = {"sat": 1200}
+        self.profile.exam_plans = {
+            "taken": ["SAT"],
+            "planned": [
+                {
+                    "name": "SAT",
+                    "exam_type": "SAT",
+                    "target_score": "1550",
+                    "planned_retake": True,
+                }
+            ],
+        }
+        self.profile.save()
+        university = create_university(
+            "sat-conditional-university",
+            sat_p25=1400,
+            sat_p75=1550,
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn("sat_below_p25", fit["risks"])
+        self.assertIn("plan_exam_retake", fit["next_actions"])
+        self.assertTrue(fit["conditional_notes"])
+        self.assertLessEqual(fit["fit_score"], 55)
+
+    def test_ultra_selective_university_is_never_safety(self):
+        self.profile.gpa = "4.00"
+        self.profile.gpa_scale = "4.00"
+        self.profile.test_scores = {"sat": 1600, "ielts": 9.0}
+        self.profile.curriculum_type = "ib"
+        self.profile.save()
+        university = create_university(
+            "ultra-selective-university",
+            acceptance_rate="4.00",
+            gpa_average="3.70",
+            sat_p25=1450,
+            sat_p75=1570,
+            ielts_minimum="7.0",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn(fit["category"], {"dream", "reach"})
+        self.assertNotEqual(fit["category"], "safety")
+
     def test_fit_source_notes_fall_back_to_official_website(self):
         university = create_university("source-notes-university")
         self.client.force_authenticate(self.user)
@@ -324,3 +440,96 @@ class FitAnalysisTests(APITestCase):
         university = create_university("auth-fit-university")
         response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class CurrencyNormalizationTests(APITestCase):
+    def test_non_usd_tuition_converts_when_rate_exists(self):
+        ExchangeRate.objects.create(
+            currency_code="EUR",
+            usd_rate="1.200000",
+            effective_date=timezone.now().date(),
+            source="Configured test rate",
+            confidence="high",
+        )
+        university = create_university(
+            "eur-cost-university",
+            tuition_amount="100.00",
+            tuition_currency="EUR",
+        )
+
+        normalize_university_costs(university, save=True)
+        university.refresh_from_db()
+
+        self.assertEqual(university.tuition_original_currency, "EUR")
+        self.assertEqual(str(university.tuition_usd_amount), "120.00")
+        self.assertEqual(university.currency_conversion_source, "Configured test rate")
+
+    def test_unknown_currency_preserves_original_without_usd_conversion(self):
+        university = create_university(
+            "unknown-cost-university",
+            tuition_amount="100.00",
+            tuition_currency="ABC",
+        )
+
+        normalize_university_costs(university, save=True)
+        university.refresh_from_db()
+
+        self.assertEqual(university.tuition_original_currency, "ABC")
+        self.assertIsNone(university.tuition_usd_amount)
+        self.assertIn("USD conversion not available yet", university.cost_notes)
+
+    def test_cost_sorting_uses_usd_normalized_field(self):
+        high = create_university("high-usd-cost", tuition_usd_amount="200.00")
+        low = create_university("low-usd-cost", tuition_usd_amount="100.00")
+
+        self.client.force_authenticate(
+            User.objects.create_user(
+                username="sorter", email="sorter@test.com", password="testpass123"
+            )
+        )
+        response = self.client.get(
+            "/api/v1/universities/",
+            {"ordering": "tuition_usd_amount"},
+        )
+
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertLess(slugs.index(low.slug), slugs.index(high.slug))
+
+
+class RecommendationFoundationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="recommender", email="recommender@test.com", password="testpass123"
+        )
+        self.profile, _ = ensure_profile_records(self.user)
+        self.profile.target_countries = ["United States"]
+        self.profile.intended_majors = ["Computer Science"]
+        self.profile.gpa = "4.80"
+        self.profile.gpa_scale = "5.00"
+        self.profile.test_scores = {"sat": 1450}
+        self.profile.save()
+
+    def test_recommendations_follow_preferred_country(self):
+        create_university(
+            "us-recommendation",
+            country="United States",
+            acceptance_rate="50.00",
+            tuition_usd_amount="10000.00",
+        )
+        create_university(
+            "asia-recommendation",
+            country="Singapore",
+            acceptance_rate="50.00",
+            tuition_usd_amount="10000.00",
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get("/api/v1/universities/recommendations/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        countries = {
+            item["university"]["country"] for item in response.data["recommendations"]
+        }
+        self.assertEqual(countries, {"United States"})
+        self.assertNotIn("probability", str(response.data).lower())
+        self.assertNotIn("chance", str(response.data).lower())

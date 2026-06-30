@@ -14,6 +14,7 @@ from services.user_profile_service.services import ensure_profile_records
 
 from .import_jobs import enqueue_university_import_job, mark_stale_university_import_job
 from .models import SavedUniversity, University, UniversityImportJob
+from .recommendations import calculate_university_recommendations
 from .serializers import (
     SavedUniversitySerializer,
     UniversityImportJobSerializer,
@@ -22,7 +23,15 @@ from .serializers import (
 )
 from .services import calculate_university_fit
 
-SELF_SERVICE_ACTIONS = {"list", "retrieve", "fit", "shortlist", "shortlisted", "compare"}
+SELF_SERVICE_ACTIONS = {
+    "list",
+    "retrieve",
+    "fit",
+    "shortlist",
+    "shortlisted",
+    "compare",
+    "recommendations",
+}
 
 
 class UniversityViewSet(ModelViewSet):
@@ -31,7 +40,14 @@ class UniversityViewSet(ModelViewSet):
     lookup_field = "slug"
     search_fields = ("name", "city", "country", "programs__name")
     filterset_fields = ("country", "institution_type", "scholarship_available", "test_policy")
-    ordering_fields = ("name", "country", "created_at", "acceptance_rate")
+    ordering_fields = (
+        "name",
+        "country",
+        "created_at",
+        "acceptance_rate",
+        "tuition_usd_amount",
+        "total_cost_usd_amount",
+    )
 
     def get_queryset(self):
         queryset = University.objects.prefetch_related(
@@ -125,6 +141,11 @@ class UniversityViewSet(ModelViewSet):
 
         serializer = self.get_serializer(ordered, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="recommendations")
+    def recommendations(self, request):
+        profile, preferences = ensure_profile_records(request.user)
+        return Response(calculate_university_recommendations(profile, preferences))
 
 
 class AdminUniversityImportBaseView(APIView):

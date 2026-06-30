@@ -122,6 +122,15 @@ Authenticated. Returns the student/applicant profile aggregate:
   "education_status": "school_student",
   "gpa": 4.5,
   "gpa_scale": 5,
+  "original_gpa_value": 4.5,
+  "original_gpa_scale": 5,
+  "original_gpa_scale_type": "five_point",
+  "normalized_gpa_4": 3.6,
+  "normalized_percentage": null,
+  "curriculum_type": "national",
+  "curriculum_country": "Uzbekistan",
+  "academic_normalization_confidence": "high",
+  "academic_normalization_note": "Converted proportionally from a 5.0 GPA scale.",
   "intended_degree": "bachelor",
   "target_countries": ["United States", "Germany"],
   "intended_majors": ["Computer Science", "Economics"],
@@ -141,8 +150,13 @@ Authenticated. Returns the student/applicant profile aggregate:
     "planned": [
       {
         "name": "SAT",
+        "exam_type": "SAT",
         "date": "2027-03-13",
-        "target_score": "1450"
+        "target_score": "1450",
+        "current_score": "1320",
+        "planned_retake": true,
+        "planned_retake_month": "2027-03",
+        "test_status": "preparing"
       }
     ]
   },
@@ -178,9 +192,13 @@ Authenticated. Returns the student/applicant profile aggregate:
 
 `id`, `email`, `role`, and `updated_at` are read-only.
 
+Academic comparison must use the normalized fields when confidence is high or medium. Raw GPA fields (`original_gpa_value`, `original_gpa_scale`, `original_gpa_scale_type`) preserve the student's source record; `normalized_gpa_4` is the comparable 4.0-scale value (for example, `4.8/5.0 -> 3.84/4.0`) and must never be confused with the raw score. Unsupported or ambiguous systems keep `normalized_gpa_4=null` with a low-confidence note.
+
 ### PATCH `/api/profile/me/`
 
 Authenticated. Accepts any writable subset of the profile response. Arrays must contain short text values. `test_scores` is a bounded object supporting text, numeric, or text-list values. Known numeric ranges are validated for SAT, IELTS, and TOEFL.
+
+GPA writes should include `original_gpa_value`, `original_gpa_scale`, and `original_gpa_scale_type` where possible. `exam_plans.planned[]` may include `exam_type`, `current_score`, `planned_retake`, `planned_retake_month`, and `test_status`; SAT/AP official-date guidance is generated only from verified `OfficialExamDate` records, not from guessed dates.
 
 Example:
 
@@ -522,8 +540,9 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | GET | `/api/admin/university-import/jobs/{id}/` | Admin/staff | Read import job status, counters, report JSON, or error message |
 | GET | `/health/` | Public | Service health |
 | GET | `/api/v1/universities/` | Authenticated | University catalog, search/filter; excludes `is_demo=true` records unless `?include_demo=true` |
+| GET | `/api/v1/universities/recommendations/` | Authenticated | Profile-aware university recommendations with fit score, category, confidence, recommended programs, key risk, next action, and no admissions-odds language |
 | GET | `/api/v1/universities/{slug}/` | Authenticated | University detail: stats, programs, scholarships, sources, `field_verifications` |
-| GET | `/api/v1/universities/{slug}/fit/` | Authenticated | Admissions fit analysis (Reach/Competitive/Target/Safety) from the caller's profile and this university's verified stats only |
+| GET | `/api/v1/universities/{slug}/fit/` | Authenticated | Admissions fit analysis with a 1-100 fit score and `dream`/`reach`/`competitive`/`target`/`safety` category from normalized profile data and verified university stats only |
 | POST/DELETE | `/api/v1/universities/{slug}/shortlist/` | Authenticated | Add/remove this university from the caller's shortlist |
 | GET | `/api/v1/universities/shortlist/` | Authenticated | List the caller's shortlisted universities |
 | GET | `/api/v1/universities/compare/?ids=1,2,3` | Authenticated | Side-by-side detail for 2-4 universities by id |
@@ -564,9 +583,11 @@ Any University field with no confirmed source is left `null`/blank and rendered 
 
 `international_office_url` and `virtual_info_session_url` are identity-ish contact links (same exemption as `admissions_url`/`financial_aid_url`/`application_portal_url`) shown on the university detail page's Contact tab; they do not require a `field_verifications` entry and are simply blank when unknown.
 
-The university detail object also carries `ielts_competitive` (nullable decimal) and six raw-text fields populated by the XLSX importer (`docs/DATA_SOURCES.md`): `application_requirements`, `ap_recommendations`, `deadlines_text`, `financial_aid_notes`, `scholarships_text`, and `data_quality_notes`. These hold source text preserved verbatim when it is too unstructured to split safely; each is an empty string when not provided and is rendered as a labelled block in the Requirements/Deadlines/Financial Aid/Sources tabs. `data_quality_notes` surfaces importer caveats (placeholder SAT, textual GPA, USD-equivalent tuition) so questionable values are transparent rather than silently trusted.
+The university detail object also carries `ielts_competitive` (nullable decimal) and six raw-text fields populated by the XLSX importer (`docs/DATA_SOURCES.md`): `application_requirements`, `ap_recommendations`, `deadlines_text`, `financial_aid_notes`, `scholarships_text`, and `data_quality_notes`. These hold source text preserved verbatim when it is too unstructured to split safely; each is an empty string when not provided and is rendered as a labelled block in the Requirements/Deadlines/Financial Aid/Sources tabs. `data_quality_notes` surfaces importer caveats (placeholder SAT, textual GPA, missing currency conversion) so questionable values are transparent rather than silently trusted.
 
-The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) only ever compares `acceptance_rate`, `gpa_average`, and `sat_average` against the caller's profile. It returns `category: null` when none of those three are verified for either side, and adds a `limited_data_for_category` next-action when a category is assigned from only one of the three. Response keys and UI copy use "fit", "category" (`reach`/`competitive`/`target`/`safety`), "strengths", "risks", "missing_fields", and "next_actions" instead of admissions-odds language.
+Tuition and cost fields preserve source currency separately from comparable USD values: `tuition_original_amount`, `tuition_original_currency`, `tuition_usd_amount`, `total_cost_original_amount`, `total_cost_original_currency`, `total_cost_usd_amount`, `currency_conversion_rate`, `currency_conversion_date`, `currency_conversion_source`, `currency_conversion_confidence`, and `cost_notes`. Non-USD values are converted only when a stored `ExchangeRate` exists; missing rates leave USD fields null and show a low-confidence note. University list ordering supports `tuition_usd_amount`, `-tuition_usd_amount`, `total_cost_usd_amount`, and `-total_cost_usd_amount`.
+
+The admissions fit analysis (`/api/v1/universities/{slug}/fit/`) uses normalized GPA, SAT percentile bands where available, IELTS minimum/competitive gaps, curriculum context, published acceptance rate, cost context, and profile completeness. It returns `fit_score` (1-100), `category` (`dream`/`reach`/`competitive`/`target`/`safety` or `null`), `confidence`, component subscores, `strengths`, `risks`, `missing_fields`, `missing_data`, `next_actions`, `conditional_notes`, `student_academic_context`, `cost_context`, `source_notes`, and a no-guarantee disclaimer. Ultra-selective universities below 5% acceptance are never shown as safety; a planned retake may add a conditional note but must not erase a current score gap. Response keys and UI copy use "fit", "score", "category", "strengths", "risks", "missing_fields", and "next_actions" instead of admissions-odds language.
 
 ## University import response shapes
 

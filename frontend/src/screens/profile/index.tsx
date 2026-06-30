@@ -13,6 +13,7 @@ import type {
   EssayDraft,
   Honor,
   Olympiad,
+  PlannedExam,
   PortfolioProject,
   ProfileCompletion,
   ResearchProject,
@@ -64,6 +65,9 @@ type ProfileFormState = {
   expectedGraduationYear: string;
   gpa: string;
   gpaScale: string;
+  gpaScaleType: StudentProfileDetails["original_gpa_scale_type"];
+  curriculumType: StudentProfileDetails["curriculum_type"];
+  curriculumCountry: string;
   educationStatus: string;
   intendedDegree: string;
   targetCountries: string;
@@ -96,6 +100,9 @@ const emptyForm: ProfileFormState = {
   expectedGraduationYear: "",
   gpa: "",
   gpaScale: "",
+  gpaScaleType: "custom_unknown",
+  curriculumType: "unknown",
+  curriculumCountry: "",
   educationStatus: "",
   intendedDegree: "",
   targetCountries: "",
@@ -149,8 +156,11 @@ function profileToForm(profile: StudentProfileDetails): ProfileFormState {
     schoolOrUniversity: profile.school_or_university,
     grade: profile.grade,
     expectedGraduationYear: profile.expected_graduation_year?.toString() ?? "",
-    gpa: profile.gpa === null ? "" : String(profile.gpa),
-    gpaScale: profile.gpa_scale === null ? "" : String(profile.gpa_scale),
+    gpa: profile.original_gpa_value === null ? "" : String(profile.original_gpa_value),
+    gpaScale: profile.original_gpa_scale === null ? "" : String(profile.original_gpa_scale),
+    gpaScaleType: profile.original_gpa_scale_type,
+    curriculumType: profile.curriculum_type,
+    curriculumCountry: profile.curriculum_country,
     educationStatus: profile.education_status,
     intendedDegree: profile.intended_degree,
     targetCountries: listToText(profile.target_countries),
@@ -336,6 +346,11 @@ export function ProfileScreen() {
           : null,
         gpa: form.gpa || null,
         gpa_scale: form.gpaScale || null,
+        original_gpa_value: form.gpa || null,
+        original_gpa_scale: form.gpaScale || null,
+        original_gpa_scale_type: form.gpaScaleType,
+        curriculum_type: form.curriculumType,
+        curriculum_country: form.curriculumCountry,
         education_status: form.educationStatus,
         intended_degree: form.intendedDegree,
         target_countries: textToList(form.targetCountries),
@@ -347,11 +362,11 @@ export function ProfileScreen() {
         test_scores: testScores,
         exam_plans: {
           taken: profile?.exam_plans.taken ?? [],
-          planned: [
-            { name: "SAT", date: form.satDate, target_score: form.satTarget },
-            { name: "IELTS", date: form.ieltsDate, target_score: form.ieltsTarget },
-            { name: "AP", date: form.apDate, target_score: form.apTarget }
-          ].filter((exam) => exam.date || exam.target_score)
+          planned: ([
+            { name: "SAT", exam_type: "SAT", date: form.satDate, target_score: form.satTarget },
+            { name: "IELTS", exam_type: "IELTS", date: form.ieltsDate, target_score: form.ieltsTarget },
+            { name: "AP", exam_type: "AP", date: form.apDate, target_score: form.apTarget }
+          ] satisfies PlannedExam[]).filter((exam) => exam.date || exam.target_score)
         },
         telegram_username: form.telegramUsername,
         phone: form.phone
@@ -574,6 +589,68 @@ export function ProfileScreen() {
             value={form.gpaScale}
           />
         </Field>
+        <Field label={t("profile.gpaScaleType")}>
+          <select
+            className={fieldClassName}
+            onChange={(event) =>
+              updateField(
+                "gpaScaleType",
+                event.target.value as StudentProfileDetails["original_gpa_scale_type"]
+              )
+            }
+            value={form.gpaScaleType}
+          >
+            <option value="custom_unknown">{t("profile.gpaScaleType.custom_unknown")}</option>
+            <option value="4_0">{t("profile.gpaScaleType.4_0")}</option>
+            <option value="5_0">{t("profile.gpaScaleType.5_0")}</option>
+            <option value="percentage_100">{t("profile.gpaScaleType.percentage_100")}</option>
+            <option value="ib_45">{t("profile.gpaScaleType.ib_45")}</option>
+            <option value="a_level">{t("profile.gpaScaleType.a_level")}</option>
+            <option value="ap_heavy">{t("profile.gpaScaleType.ap_heavy")}</option>
+            <option value="uzbekistan_5">{t("profile.gpaScaleType.uzbekistan_5")}</option>
+            <option value="kazakhstan_local">{t("profile.gpaScaleType.kazakhstan_local")}</option>
+            <option value="kyrgyzstan_local">{t("profile.gpaScaleType.kyrgyzstan_local")}</option>
+            <option value="tajikistan_local">{t("profile.gpaScaleType.tajikistan_local")}</option>
+          </select>
+        </Field>
+        <Field label={t("profile.curriculumType")}>
+          <select
+            className={fieldClassName}
+            onChange={(event) =>
+              updateField(
+                "curriculumType",
+                event.target.value as StudentProfileDetails["curriculum_type"]
+              )
+            }
+            value={form.curriculumType}
+          >
+            <option value="unknown">{t("profile.curriculumType.unknown")}</option>
+            <option value="local_school">{t("profile.curriculumType.local_school")}</option>
+            <option value="academic_lyceum">{t("profile.curriculumType.academic_lyceum")}</option>
+            <option value="ib">{t("profile.curriculumType.ib")}</option>
+            <option value="a_level">{t("profile.curriculumType.a_level")}</option>
+            <option value="ap">{t("profile.curriculumType.ap")}</option>
+            <option value="national_diploma">{t("profile.curriculumType.national_diploma")}</option>
+            <option value="foundation">{t("profile.curriculumType.foundation")}</option>
+            <option value="other">{t("profile.curriculumType.other")}</option>
+          </select>
+        </Field>
+        <Field label={t("profile.curriculumCountry")}>
+          <input
+            className={fieldClassName}
+            maxLength={100}
+            onChange={(event) => updateField("curriculumCountry", event.target.value)}
+            value={form.curriculumCountry}
+          />
+        </Field>
+        {profile?.normalized_gpa_4 ? (
+          <div className="rounded-sm border bg-surface p-3 text-xs text-muted-foreground sm:col-span-2">
+            <p className="font-semibold text-foreground">
+              {t("profile.normalizedGpa", { value: String(profile.normalized_gpa_4) })}
+            </p>
+            <p className="mt-1">{profile.academic_normalization_note}</p>
+          </div>
+        ) : null}
       </ProfileSection>
 
       <ProfileSection

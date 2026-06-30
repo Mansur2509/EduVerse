@@ -22,6 +22,7 @@ from pathlib import Path
 from django.db import transaction
 from django.utils.text import slugify
 
+from .currency import normalize_university_costs
 from .models import (
     University,
     UniversityDataSource,
@@ -619,6 +620,8 @@ def parse_row(raw_row: dict, index: int, *, include_questionable: bool, default_
         "ielts_minimum": ielts_min,
         "ielts_competitive": ielts_comp,
         "tuition_amount": tuition,
+        "tuition_original_amount": tuition,
+        "tuition_original_currency": currency if tuition is not None else "",
         "application_deadline": app_deadline,
         "essay_requirements": essays_text,
         "application_requirements": application_requirements,
@@ -786,6 +789,9 @@ def _write_parsed_row(parsed: ParsedRow, *, replace_existing: bool, source_label
     had_tuition = university.tuition_amount is not None
     if parsed.tuition is not None and (created or replace_existing or not had_tuition):
         university.tuition_currency = parsed.currency
+        university.tuition_original_amount = parsed.tuition
+        university.tuition_original_currency = parsed.currency
+        normalize_university_costs(university)
 
     if parsed.scholarship_available and (
         created or replace_existing or university.scholarship_available is None

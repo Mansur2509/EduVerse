@@ -9,6 +9,11 @@ export type PlannedExam = {
   name: string;
   date: string;
   target_score: string;
+  exam_type?: "SAT" | "AP" | "ACT" | "IELTS" | "TOEFL";
+  planned_retake?: boolean;
+  planned_retake_month?: string;
+  current_score?: string;
+  test_status?: string;
 };
 
 export type ExamPlans = {
@@ -49,6 +54,35 @@ export type StudentProfileDetails = {
   education_status: string;
   gpa: string | number | null;
   gpa_scale: string | number | null;
+  original_gpa_value: string | number | null;
+  original_gpa_scale: string | number | null;
+  original_gpa_scale_type:
+    | "4_0"
+    | "5_0"
+    | "percentage_100"
+    | "ib_45"
+    | "a_level"
+    | "ap_heavy"
+    | "uzbekistan_5"
+    | "kazakhstan_local"
+    | "kyrgyzstan_local"
+    | "tajikistan_local"
+    | "custom_unknown";
+  normalized_gpa_4: string | number | null;
+  normalized_percentage: string | number | null;
+  curriculum_type:
+    | "local_school"
+    | "academic_lyceum"
+    | "ib"
+    | "a_level"
+    | "ap"
+    | "national_diploma"
+    | "foundation"
+    | "other"
+    | "unknown";
+  curriculum_country: string;
+  academic_normalization_confidence: "low" | "medium" | "high";
+  academic_normalization_note: string;
   intended_degree: string;
   target_countries: string[];
   intended_majors: string[];

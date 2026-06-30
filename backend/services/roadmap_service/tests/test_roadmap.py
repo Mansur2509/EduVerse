@@ -1,11 +1,13 @@
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from services.application_service.models import ApplicationTrackerItem
+from services.exam_content_service.models import OfficialExamDate
 from services.roadmap_service.models import RoadmapPlan, RoadmapTask
 from services.roadmap_service.roadmap_generator import generate_roadmap
 from services.university_service.models import (
@@ -158,6 +160,58 @@ class RoadmapGenerationTests(APITestCase):
         self.assertIsNotNone(task.due_date)
         self.assertEqual(task.source_url, "")
         self.assertIn("Planning window only", task.evidence_note)
+
+    def test_planned_sat_without_official_source_creates_verify_task(self):
+        profile, _ = ensure_profile_records(self.user)
+        profile.exam_plans = {
+            "taken": [],
+            "planned": [{"name": "SAT", "exam_type": "SAT", "target_score": "1500"}],
+        }
+        profile.save()
+
+        plan, _ = generate_roadmap(self.user)
+        task = plan.tasks.get(dedup_key="official_exam_date_missing:SAT")
+
+        self.assertIsNone(task.due_date)
+        self.assertEqual(task.source_url, "")
+        self.assertIn("College Board", task.evidence_note)
+
+    def test_verified_sat_date_uses_college_board_source(self):
+        profile, _ = ensure_profile_records(self.user)
+        profile.exam_plans = {
+            "taken": [],
+            "planned": [{"name": "SAT", "exam_type": "SAT", "target_score": "1500"}],
+        }
+        profile.save()
+        official = OfficialExamDate.objects.create(
+            exam_type=OfficialExamDate.ExamType.SAT,
+            name="SAT Test Date",
+            test_date=self.today + timedelta(days=90),
+            registration_deadline=self.today + timedelta(days=45),
+            academic_year=f"{self.today.year}-{self.today.year + 1}",
+            source_url="https://satsuite.collegeboard.org/sat/dates-deadlines",
+            last_verified_date=self.today,
+            verification_status=OfficialExamDate.VerificationStatus.VERIFIED,
+        )
+
+        plan, _ = generate_roadmap(self.user)
+        task = plan.tasks.get(dedup_key=f"official_exam_date:{official.id}")
+
+        self.assertEqual(task.due_date, official.registration_deadline)
+        self.assertEqual(task.source_url, official.source_url)
+        self.assertIn("Official SAT test date", task.evidence_note)
+
+    def test_verified_sat_date_rejects_non_college_board_source(self):
+        with self.assertRaises(ValidationError):
+            OfficialExamDate.objects.create(
+                exam_type=OfficialExamDate.ExamType.SAT,
+                name="Unofficial SAT date",
+                test_date=self.today + timedelta(days=90),
+                academic_year=f"{self.today.year}-{self.today.year + 1}",
+                source_url="https://example.com/sat-dates",
+                last_verified_date=self.today,
+                verification_status=OfficialExamDate.VerificationStatus.VERIFIED,
+            )
 
     def test_no_invented_deadline_when_university_deadline_missing(self):
         university = create_university("no-deadline-university", application_deadline=None)

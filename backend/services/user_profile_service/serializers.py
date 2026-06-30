@@ -5,6 +5,11 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework import serializers
 
+from .academic_normalization import (
+    apply_academic_normalization,
+    infer_gpa_scale_type,
+    normalize_profile_academics,
+)
 from .models import (
     Activity,
     EssayDraft,
@@ -14,12 +19,6 @@ from .models import (
     ResearchProject,
     Sport,
     StudentProfile,
-)
-from .academic_normalization import (
-    SCALE_CUSTOM_UNKNOWN,
-    apply_academic_normalization,
-    infer_gpa_scale_type,
-    normalize_profile_academics,
 )
 from .readiness import calculate_application_readiness
 from .services import (
@@ -195,6 +194,7 @@ class ProfileSerializer(serializers.Serializer):
         profile = instance
         _, preferences = ensure_profile_records(profile.user)
         exam_plans = profile.exam_plans if isinstance(profile.exam_plans, dict) else {}
+        normalization = normalize_profile_academics(profile)
         return {
             "id": profile.user_id,
             "email": profile.user.email,
@@ -355,6 +355,10 @@ class ProfileSerializer(serializers.Serializer):
             name = str(plan.get("name", "")).strip()
             exam_date = str(plan.get("date", "")).strip()
             target_score = str(plan.get("target_score", "")).strip()
+            exam_type = str(plan.get("exam_type", "")).strip().upper()
+            planned_retake_month = str(plan.get("planned_retake_month", "")).strip()
+            current_score = str(plan.get("current_score", "")).strip()
+            test_status = str(plan.get("test_status", "")).strip()
             if not name or len(name) > 80:
                 raise serializers.ValidationError("Every planned exam needs a short name.")
             if exam_date:
@@ -366,9 +370,35 @@ class ProfileSerializer(serializers.Serializer):
                     raise serializers.ValidationError("Exam date is outside the supported range.")
             if len(target_score) > 40:
                 raise serializers.ValidationError("Target scores must be 40 characters or fewer.")
-            normalized_plans.append(
-                {"name": name, "date": exam_date, "target_score": target_score}
-            )
+            if exam_type and exam_type not in {"SAT", "AP", "ACT", "IELTS", "TOEFL"}:
+                raise serializers.ValidationError("Exam type is not supported.")
+            if planned_retake_month:
+                try:
+                    datetime.strptime(planned_retake_month, "%Y-%m")
+                except ValueError as error:
+                    raise serializers.ValidationError(
+                        "Planned retake month must use YYYY-MM."
+                    ) from error
+            for field_name, field_value in {
+                "current_score": current_score,
+                "test_status": test_status,
+            }.items():
+                if len(field_value) > 80:
+                    raise serializers.ValidationError(
+                        f"{field_name.replace('_', ' ').title()} must be 80 characters or fewer."
+                    )
+            normalized_plan = {"name": name, "date": exam_date, "target_score": target_score}
+            if exam_type:
+                normalized_plan["exam_type"] = exam_type
+            if planned_retake_month:
+                normalized_plan["planned_retake_month"] = planned_retake_month
+            if current_score:
+                normalized_plan["current_score"] = current_score
+            if test_status:
+                normalized_plan["test_status"] = test_status
+            if "planned_retake" in plan:
+                normalized_plan["planned_retake"] = bool(plan.get("planned_retake"))
+            normalized_plans.append(normalized_plan)
         return {"taken": taken, "planned": normalized_plans}
 
     def validate_preparation_needs(self, value):
@@ -421,6 +451,14 @@ class ProfileSerializer(serializers.Serializer):
         profile = self.instance
         gpa = attrs.get("gpa", profile.gpa if profile else None)
         gpa_scale = attrs.get("gpa_scale", profile.gpa_scale if profile else None)
+        original_gpa = attrs.get(
+            "original_gpa_value",
+            profile.original_gpa_value if profile else None,
+        )
+        original_scale = attrs.get(
+            "original_gpa_scale",
+            profile.original_gpa_scale if profile else None,
+        )
         if (gpa is None) != (gpa_scale is None):
             raise serializers.ValidationError(
                 {"gpa": "GPA and GPA scale must be provided together."}
@@ -430,6 +468,23 @@ class ProfileSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"gpa": "GPA values are outside the supported range."})
             if gpa > gpa_scale:
                 raise serializers.ValidationError({"gpa": "GPA cannot exceed its scale."})
+        if (original_gpa is None) != (original_scale is None):
+            raise serializers.ValidationError(
+                {"original_gpa_value": "Original GPA value and scale must be provided together."}
+            )
+        if original_gpa is not None:
+            if (
+                original_gpa <= Decimal("0")
+                or original_scale <= Decimal("0")
+                or original_scale > Decimal("100")
+            ):
+                raise serializers.ValidationError(
+                    {"original_gpa_value": "Original GPA values are outside the supported range."}
+                )
+            if original_gpa > original_scale:
+                raise serializers.ValidationError(
+                    {"original_gpa_value": "Original GPA cannot exceed its scale."}
+                )
         return attrs
 
     @transaction.atomic
@@ -451,6 +506,26 @@ class ProfileSerializer(serializers.Serializer):
         for field, value in validated_data.items():
             setattr(profile, field, value)
 
+        if "gpa" in validated_data or "gpa_scale" in validated_data:
+            profile.original_gpa_value = profile.gpa
+            profile.original_gpa_scale = profile.gpa_scale
+            if "original_gpa_scale_type" not in validated_data:
+                profile.original_gpa_scale_type = infer_gpa_scale_type(
+                    profile.gpa,
+                    profile.gpa_scale,
+                    profile.original_gpa_scale_type,
+                )
+
+        if "original_gpa_value" in validated_data or "original_gpa_scale" in validated_data:
+            profile.gpa = profile.original_gpa_value
+            profile.gpa_scale = profile.original_gpa_scale
+            if "original_gpa_scale_type" not in validated_data:
+                profile.original_gpa_scale_type = infer_gpa_scale_type(
+                    profile.original_gpa_value,
+                    profile.original_gpa_scale,
+                    profile.original_gpa_scale_type,
+                )
+
         if "intended_majors" in validated_data:
             profile.intended_major = (
                 validated_data["intended_majors"][0] if validated_data["intended_majors"] else ""
@@ -461,6 +536,7 @@ class ProfileSerializer(serializers.Serializer):
             profile.sat_level = str(sat_score) if sat_score != "" else ""
             profile.ielts_level = str(ielts_score) if ielts_score != "" else ""
 
+        apply_academic_normalization(profile)
         profile.save()
         if interests is not None:
             preferences.interests = interests
