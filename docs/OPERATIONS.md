@@ -84,6 +84,24 @@ public launch or live admissions-reviewer demo, where a 60-90s first-load delay
 is unacceptable and keep-alive's best-effort guarantee is too weak. Until then,
 options 1 + 2 are the interim solution.
 
+## Web-service startup must stay light
+
+Render starts the web service with `migrate --noinput && seed_demo && gunicorn …`
+and kills the deploy if gunicorn does not open its port within the port-scan
+window. Nothing heavy may run before gunicorn binds:
+
+- **Migrations** must be schema-only / tiny. A data migration that did the XLSX
+  university import was reverted to a no-op for exactly this reason
+  (`university_service/0006`).
+- **`seed_demo`** no longer seeds universities/events/exams on startup. The full
+  demo dataset (which `update_or_create`s university rows and can hit a Supabase
+  `statement timeout` while locking tuples) is gated behind `--with-demo-data`;
+  the default only promotes allow-listed admins. For an explicit startup that does
+  no seeding at all, use `python manage.py migrate --noinput && python manage.py
+  bootstrap_admins && gunicorn …`.
+- Bulk imports run **out-of-band** (admin-only `/admin/university-import` UI, or
+  the `import_universities_xlsx` command), never during startup.
+
 ## Supabase RLS cleanup (tracked, not blocking)
 
 Supabase reports RLS warnings because Django created tables in the public

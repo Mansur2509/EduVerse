@@ -27,7 +27,7 @@ try {
         throw "Django migrations failed."
     }
 
-    & $pythonPath manage.py seed_demo
+    & $pythonPath manage.py seed_demo --with-demo-data
     if ($LASTEXITCODE -ne 0) {
         throw "Demo seed failed."
     }

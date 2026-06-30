@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from common.admin_bootstrap import KNOWN_ADMIN_EMAILS, promote_known_admins
 from services.event_service.models import (
     Event,
     EventCategory,
@@ -33,51 +34,64 @@ User = get_user_model()
 
 DEMO_PASSWORD = "EduVerse-Demo-842!"
 
-# Real EduVerse operators who should hold admin access (e.g. for the admin-only
-# university import page). Promotion is idempotent and only ever acts on an
-# account that already exists — these users are never created here and their
-# passwords are never touched. seed_demo runs on every deploy, so a person added
-# to this list becomes admin on the next deploy after they register, with no
-# Render shell required. The standalone `promote_admins` command and the
-# auth_service data migration apply the same rule.
-KNOWN_ADMIN_EMAILS = (
-    "timarus52111@gmail.com",
-    "khamidjonovmansurjon@gmail.com",
-    "iilich6304@gmail.com",
-)
+# `KNOWN_ADMIN_EMAILS` is re-exported from common.admin_bootstrap for callers that
+# still import it from here.
+__all__ = ["Command", "KNOWN_ADMIN_EMAILS"]
 
 
 class Command(BaseCommand):
-    help = "Create safe, clearly labeled demonstration data for local development."
+    help = (
+        "Promote allow-listed admins (always) and, with --with-demo-data, seed the "
+        "full local demonstration dataset. Heavy demo/university seeding is OFF by "
+        "default so it never runs during production web-service startup."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--with-demo-data",
+            action="store_true",
+            help=(
+                "Also seed the full demo dataset (usage limits, demo accounts, demo + "
+                "real universities, events, exam questions). Off by default. This path "
+                "performs update_or_create on university rows and must NOT run on "
+                "production web-service startup."
+            ),
+        )
+        parser.add_argument(
+            "--bootstrap-admins-only",
+            action="store_true",
+            help="Explicit no-op alias for the default: only promote allow-listed admins.",
+        )
 
     def handle(self, *args, **options):
-        self.seed_usage_limits()
-        demo_users = self.seed_demo_accounts()
+        # Always safe + tiny: promote allow-listed operators who have registered.
         self.promote_known_admins()
-        self.seed_university()
-        self.seed_real_universities()
-        self.seed_event(demo_users)
-        self.seed_question()
-        self.stdout.write(self.style.SUCCESS("EduVerse demo data is ready."))
+
+        if options["with_demo_data"] and not options["bootstrap_admins_only"]:
+            self.seed_usage_limits()
+            demo_users = self.seed_demo_accounts()
+            self.seed_university()
+            self.seed_real_universities()
+            self.seed_event(demo_users)
+            self.seed_question()
+            self.stdout.write(self.style.SUCCESS("EduVerse demo data is ready."))
+        else:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Admin bootstrap complete; demo/university seeding skipped "
+                    "(pass --with-demo-data to seed the full local dataset)."
+                )
+            )
 
     def promote_known_admins(self):
         """Idempotently grant admin access to real operators who have registered.
 
-        No-op for any email that has no account yet (or is ambiguous); never
-        creates users or changes passwords. Mirrors the `promote_admins`
-        command and the auth_service bootstrap migration.
+        Delegates to the shared, university-free bootstrap helper. No-op for any
+        email without an account; never creates users or changes passwords.
         """
-        for email in KNOWN_ADMIN_EMAILS:
-            users = list(User.objects.filter(email__iexact=email).order_by("id"))
-            if len(users) != 1:
-                continue
-            user = users[0]
-            if user.role == User.Role.ADMIN and user.is_staff:
-                continue
-            user.role = User.Role.ADMIN
-            user.is_staff = True
-            user.save(update_fields=["role", "is_staff"])
-            self.stdout.write(f"Promoted {user.email} to admin.")
+        report = promote_known_admins(User)
+        for email in report["promoted"]:
+            self.stdout.write(f"Promoted {email} to admin.")
 
     def seed_demo_accounts(self):
         accounts = {
