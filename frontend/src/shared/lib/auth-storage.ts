@@ -6,19 +6,40 @@ export type AuthTokens = {
 const AUTH_STORAGE_KEY = "eduverse.auth.tokens";
 export const AUTH_INVALID_EVENT = "eduverse:auth-invalid";
 
-function canUseStorage() {
-  return typeof window !== "undefined";
+let memoryTokens: AuthTokens | null = null;
+
+function getBrowserStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function removeStoredTokens(storage: Storage | null) {
+  try {
+    storage?.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in hardened/incognito browser contexts.
+  }
 }
 
 export const authStorage = {
   get(): AuthTokens | null {
-    if (!canUseStorage()) {
-      return null;
-    }
+    const storage = getBrowserStorage();
 
-    const rawValue = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    let rawValue: string | null = null;
+    try {
+      rawValue = storage?.getItem(AUTH_STORAGE_KEY) ?? null;
+    } catch {
+      return memoryTokens;
+    }
     if (!rawValue) {
-      return null;
+      return memoryTokens;
     }
 
     try {
@@ -36,20 +57,25 @@ export const authStorage = {
       // Invalid or manually modified auth state is discarded.
     }
 
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    memoryTokens = null;
+    removeStoredTokens(storage);
     return null;
   },
 
   set(tokens: AuthTokens) {
-    if (canUseStorage()) {
-      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokens));
+    memoryTokens = tokens;
+
+    const storage = getBrowserStorage();
+    try {
+      storage?.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokens));
+    } catch {
+      // Keep the current tab usable even when persistent storage is blocked.
     }
   },
 
   clear() {
-    if (canUseStorage()) {
-      window.localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
+    memoryTokens = null;
+    removeStoredTokens(getBrowserStorage());
   }
 };
 

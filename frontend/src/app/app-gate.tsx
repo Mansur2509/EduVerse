@@ -17,6 +17,7 @@ import { AuthForm } from "@/features/auth/ui/auth-form";
 
 type AuthMode = "login" | "register";
 type OnboardingGateStatus = "checking" | "incomplete" | "complete" | "offline";
+const AUTH_ROUTE_PATHS = new Set(["/login", "/register"]);
 
 function AcademicBrand() {
   const { t } = useI18n();
@@ -125,6 +126,7 @@ export function AppGate({ children }: { children: ReactNode }) {
   );
   const [onboardingStatus, setOnboardingStatus] =
     useState<OnboardingGateStatus>("checking");
+  const isAuthRoute = AUTH_ROUTE_PATHS.has(pathname);
 
   const checkOnboarding = useCallback(async () => {
     setOnboardingStatus("checking");
@@ -158,6 +160,12 @@ export function AppGate({ children }: { children: ReactNode }) {
       router.replace("/dashboard");
     }
   }, [onboardingStatus, pathname, router, status]);
+
+  useEffect(() => {
+    if (status === "unauthenticated" && !isAuthRoute) {
+      router.replace("/login");
+    }
+  }, [isAuthRoute, router, status]);
 
   if (status === "checking") return <FullScreenStatus />;
   if (status === "offline") {
