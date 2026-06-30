@@ -15,6 +15,12 @@ from .models import (
     Sport,
     StudentProfile,
 )
+from .academic_normalization import (
+    SCALE_CUSTOM_UNKNOWN,
+    apply_academic_normalization,
+    infer_gpa_scale_type,
+    normalize_profile_academics,
+)
 from .readiness import calculate_application_readiness
 from .services import (
     REQUIRED_ONBOARDING_SECTIONS,
@@ -81,6 +87,42 @@ class ProfileSerializer(serializers.Serializer):
         max_digits=5,
         decimal_places=2,
     )
+    original_gpa_value = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=5,
+        decimal_places=2,
+    )
+    original_gpa_scale = serializers.DecimalField(
+        required=False,
+        allow_null=True,
+        max_digits=5,
+        decimal_places=2,
+    )
+    original_gpa_scale_type = serializers.ChoiceField(
+        choices=StudentProfile.GpaScaleType.choices,
+        required=False,
+    )
+    normalized_gpa_4 = serializers.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        read_only=True,
+    )
+    normalized_percentage = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        read_only=True,
+    )
+    curriculum_type = serializers.ChoiceField(
+        choices=StudentProfile.CurriculumType.choices,
+        required=False,
+    )
+    curriculum_country = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    academic_normalization_confidence = serializers.ChoiceField(
+        choices=StudentProfile.NormalizationConfidence.choices,
+        read_only=True,
+    )
+    academic_normalization_note = serializers.CharField(read_only=True)
     intended_degree = serializers.CharField(required=False, allow_blank=True, max_length=120)
     target_countries = serializers.ListField(
         child=serializers.CharField(max_length=120),
@@ -167,6 +209,15 @@ class ProfileSerializer(serializers.Serializer):
             "education_status": profile.education_status,
             "gpa": profile.gpa,
             "gpa_scale": profile.gpa_scale,
+            "original_gpa_value": normalization.original_gpa_value,
+            "original_gpa_scale": normalization.original_gpa_scale,
+            "original_gpa_scale_type": normalization.original_gpa_scale_type,
+            "normalized_gpa_4": normalization.normalized_gpa_4,
+            "normalized_percentage": normalization.normalized_percentage,
+            "curriculum_type": profile.curriculum_type,
+            "curriculum_country": profile.curriculum_country,
+            "academic_normalization_confidence": normalization.confidence,
+            "academic_normalization_note": normalization.note,
             "intended_degree": profile.intended_degree,
             "target_countries": profile.target_countries,
             "intended_majors": profile.intended_majors,

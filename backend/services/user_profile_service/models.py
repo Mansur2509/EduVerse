@@ -3,6 +3,35 @@ from django.db import models
 
 
 class StudentProfile(models.Model):
+    class GpaScaleType(models.TextChoices):
+        FOUR_POINT = "4_0", "4.0 scale"
+        FIVE_POINT = "5_0", "5.0 scale"
+        PERCENTAGE_100 = "percentage_100", "100-point percentage"
+        IB_45 = "ib_45", "IB / 45"
+        A_LEVEL = "a_level", "A-Level"
+        AP_HEAVY = "ap_heavy", "AP-heavy curriculum"
+        UZBEKISTAN_5 = "uzbekistan_5", "Uzbekistan 5-point / lyceum scale"
+        KAZAKHSTAN_LOCAL = "kazakhstan_local", "Kazakhstan local scale"
+        KYRGYZSTAN_LOCAL = "kyrgyzstan_local", "Kyrgyzstan local scale"
+        TAJIKISTAN_LOCAL = "tajikistan_local", "Tajikistan local scale"
+        CUSTOM_UNKNOWN = "custom_unknown", "Custom / unknown"
+
+    class CurriculumType(models.TextChoices):
+        LOCAL_SCHOOL = "local_school", "Local school"
+        ACADEMIC_LYCEUM = "academic_lyceum", "Academic lyceum"
+        IB = "ib", "IB"
+        A_LEVEL = "a_level", "A-Level"
+        AP = "ap", "AP"
+        NATIONAL_DIPLOMA = "national_diploma", "National diploma"
+        FOUNDATION = "foundation", "Foundation"
+        OTHER = "other", "Other"
+        UNKNOWN = "unknown", "Unknown"
+
+    class NormalizationConfidence(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+
     class ScholarshipNeed(models.TextChoices):
         YES = "yes", "Yes"
         NO = "no", "No"
@@ -28,6 +57,35 @@ class StudentProfile(models.Model):
     education_status = models.CharField(max_length=120, blank=True)
     gpa = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     gpa_scale = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    original_gpa_value = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    original_gpa_scale = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    original_gpa_scale_type = models.CharField(
+        max_length=32,
+        choices=GpaScaleType.choices,
+        default=GpaScaleType.CUSTOM_UNKNOWN,
+    )
+    normalized_gpa_4 = models.DecimalField(
+        max_digits=4, decimal_places=2, null=True, blank=True
+    )
+    normalized_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    curriculum_type = models.CharField(
+        max_length=32,
+        choices=CurriculumType.choices,
+        default=CurriculumType.UNKNOWN,
+    )
+    curriculum_country = models.CharField(max_length=100, blank=True)
+    academic_normalization_confidence = models.CharField(
+        max_length=12,
+        choices=NormalizationConfidence.choices,
+        default=NormalizationConfidence.LOW,
+    )
+    academic_normalization_note = models.TextField(blank=True)
     intended_degree = models.CharField(max_length=120, blank=True)
     intended_major = models.CharField(max_length=180, blank=True)
     intended_majors = models.JSONField(default=list, blank=True)
