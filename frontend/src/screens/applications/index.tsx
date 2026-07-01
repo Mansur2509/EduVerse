@@ -26,7 +26,8 @@ import {
   updateApplicationRequest
 } from "@/features/applications";
 import { ApplicationForm, type ApplicationFormValues } from "@/features/applications/ui/application-form";
-import { MilestoneForm } from "@/features/applications/ui/milestone-form";
+import { ApplicationTimelinePanel } from "@/features/applications/ui/application-timeline";
+import { MilestoneForm, type MilestoneFormValues } from "@/features/applications/ui/milestone-form";
 import { getRoadmapTasksRequest } from "@/features/roadmap";
 import {
   addSuggestionToRoadmapRequest,
@@ -43,7 +44,7 @@ import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
-import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
+import { PaginationControls } from "@/shared/ui/pagination";
 
 const ESSAYS_STATUSES = ["not_started", "drafting", "needs_revision", "ready", "submitted"];
 const RECOMMENDATIONS_STATUSES: RecommendationsStatus[] = [
@@ -62,6 +63,58 @@ const FINANCIAL_AID_STATUSES: FinancialAidStatus[] = [
 ];
 const ALL_STATUSES: ApplicationStatus[] = [...APPLICATION_BOARD_COLUMNS, ...DECISION_STATUSES];
 
+const SORT_OPTIONS = [
+  "nearest_deadline",
+  "urgency",
+  "name",
+  "recently_updated",
+  "progress"
+] as const;
+type SortOption = (typeof SORT_OPTIONS)[number];
+
+const ROUND_OPTIONS = [
+  "early_decision",
+  "early_action",
+  "restrictive_early_action",
+  "regular_decision",
+  "rolling",
+  "scholarship",
+  "other"
+] as const;
+
+// Applications per user are few and lightweight, so load a wide page and let the
+// compact filters/sort operate across the whole set rather than one grid page.
+const APPLICATIONS_PAGE_SIZE = 100;
+
+type UrgencyLevel = "overdue" | "critical" | "urgent" | "soon" | "upcoming" | "far" | "unknown";
+
+// Mirrors backend services/application_service/timeline.py:urgency_for_days so the
+// list-level urgency filter matches the timeline badges exactly.
+function urgencyForDeadline(deadline: string | null): UrgencyLevel {
+  if (!deadline) return "unknown";
+  const parsed = new Date(`${deadline}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return "unknown";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((parsed.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0) return "overdue";
+  if (days <= 7) return "critical";
+  if (days <= 14) return "urgent";
+  if (days <= 30) return "soon";
+  if (days <= 90) return "upcoming";
+  return "far";
+}
+
+const URGENCY_RANK: Record<UrgencyLevel, number> = {
+  overdue: 0,
+  critical: 1,
+  urgent: 2,
+  soon: 3,
+  upcoming: 4,
+  far: 5,
+  unknown: 6
+};
+
 export function ApplicationsScreen() {
   const { locale, t } = useI18n();
   const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
@@ -76,13 +129,18 @@ export function ApplicationsScreen() {
   const [actionError, setActionError] = useState(false);
   const [linkedTasks, setLinkedTasks] = useState<RoadmapTask[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [roundFilter, setRoundFilter] = useState<string>("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<string>("all");
+  const [missingDeadlineOnly, setMissingDeadlineOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("nearest_deadline");
 
   const loadApplications = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
       const [applicationsResponse, shortlistResponse, suggestionsResponse] = await Promise.allSettled([
-        getApplicationsRequest({ page: currentPage, page_size: DEFAULT_PAGE_SIZE }),
+        getApplicationsRequest({ page: currentPage, page_size: APPLICATIONS_PAGE_SIZE }),
         getShortlistRequest(),
         getSuggestionsRequest()
       ]);
@@ -170,14 +228,16 @@ export function ApplicationsScreen() {
     }
   }
 
-  async function handleAddMilestone(values: { title: string; category: string; due_date: string }) {
+  async function handleAddMilestone(values: MilestoneFormValues) {
     if (!selected) return;
     setActionError(false);
     try {
       const milestone = await createApplicationMilestoneRequest(selected.id, {
         title: values.title,
-        category: values.category as never,
-        due_date: values.due_date || null
+        category: values.category,
+        due_date: values.due_date || null,
+        priority: values.priority,
+        notes: values.notes
       });
       updateInList({ ...selected, milestones: [...selected.milestones, milestone] });
     } catch {
@@ -238,14 +298,51 @@ export function ApplicationsScreen() {
     }
   }
 
+  const visibleApplications = useMemo(() => {
+    const progressRank = (status: ApplicationStatus) => ALL_STATUSES.indexOf(status);
+    const filtered = applications.filter((application) => {
+      if (priorityFilter !== "all" && application.priority !== priorityFilter) return false;
+      if (roundFilter !== "all" && application.application_round !== roundFilter) return false;
+      if (urgencyFilter !== "all" && urgencyForDeadline(application.deadline) !== urgencyFilter) {
+        return false;
+      }
+      if (missingDeadlineOnly && application.deadline) return false;
+      return true;
+    });
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.university_name.localeCompare(b.university_name);
+        case "recently_updated":
+          return b.updated_at.localeCompare(a.updated_at);
+        case "progress":
+          return progressRank(b.status) - progressRank(a.status);
+        case "urgency":
+          return (
+            URGENCY_RANK[urgencyForDeadline(a.deadline)] -
+            URGENCY_RANK[urgencyForDeadline(b.deadline)]
+          );
+        case "nearest_deadline":
+        default: {
+          if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
+          if (a.deadline) return -1;
+          if (b.deadline) return 1;
+          return 0;
+        }
+      }
+    });
+    return sorted;
+  }, [applications, priorityFilter, roundFilter, urgencyFilter, missingDeadlineOnly, sortBy]);
+
   const columns = useMemo(() => {
     const grouped = new Map<string, ApplicationTrackerItem[]>();
     ALL_STATUSES.forEach((status) => grouped.set(status, []));
-    applications.forEach((application) => {
+    visibleApplications.forEach((application) => {
       grouped.get(application.status)?.push(application);
     });
     return grouped;
-  }, [applications]);
+  }, [visibleApplications]);
 
   const applicationSuggestions = suggestions.filter((suggestion) => {
     const isApplicationSuggestion =
@@ -256,8 +353,8 @@ export function ApplicationsScreen() {
     if (!isApplicationSuggestion) return false;
     return selected ? suggestion.linked_application === selected.id : true;
   });
-  const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
-  const pageStart = totalCount ? (currentPage - 1) * DEFAULT_PAGE_SIZE + 1 : 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / APPLICATIONS_PAGE_SIZE));
+  const pageStart = totalCount ? (currentPage - 1) * APPLICATIONS_PAGE_SIZE + 1 : 0;
   const pageEnd = Math.min(pageStart + Math.max(applications.length, 1) - 1, totalCount);
 
   if (isLoading) {
@@ -331,6 +428,110 @@ export function ApplicationsScreen() {
         </Card>
       ) : (
         <div className="space-y-4">
+          <Card className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-semibold">{t("applications.filters.title")}</h2>
+                <span className="rounded-sm border bg-surface px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("applications.filters.autoApply")}
+                </span>
+              </div>
+              <Button
+                onClick={() => {
+                  setPriorityFilter("all");
+                  setRoundFilter("all");
+                  setUrgencyFilter("all");
+                  setMissingDeadlineOnly(false);
+                  setSortBy("nearest_deadline");
+                }}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                {t("applications.filters.clear")}
+              </Button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="block">
+                <span className="text-xs font-semibold">{t("applications.detail.priority")}</span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) => setPriorityFilter(event.target.value)}
+                  value={priorityFilter}
+                >
+                  <option value="all">{t("applications.filters.all")}</option>
+                  {(["low", "medium", "high", "dream"] as const).map((priority) => (
+                    <option key={priority} value={priority}>
+                      {t(`applications.priority.${priority}` as TranslationKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="flex items-center gap-1 text-xs font-semibold">
+                  {t("applications.detail.round")}
+                  <HelpTooltip label={t("applications.help.applicationRound")} />
+                </span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) => setRoundFilter(event.target.value)}
+                  value={roundFilter}
+                >
+                  <option value="all">{t("applications.filters.all")}</option>
+                  {ROUND_OPTIONS.map((round) => (
+                    <option key={round} value={round}>
+                      {t(`applications.round.${round}` as TranslationKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="flex items-center gap-1 text-xs font-semibold">
+                  {t("applications.filters.urgency")}
+                  <HelpTooltip label={t("applications.help.urgency")} />
+                </span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) => setUrgencyFilter(event.target.value)}
+                  value={urgencyFilter}
+                >
+                  <option value="all">{t("applications.filters.all")}</option>
+                  {(["overdue", "critical", "urgent", "soon", "upcoming", "far"] as const).map(
+                    (level) => (
+                      <option key={level} value={level}>
+                        {t(`applications.urgency.${level}` as TranslationKey)}
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("applications.sort.label")}</span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) => setSortBy(event.target.value as SortOption)}
+                  value={sortBy}
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`applications.sort.${option}` as TranslationKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <input
+                checked={missingDeadlineOnly}
+                onChange={(event) => setMissingDeadlineOnly(event.target.checked)}
+                type="checkbox"
+              />
+              {t("applications.filters.missingDeadline")}
+            </label>
+            <p className="text-xs text-muted-foreground">
+              {t("applications.filters.resultCount", { count: visibleApplications.length })}
+            </p>
+          </Card>
           <p className="text-sm font-semibold text-muted-foreground">
             {t("pagination.showingRange", {
               start: pageStart,
@@ -391,6 +592,19 @@ export function ApplicationsScreen() {
               {t("applications.actions.delete")}
             </Button>
           </div>
+
+          <section className="rounded-sm border bg-elevated p-4">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-base font-semibold">{t("applications.timeline.title")}</h3>
+              <HelpTooltip label={t("applications.help.timeline")} />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("applications.timeline.description")}
+            </p>
+            <div className="mt-3">
+              <ApplicationTimelinePanel applicationId={selected.id} />
+            </div>
+          </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="block">
@@ -523,11 +737,19 @@ export function ApplicationsScreen() {
                     className="flex flex-wrap items-center justify-between gap-3 rounded-sm border bg-surface p-3 text-sm"
                     key={milestone.id}
                   >
-                    <div>
-                      <span className="rounded-sm border bg-elevated px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t(`applications.milestoneCategory.${milestone.category}` as TranslationKey)}
-                      </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-sm border bg-elevated px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t(`applications.milestoneCategory.${milestone.category}` as TranslationKey)}
+                        </span>
+                        <span className="rounded-sm border bg-elevated px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t(`applications.priority.${milestone.priority}` as TranslationKey)}
+                        </span>
+                      </div>
                       <p className="mt-1 font-semibold">{milestone.title}</p>
+                      {milestone.notes ? (
+                        <p className="text-xs text-muted-foreground">{milestone.notes}</p>
+                      ) : null}
                       {milestone.due_date ? (
                         <p className="text-xs text-muted-foreground">
                           {formatDate(milestone.due_date, locale)}

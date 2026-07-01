@@ -50,6 +50,37 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 
+type DashboardUrgency =
+  | "overdue"
+  | "critical"
+  | "urgent"
+  | "soon"
+  | "upcoming"
+  | "far"
+  | "unknown";
+
+// Mirrors backend timeline urgency thresholds so the dashboard warning matches
+// the per-application timeline badges.
+function urgencyForDays(days: number | null): DashboardUrgency {
+  if (days === null) return "unknown";
+  if (days < 0) return "overdue";
+  if (days <= 7) return "critical";
+  if (days <= 14) return "urgent";
+  if (days <= 30) return "soon";
+  if (days <= 90) return "upcoming";
+  return "far";
+}
+
+const DASHBOARD_URGENCY_STYLES: Record<DashboardUrgency, string> = {
+  overdue: "border-danger/45 bg-danger/10 text-danger",
+  critical: "border-danger/45 bg-danger/10 text-danger",
+  urgent: "border-warning/45 bg-warning/10 text-warning",
+  soon: "border-warning/35 bg-warning/10 text-warning",
+  upcoming: "border-accent/35 bg-accent/10 text-accent",
+  far: "border-muted-foreground/30 bg-surface text-muted-foreground",
+  unknown: "border-muted-foreground/30 bg-surface text-muted-foreground"
+};
+
 export function DashboardScreen() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -248,6 +279,29 @@ export function DashboardScreen() {
       });
     return candidates.sort((left, right) => left.date.localeCompare(right.date))[0] ?? null;
   }, [applications, roadmapTasks]);
+
+  const nextDeadlineDays = useMemo(() => {
+    if (!nextDeadline) return null;
+    const parsed = new Date(`${nextDeadline.date}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((parsed.getTime() - today.getTime()) / 86_400_000);
+  }, [nextDeadline]);
+
+  const nextDeadlineUrgency = urgencyForDays(nextDeadlineDays);
+
+  // Active applications (still being worked on) that have no user or verified
+  // deadline yet — surfaced so a missing deadline is never treated as "safe".
+  const missingDeadlineCount = useMemo(
+    () =>
+      applications.filter(
+        (application) =>
+          !application.deadline &&
+          !["accepted", "rejected", "withdrawn"].includes(application.status)
+      ).length,
+    [applications]
+  );
 
   return (
     <div className="space-y-4">
@@ -548,12 +602,31 @@ export function DashboardScreen() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {formatDate(nextDeadline.date, locale)}
               </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {nextDeadlineUrgency !== "unknown" ? (
+                  <span
+                    className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${DASHBOARD_URGENCY_STYLES[nextDeadlineUrgency]}`}
+                  >
+                    {t(`applications.urgency.${nextDeadlineUrgency}` as TranslationKey)}
+                  </span>
+                ) : null}
+                {nextDeadlineDays !== null && nextDeadlineDays >= 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {t("applications.timeline.dueIn", { count: nextDeadlineDays })}
+                  </span>
+                ) : null}
+              </div>
             </>
           ) : (
             <p className="mt-3 text-xs text-muted-foreground">
               {t("dashboard.deadlineWidget.empty")}
             </p>
           )}
+          {missingDeadlineCount > 0 ? (
+            <p className="mt-2 text-xs font-semibold text-warning">
+              {t("dashboard.deadlineWidget.missingDeadlines", { count: missingDeadlineCount })}
+            </p>
+          ) : null}
           <Button asChild className="mt-3" size="sm" variant="ghost">
             <Link href="/roadmap">{t("dashboard.deadlineWidget.open")}</Link>
           </Button>

@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -6,12 +7,15 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from services.user_profile_service.services import ensure_profile_records
+
 from .models import ApplicationMilestone, ApplicationTrackerItem
 from .serializers import (
     ApplicationMilestoneCreateSerializer,
     ApplicationMilestoneSerializer,
     ApplicationTrackerItemSerializer,
 )
+from .timeline import build_application_timeline
 
 
 class ApplicationTrackerViewSet(viewsets.ModelViewSet):
@@ -26,6 +30,23 @@ class ApplicationTrackerViewSet(viewsets.ModelViewSet):
             .select_related("university", "target_program")
             .prefetch_related("milestones")
         )
+
+    @action(detail=True, methods=["get"], url_path="timeline")
+    def timeline(self, request, pk=None):
+        application = (
+            self.get_queryset()
+            .prefetch_related(
+                "university__field_verifications",
+                "university__scholarships",
+                "roadmap_tasks",
+            )
+            .get(pk=self.get_object().pk)
+        )
+        profile, _ = ensure_profile_records(request.user)
+        payload = build_application_timeline(
+            application, profile, today=timezone.now().date()
+        )
+        return Response(payload)
 
     def perform_create(self, serializer):
         try:

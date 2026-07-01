@@ -559,7 +559,8 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | GET/PATCH | `/api/essays/revision-tasks/{id}/` | Authenticated, self-only | Read/update a revision task's title/description/category/status |
 | GET/POST | `/api/applications/` | Authenticated, self-only | List caller's application tracker items or start tracking a university |
 | GET/PATCH/DELETE | `/api/applications/{id}/` | Authenticated, self-only | Read/update/delete an application tracker item (filters: `status`, `university`) |
-| GET/POST | `/api/applications/{id}/milestones/` | Authenticated, self-only | List or add milestones for an application |
+| GET | `/api/applications/{id}/timeline/` | Authenticated, self-only | Derived, read-only source-aware timeline for one application (deadlines, events, suggested finish dates, linked essays/exams). Nothing is persisted; no invented dates |
+| GET/POST | `/api/applications/{id}/milestones/` | Authenticated, self-only | List or add milestones for an application (milestones now carry `priority` and `notes`) |
 | GET/PATCH | `/api/applications/milestones/{id}/` | Authenticated, self-only | Read/update a milestone, optionally linking to one of the caller's own roadmap tasks |
 | GET | `/api/suggestions/` | Authenticated, self-only | List caller's active suggestions (filters: `status`, `suggestion_type`, `linked_university`, `linked_application`, `linked_essay`) |
 | POST | `/api/suggestions/generate/` | Authenticated, self-only | Generate or refresh source-aware rule-based suggestions; no AI and no invented official dates |
@@ -673,6 +674,14 @@ The generator additionally reads (read-only) the caller's own `EssayWorkspace` r
 `ApplicationTrackerItem` embeds its `milestones[]`. Creating an application only requires `university`; all status fields (`status`, `essays_status`, `recommendations_status`, `test_scores_status`, `documents_status`, `financial_aid_status`) default to their "not started" equivalents — the API never auto-advances a status. A second `POST` for the same `(user, university)` pair returns 400. `ApplicationMilestone.linked_roadmap_task` is optional and validated to belong to the caller; it lets a milestone point at an existing roadmap task without `application_service` owning or duplicating roadmap data.
 
 ## Suggestions response shapes
+
+`GET /api/applications/{id}/timeline/` returns a **derived, read-only** planning view for one tracked application, assembled fresh on each request from data that already exists (the tracker item, the linked university's verified/imported fields and scholarships, the caller's essays for that university, official College Board exam dates, linked roadmap tasks, and milestones). Nothing is persisted and no date is invented. The payload has five arrays:
+
+- `deadlines[]` — application / financial-aid / scholarship deadlines, each with `date`, `days_remaining`, `urgency` (`far` | `upcoming` | `soon` | `urgent` | `critical` | `overdue` | `unknown`), `confidence` (`verified` | `partial` | `user_provided` | `estimated` | `missing`), `source_url`, and `source_label`. A missing deadline is returned with `date: null` and `confidence: "missing"` — never as a safe/zero value.
+- `events[]` — dated timeline items (real deadlines, milestones, roadmap tasks, and clearly-labelled suggested checkpoints), each with `type`, `date`, `days_remaining`, `urgency`, and `confidence`, sorted chronologically.
+- `suggested_dates[]` — phase-aware suggested finish dates (`type`, `date`, `reason_key`, `weeks_before`, `reference_deadline`, `confidence: "estimated"`). They are only produced when a real reference deadline exists and only within the window appropriate to how far away it is, so a distant deadline never generates urgent work and an imminent one drops unrealistic long-term tasks. Add-to-roadmap remains the existing idempotent `suggestions_service` flow; these are informational.
+- `linked_essays[]` — the caller's essays for this university (`title`, `status`, `word_limit`, `word_count`, `updated_at`).
+- `linked_exams[]` — SAT/IELTS/TOEFL/AP context (`current_score`, `threshold`, `threshold_label`, `severity` reusing the fit gap-severity model, `planned_retake`, official `official_test_date`/`registration_deadline` for SAT/AP only, and `scores_arrive_before_deadline` which is `false` when an official test date is too late to help this cycle). No admission-probability language.
 
 `suggestions_service` owns persistent, self-only `SuggestedItem` records under `/api/suggestions/`. Suggestions are deterministic and rule-based; they read the caller's profile, exam plans, shortlist/tracked universities, verified university fields, essays, applications, and existing roadmap context. They never call AI, never estimate admission probability, and never invent official dates.
 

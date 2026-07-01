@@ -48,6 +48,8 @@ export type MilestoneCategory =
 
 export type MilestoneStatus = "todo" | "in_progress" | "completed" | "skipped";
 
+export type MilestonePriority = "low" | "medium" | "high";
+
 export type ApplicationMilestone = {
   id: number;
   application: number;
@@ -55,11 +57,101 @@ export type ApplicationMilestone = {
   category: MilestoneCategory;
   due_date: string | null;
   status: MilestoneStatus;
+  priority: MilestonePriority;
+  notes: string;
   linked_roadmap_task: number | null;
   linked_roadmap_task_title: string | null;
   source_url: string;
   created_at: string;
   updated_at: string;
+};
+
+export type DateConfidence =
+  | "verified"
+  | "partial"
+  | "user_provided"
+  | "estimated"
+  | "missing";
+
+export type Urgency =
+  | "overdue"
+  | "critical"
+  | "urgent"
+  | "soon"
+  | "upcoming"
+  | "far"
+  | "unknown";
+
+export type TimelineDeadline = {
+  kind: "application" | "financial_aid" | "scholarship";
+  date: string | null;
+  confidence: DateConfidence;
+  days_remaining: number | null;
+  urgency: Urgency;
+  source_url: string;
+  source_label: string;
+  last_verified_date: string | null;
+};
+
+export type TimelineEvent = {
+  type: string;
+  title: string | null;
+  date: string | null;
+  days_remaining: number | null;
+  urgency: Urgency;
+  confidence: DateConfidence;
+  reason_key?: string;
+  weeks_before?: number;
+  reference_deadline?: string | null;
+  status?: string;
+  is_timeline_marker?: boolean;
+  source_url?: string;
+  category?: string;
+};
+
+export type TimelineSuggestedDate = {
+  type: string;
+  date: string | null;
+  days_remaining: number | null;
+  urgency: Urgency;
+  reason_key: string;
+  weeks_before: number;
+  reference_deadline: string | null;
+  reference_confidence: DateConfidence;
+  confidence: DateConfidence;
+};
+
+export type TimelineEssay = {
+  id: number;
+  title: string;
+  essay_type: string;
+  status: string;
+  word_limit: number | null;
+  word_count: number;
+  updated_at: string;
+  source_url: string;
+};
+
+export type TimelineExam = {
+  exam: string;
+  current_score: number | null;
+  threshold: number | null;
+  threshold_label: string | null;
+  severity: string | null;
+  planned_retake: boolean;
+  official_test_date: string | null;
+  official_test_date_confidence: string | null;
+  registration_deadline: string | null;
+  source_url: string;
+  scores_arrive_before_deadline: boolean | null;
+};
+
+export type ApplicationTimeline = {
+  deadlines: TimelineDeadline[];
+  events: TimelineEvent[];
+  suggested_dates: TimelineSuggestedDate[];
+  linked_essays: TimelineEssay[];
+  linked_exams: TimelineExam[];
 };
 
 export type ApplicationTrackerItem = {
@@ -107,6 +199,8 @@ export type ApplicationMilestoneInput = {
   title: string;
   category: MilestoneCategory;
   due_date?: string | null;
+  priority?: MilestonePriority;
+  notes?: string;
   linked_roadmap_task?: number | null;
   source_url?: string;
 };

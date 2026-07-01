@@ -133,6 +133,11 @@ class ApplicationMilestone(models.Model):
         COMPLETED = "completed", "Completed"
         SKIPPED = "skipped", "Skipped"
 
+    class Priority(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+
     application = models.ForeignKey(
         ApplicationTrackerItem, on_delete=models.CASCADE, related_name="milestones"
     )
@@ -140,6 +145,8 @@ class ApplicationMilestone(models.Model):
     category = models.CharField(max_length=20, choices=Category.choices)
     due_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
+    priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
+    notes = models.TextField(max_length=1000, blank=True)
     linked_roadmap_task = models.ForeignKey(
         "roadmap_service.RoadmapTask",
         on_delete=models.SET_NULL,

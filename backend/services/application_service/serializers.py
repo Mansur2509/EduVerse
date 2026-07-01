@@ -17,6 +17,8 @@ class ApplicationMilestoneSerializer(serializers.ModelSerializer):
             "category",
             "due_date",
             "status",
+            "priority",
+            "notes",
             "linked_roadmap_task",
             "linked_roadmap_task_title",
             "source_url",
@@ -34,7 +36,15 @@ class ApplicationMilestoneSerializer(serializers.ModelSerializer):
 class ApplicationMilestoneCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicationMilestone
-        fields = ("title", "category", "due_date", "linked_roadmap_task", "source_url")
+        fields = (
+            "title",
+            "category",
+            "due_date",
+            "priority",
+            "notes",
+            "linked_roadmap_task",
+            "source_url",
+        )
 
     def validate_title(self, value):
         if not value.strip():

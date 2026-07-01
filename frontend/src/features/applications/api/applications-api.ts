@@ -1,6 +1,7 @@
 import type {
   ApplicationMilestone,
   ApplicationMilestoneInput,
+  ApplicationTimeline,
   ApplicationTrackerItem,
   ApplicationTrackerItemInput
 } from "@/entities/application";
@@ -30,6 +31,10 @@ export async function getApplicationsRequest(filters: ApplicationListParams = {}
 
 export function getApplicationRequest(id: number) {
   return apiRequest<ApplicationTrackerItem>(`/${id}/`, { base: "applications" });
+}
+
+export function getApplicationTimelineRequest(id: number) {
+  return apiRequest<ApplicationTimeline>(`/${id}/timeline/`, { base: "applications" });
 }
 
 export function createApplicationRequest(input: ApplicationTrackerItemInput) {
