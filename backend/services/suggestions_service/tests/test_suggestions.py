@@ -160,7 +160,73 @@ class SuggestionsApiTests(APITestCase):
         task = RoadmapTask.objects.get(id=response.data["roadmap_task_id"])
         self.assertEqual(task.user, self.user1)
         self.assertEqual(task.linked_university, university)
+        self.assertEqual(task.linked_application, application)
         self.assertEqual(task.source_type, RoadmapTask.SourceType.PLANNING_WINDOW)
+
+    def test_add_suggestion_to_roadmap_is_idempotent_and_preserves_source(self):
+        suggestion = SuggestedItem.objects.create(
+            user=self.user1,
+            suggestion_type=SuggestedItem.SuggestionType.PROFILE_GAP,
+            title="Verify official source",
+            description="Check the official admissions source before planning.",
+            priority=SuggestedItem.Priority.HIGH,
+            source_type=SuggestedItem.SourceType.MISSING_DATA_WARNING,
+            source_url="https://example.com/source",
+            evidence_note="Official date not verified yet.",
+            dedup_key="verify:source",
+        )
+
+        self.client.force_authenticate(self.user1)
+        first_response = self.client.post(f"/api/suggestions/{suggestion.id}/add-to-roadmap/")
+        second_response = self.client.post(f"/api/suggestions/{suggestion.id}/add-to-roadmap/")
+
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED, first_response.data)
+        self.assertEqual(second_response.status_code, status.HTTP_201_CREATED, second_response.data)
+        self.assertEqual(first_response.data["roadmap_task_id"], second_response.data["roadmap_task_id"])
+        self.assertEqual(
+            RoadmapTask.objects.filter(
+                user=self.user1,
+                dedup_key=f"suggestion:{suggestion.id}",
+            ).count(),
+            1,
+        )
+        task = RoadmapTask.objects.get(id=first_response.data["roadmap_task_id"])
+        self.assertEqual(task.source_url, "https://example.com/source")
+
+    def test_added_suggestion_is_removed_from_active_list(self):
+        suggestion = SuggestedItem.objects.create(
+            user=self.user1,
+            suggestion_type=SuggestedItem.SuggestionType.PROFILE_GAP,
+            title="Add profile detail",
+            priority=SuggestedItem.Priority.MEDIUM,
+            source_type=SuggestedItem.SourceType.PROFILE_BASED,
+            dedup_key="profile:add-detail",
+        )
+
+        self.client.force_authenticate(self.user1)
+        self.client.post(f"/api/suggestions/{suggestion.id}/add-to-roadmap/")
+        response = self.client.get("/api/suggestions/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn(suggestion.id, [item["id"] for item in response.data["results"]])
+
+    def test_dismiss_suggestion_persists_from_active_list(self):
+        suggestion = SuggestedItem.objects.create(
+            user=self.user1,
+            suggestion_type=SuggestedItem.SuggestionType.PROFILE_GAP,
+            title="Dismissible suggestion",
+            priority=SuggestedItem.Priority.LOW,
+            source_type=SuggestedItem.SourceType.PROFILE_BASED,
+            dedup_key="profile:dismiss",
+        )
+
+        self.client.force_authenticate(self.user1)
+        dismiss_response = self.client.patch(f"/api/suggestions/{suggestion.id}/dismiss/")
+        list_response = self.client.get("/api/suggestions/")
+
+        self.assertEqual(dismiss_response.status_code, status.HTTP_200_OK, dismiss_response.data)
+        self.assertEqual(dismiss_response.data["status"], SuggestedItem.Status.DISMISSED)
+        self.assertNotIn(suggestion.id, [item["id"] for item in list_response.data["results"]])
 
     def test_cannot_add_another_users_suggestion_to_roadmap(self):
         suggestion = SuggestedItem.objects.create(

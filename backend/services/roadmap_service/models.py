@@ -26,6 +26,8 @@ class RoadmapPlan(models.Model):
 
 
 class RoadmapTask(models.Model):
+    TIMELINE_MARKER_DAYS = {"60", "30", "15", "14", "7"}
+
     class Category(models.TextChoices):
         PROFILE = "profile", "Profile"
         EXAMS = "exams", "Exams"
@@ -94,6 +96,13 @@ class RoadmapTask(models.Model):
         blank=True,
         related_name="roadmap_tasks",
     )
+    linked_application = models.ForeignKey(
+        "application_service.ApplicationTrackerItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="roadmap_tasks",
+    )
     linked_event = models.ForeignKey(
         "event_service.Event",
         on_delete=models.SET_NULL,
@@ -124,6 +133,19 @@ class RoadmapTask(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    @property
+    def task_kind(self) -> str:
+        return "manual" if self.source_type == self.SourceType.MANUAL else "generated"
+
+    @property
+    def is_timeline_marker(self) -> bool:
+        if self.source_type != self.SourceType.UNIVERSITY_DEADLINE:
+            return False
+        if not self.dedup_key.startswith("university_deadline:"):
+            return False
+        marker = self.dedup_key.rsplit(":", 1)[-1]
+        return marker in self.TIMELINE_MARKER_DAYS
 
 
 class RoadmapTaskDependency(models.Model):

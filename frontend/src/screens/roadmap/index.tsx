@@ -45,12 +45,35 @@ import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid, PaginatedList } from "@/shared/ui/pagination";
 
-const BUCKETS: RoadmapBucket[] = ["this_week", "this_month", "later", "completed"];
-type TaskBucketFilter = RoadmapBucket | "all";
+type ActiveBucketFilter = Exclude<RoadmapBucket, "completed"> | "all";
+type RoadmapViewMode = "list" | "timeline";
+type TaskStatusScope = "active" | "completed" | "skipped" | "all";
 
-const BUCKET_FILTERS: TaskBucketFilter[] = ["all", ...BUCKETS];
+const BUCKET_FILTERS: ActiveBucketFilter[] = ["all", "this_week", "this_month", "later"];
+const STATUS_SCOPES: TaskStatusScope[] = ["active", "completed", "skipped", "all"];
+const ROADMAP_SOURCE_TYPES = [
+  "generated",
+  "manual",
+  "university_deadline",
+  "profile_gap",
+  "fit_analysis",
+  "essay_status",
+  "exam_plan",
+  "planning_window",
+  "event"
+] as const;
 
-const emptyFilters = { category: "", priority: "", status: "", university: "" };
+const emptyFilters = {
+  category: "",
+  priority: "",
+  university: "",
+  application: "",
+  exam: "",
+  dueAfter: "",
+  dueBefore: "",
+  sourceType: "",
+  taskKind: ""
+};
 
 export function RoadmapScreen() {
   const { locale, t } = useI18n();
@@ -59,8 +82,9 @@ export function RoadmapScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [bucket, setBucket] = useState<TaskBucketFilter>("all");
-  const [timelineMode, setTimelineMode] = useState(false);
+  const [bucket, setBucket] = useState<ActiveBucketFilter>("all");
+  const [viewMode, setViewMode] = useState<RoadmapViewMode>("list");
+  const [statusScope, setStatusScope] = useState<TaskStatusScope>("active");
   const [taskPage, setTaskPage] = useState(1);
   const [filters, setFilters] = useState(emptyFilters);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -69,6 +93,7 @@ export function RoadmapScreen() {
   const [actionError, setActionError] = useState(false);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [completedOpen, setCompletedOpen] = useState(false);
 
   const loadRoadmap = useCallback(async () => {
     setIsLoading(true);
@@ -101,7 +126,16 @@ export function RoadmapScreen() {
     if (window.localStorage.getItem("eduverse.roadmap.instructions.viewed") === "true") {
       setInstructionsOpen(false);
     }
+    const storedView = window.localStorage.getItem("eduverse.roadmap.viewMode");
+    if (storedView === "list" || storedView === "timeline") {
+      setViewMode(storedView);
+    }
   }, []);
+
+  function handleViewModeChange(nextMode: RoadmapViewMode) {
+    setViewMode(nextMode);
+    window.localStorage.setItem("eduverse.roadmap.viewMode", nextMode);
+  }
 
   async function handleGenerate() {
     setIsGenerating(true);
@@ -184,6 +218,9 @@ export function RoadmapScreen() {
   }
 
   async function handleSkip(task: RoadmapTask) {
+    if (!window.confirm(t("roadmap.confirm.dismissGenerated"))) {
+      return;
+    }
     setPendingTaskId(task.id);
     setActionError(false);
     try {
@@ -231,6 +268,13 @@ export function RoadmapScreen() {
   }
 
   async function handleDelete(task: RoadmapTask) {
+    const message =
+      task.status === "completed"
+        ? t("roadmap.confirm.deleteCompleted")
+        : t("roadmap.confirm.deleteManual");
+    if (!window.confirm(message)) {
+      return;
+    }
     setPendingTaskId(task.id);
     setActionError(false);
     try {
@@ -256,38 +300,67 @@ export function RoadmapScreen() {
     return [...names];
   }, [plan]);
 
+  const applicationOptions = useMemo(() => {
+    if (!plan) return [];
+    const options = new Map<number, string>();
+    plan.tasks.forEach((task) => {
+      if (task.linked_application) {
+        options.set(
+          task.linked_application,
+          task.linked_application_university_name || task.linked_university_name || String(task.linked_application)
+        );
+      }
+    });
+    return [...options.entries()].map(([id, label]) => ({ id, label }));
+  }, [plan]);
+
   const filteredTasks = useMemo(() => {
     if (!plan) return [];
     return plan.tasks.filter((task) => {
       if (filters.category && task.category !== filters.category) return false;
       if (filters.priority && task.priority !== filters.priority) return false;
-      if (filters.status && task.status !== filters.status) return false;
       if (filters.university && task.linked_university_name !== filters.university) return false;
+      if (filters.application && task.linked_application !== Number(filters.application)) return false;
+      if (filters.sourceType && task.source_type !== filters.sourceType) return false;
+      if (filters.taskKind && task.task_kind !== filters.taskKind) return false;
+      if (filters.dueAfter && (!task.due_date || task.due_date < filters.dueAfter)) return false;
+      if (filters.dueBefore && (!task.due_date || task.due_date > filters.dueBefore)) return false;
+      if (filters.exam) {
+        const examNeedle = filters.exam.toLowerCase();
+        const examText = `${task.title} ${task.description} ${task.generated_reason} ${task.evidence_note}`.toLowerCase();
+        if (task.category !== "exams" || !examText.includes(examNeedle)) return false;
+      }
       return true;
     });
   }, [plan, filters]);
 
-  const bucketedTasks = useMemo(
-    () =>
-      bucket === "all"
-        ? filteredTasks
-        : filteredTasks.filter((task) => bucketForTask(task, today) === bucket),
-    [filteredTasks, bucket, today]
+  const actionableTasks = useMemo(
+    () => filteredTasks.filter((task) => !task.is_timeline_marker),
+    [filteredTasks]
   );
+
+  const statusFilteredTasks = useMemo(
+    () => actionableTasks.filter((task) => matchesStatusScope(task, statusScope)),
+    [actionableTasks, statusScope]
+  );
+
+  const bucketedTasks = useMemo(() => {
+    const sorted = [...statusFilteredTasks].sort(compareRoadmapTasks(today));
+    return bucket === "all" ? sorted : sorted.filter((task) => bucketForTask(task, today) === bucket);
+  }, [statusFilteredTasks, bucket, today]);
 
   const timelineTasks = useMemo(
     () =>
       filteredTasks
-        .filter((task) => task.status === "todo" || task.status === "in_progress")
-        .sort((left, right) => {
-          if (!left.due_date && !right.due_date) return 0;
-          if (!left.due_date) return 1;
-          if (!right.due_date) return -1;
-          return left.due_date.localeCompare(right.due_date);
-        }),
-    [filteredTasks]
+        .filter(
+          (task) =>
+            (task.status === "todo" || task.status === "in_progress") &&
+            (task.due_date || task.is_timeline_marker)
+        )
+        .sort(compareRoadmapTasks(today)),
+    [filteredTasks, today]
   );
-  const activeTaskList = timelineMode ? timelineTasks : bucketedTasks;
+  const activeTaskList = viewMode === "timeline" ? timelineTasks : bucketedTasks;
   const totalTaskPages = Math.max(1, Math.ceil(activeTaskList.length / DEFAULT_PAGE_SIZE));
   const visibleTimelineTasks = timelineTasks.slice(
     (taskPage - 1) * DEFAULT_PAGE_SIZE,
@@ -300,7 +373,7 @@ export function RoadmapScreen() {
 
   useEffect(() => {
     setTaskPage(1);
-  }, [filters, bucket, timelineMode]);
+  }, [filters, bucket, viewMode, statusScope]);
 
   useEffect(() => {
     if (taskPage > totalTaskPages) {
@@ -337,6 +410,24 @@ export function RoadmapScreen() {
         .slice(0, 3),
     [plan]
   );
+
+  const completedTasks = useMemo(
+    () =>
+      actionableTasks
+        .filter((task) => task.status === "completed")
+        .sort((left, right) => {
+          const leftDate = left.completed_at || left.updated_at;
+          const rightDate = right.completed_at || right.updated_at;
+          return rightDate.localeCompare(leftDate);
+        }),
+    [actionableTasks]
+  );
+
+  function clearAllFilters() {
+    setFilters(emptyFilters);
+    setStatusScope("active");
+    setBucket("all");
+  }
 
   if (isLoading) {
     return (
@@ -381,7 +472,8 @@ export function RoadmapScreen() {
               </p>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <RoadmapViewToggle onChange={handleViewModeChange} value={viewMode} />
             <Button disabled={isGenerating} onClick={() => void handleGenerate()} type="button">
               <RefreshCw aria-hidden className="mr-2 size-4" />
               {isGenerating
@@ -558,7 +650,7 @@ export function RoadmapScreen() {
           />
 
           <Card>
-            <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="block">
                 <span className="text-xs font-semibold">{t("roadmap.filters.category")}</span>
                 <select
@@ -606,23 +698,6 @@ export function RoadmapScreen() {
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.status")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, status: event.target.value }))
-                  }
-                  value={filters.status}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  {["todo", "in_progress", "completed", "skipped"].map((statusValue) => (
-                    <option key={statusValue} value={statusValue}>
-                      {t(`roadmap.status.${statusValue}` as TranslationKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block sm:col-span-2 lg:col-span-1">
                 <span className="text-xs font-semibold">{t("roadmap.filters.university")}</span>
                 <select
                   className={fieldClassName}
@@ -639,9 +714,90 @@ export function RoadmapScreen() {
                   ))}
                 </select>
               </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("roadmap.filters.application")}</span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, application: event.target.value }))
+                  }
+                  value={filters.application}
+                >
+                  <option value="">{t("roadmap.filters.all")}</option>
+                  {applicationOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("roadmap.filters.exam")}</span>
+                <input
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, exam: event.target.value }))
+                  }
+                  placeholder={t("roadmap.filters.examPlaceholder")}
+                  value={filters.exam}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("roadmap.filters.sourceType")}</span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, sourceType: event.target.value }))
+                  }
+                  value={filters.sourceType}
+                >
+                  <option value="">{t("roadmap.filters.all")}</option>
+                  {ROADMAP_SOURCE_TYPES.map((sourceType) => (
+                    <option key={sourceType} value={sourceType}>
+                      {t(`roadmap.source.${sourceType}` as TranslationKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("roadmap.filters.taskKind")}</span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, taskKind: event.target.value }))
+                  }
+                  value={filters.taskKind}
+                >
+                  <option value="">{t("roadmap.filters.all")}</option>
+                  <option value="manual">{t("roadmap.task.kind.manual")}</option>
+                  <option value="generated">{t("roadmap.task.kind.generated")}</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("roadmap.filters.dueAfter")}</span>
+                <input
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, dueAfter: event.target.value }))
+                  }
+                  type="date"
+                  value={filters.dueAfter}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold">{t("roadmap.filters.dueBefore")}</span>
+                <input
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, dueBefore: event.target.value }))
+                  }
+                  type="date"
+                  value={filters.dueBefore}
+                />
+              </label>
               <div className="flex items-end">
                 <Button
-                  onClick={() => setFilters(emptyFilters)}
+                  onClick={clearAllFilters}
                   type="button"
                   variant="ghost"
                 >
@@ -651,31 +807,41 @@ export function RoadmapScreen() {
             </form>
           </Card>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              {BUCKET_FILTERS.map((value) => (
-                <Button
-                  key={value}
-                  onClick={() => setBucket(value)}
-                  size="sm"
-                  type="button"
-                  variant={bucket === value ? "primary" : "ghost"}
-                >
-                  {t(`roadmap.bucket.${value}` as TranslationKey)}
-                </Button>
-              ))}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                {STATUS_SCOPES.map((value) => (
+                  <Button
+                    key={value}
+                    onClick={() => setStatusScope(value)}
+                    size="sm"
+                    type="button"
+                    variant={statusScope === value ? "primary" : "ghost"}
+                  >
+                    {t(`roadmap.statusScope.${value}` as TranslationKey)}
+                  </Button>
+                ))}
+              </div>
+              <RoadmapViewToggle onChange={handleViewModeChange} value={viewMode} />
             </div>
-            <Button
-              onClick={() => setTimelineMode((current) => !current)}
-              size="sm"
-              type="button"
-              variant={timelineMode ? "secondary" : "ghost"}
-            >
-              {t("roadmap.actions.timelineMode")}
-            </Button>
+            {viewMode === "list" ? (
+              <div className="flex flex-wrap gap-2">
+                {BUCKET_FILTERS.map((value) => (
+                  <Button
+                    key={value}
+                    onClick={() => setBucket(value)}
+                    size="sm"
+                    type="button"
+                    variant={bucket === value ? "secondary" : "ghost"}
+                  >
+                    {t(`roadmap.bucket.${value}` as TranslationKey)}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
-          {timelineMode ? (
+          {viewMode === "timeline" ? (
             <Card>
               <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 {t("roadmap.timeline.title")}
@@ -692,11 +858,16 @@ export function RoadmapScreen() {
                   totalCount={timelineTasks.length}
                   totalPages={totalTaskPages}
                   renderItem={(task) => (
-                    <div className="flex items-center gap-3 border-l-2 border-primary pl-3 text-sm">
+                    <div className="flex flex-col gap-1 border-l-2 border-primary pl-3 text-sm sm:flex-row sm:items-center sm:gap-3">
                       <span className="w-24 shrink-0 text-xs text-muted-foreground">
                         {task.due_date ? formatDate(task.due_date, locale) : t("roadmap.timeline.noDate")}
                       </span>
                       <span className="font-semibold">{task.title}</span>
+                      <span className="rounded-sm border bg-surface px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {task.is_timeline_marker
+                          ? t("roadmap.timeline.marker")
+                          : t("roadmap.timeline.task")}
+                      </span>
                     </div>
                   )}
                 />
@@ -719,6 +890,7 @@ export function RoadmapScreen() {
                   isPending={pendingTaskId === task.id}
                   onComplete={(item) => void handleComplete(item)}
                   onDelete={(item) => void handleDelete(item)}
+                  onDismiss={(item) => void handleSkip(item)}
                   onEdit={openEditForm}
                   onSkip={(item) => void handleSkip(item)}
                   task={task}
@@ -726,12 +898,136 @@ export function RoadmapScreen() {
               )}
             />
           )}
+
+          {viewMode === "list" && statusScope === "active" && completedTasks.length > 0 ? (
+            <Card className="p-5">
+              <button
+                className="flex w-full items-center justify-between gap-3 text-left"
+                onClick={() => setCompletedOpen((current) => !current)}
+                type="button"
+              >
+                <span>
+                  <span className="block text-sm font-semibold">
+                    {t("roadmap.completed.title", { count: completedTasks.length })}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t("roadmap.completed.description")}
+                  </span>
+                </span>
+                <ChevronDown
+                  aria-hidden
+                  className={`size-4 shrink-0 transition-transform ${completedOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {completedOpen ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {completedTasks.slice(0, 6).map((task) => (
+                    <RoadmapTaskCard
+                      isPending={pendingTaskId === task.id}
+                      key={task.id}
+                      onComplete={(item) => void handleComplete(item)}
+                      onDelete={(item) => void handleDelete(item)}
+                      onDismiss={(item) => void handleSkip(item)}
+                      onEdit={openEditForm}
+                      onSkip={(item) => void handleSkip(item)}
+                      task={task}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
         </>
       )}
 
       <p className="text-xs leading-5 text-muted-foreground">{t("roadmap.disclaimer")}</p>
     </div>
   );
+}
+
+function RoadmapViewToggle({
+  value,
+  onChange
+}: {
+  value: RoadmapViewMode;
+  onChange: (value: RoadmapViewMode) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-sm border bg-surface p-1" aria-label={t("roadmap.view.switch")}>
+      <div className="flex gap-1">
+        <Button
+          onClick={() => onChange("list")}
+          size="sm"
+          type="button"
+          variant={value === "list" ? "primary" : "ghost"}
+        >
+          <ListTodo aria-hidden className="mr-1.5 size-3.5" />
+          {t("roadmap.view.list")}
+        </Button>
+        <Button
+          onClick={() => onChange("timeline")}
+          size="sm"
+          type="button"
+          variant={value === "timeline" ? "primary" : "ghost"}
+        >
+          <CalendarClock aria-hidden className="mr-1.5 size-3.5" />
+          {t("roadmap.view.timeline")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function matchesStatusScope(task: RoadmapTask, scope: TaskStatusScope) {
+  if (scope === "active") {
+    return task.status === "todo" || task.status === "in_progress";
+  }
+  if (scope === "completed") {
+    return task.status === "completed";
+  }
+  if (scope === "skipped") {
+    return task.status === "skipped";
+  }
+  return true;
+}
+
+const PRIORITY_WEIGHT: Record<RoadmapTask["priority"], number> = {
+  urgent: 4,
+  high: 3,
+  medium: 2,
+  low: 1
+};
+
+function compareRoadmapTasks(today: Date) {
+  return (left: RoadmapTask, right: RoadmapTask) => {
+    const leftCompleted = left.completed_at || left.updated_at;
+    const rightCompleted = right.completed_at || right.updated_at;
+    if (left.status === "completed" && right.status === "completed") {
+      return rightCompleted.localeCompare(leftCompleted);
+    }
+    const leftDue = left.due_date ? new Date(`${left.due_date}T00:00:00`).getTime() : null;
+    const rightDue = right.due_date ? new Date(`${right.due_date}T00:00:00`).getTime() : null;
+    if (leftDue !== null && rightDue !== null && leftDue !== rightDue) {
+      return leftDue - rightDue;
+    }
+    if (leftDue !== null && rightDue === null) return -1;
+    if (leftDue === null && rightDue !== null) return 1;
+    const priorityDelta = PRIORITY_WEIGHT[right.priority] - PRIORITY_WEIGHT[left.priority];
+    if (priorityDelta !== 0) return priorityDelta;
+    const leftBucket = bucketForTask(left, today);
+    const rightBucket = bucketForTask(right, today);
+    if (leftBucket !== rightBucket) {
+      const bucketOrder: Record<RoadmapBucket, number> = {
+        this_week: 1,
+        this_month: 2,
+        later: 3,
+        completed: 4
+      };
+      return bucketOrder[leftBucket] - bucketOrder[rightBucket];
+    }
+    return left.created_at.localeCompare(right.created_at);
+  };
 }
 
 function OverviewCard({
@@ -768,6 +1064,7 @@ function RoadmapTaskCardWithDelete({
   onSkip,
   onEdit,
   onDelete,
+  onDismiss,
   isPending
 }: {
   task: RoadmapTask;
@@ -775,30 +1072,18 @@ function RoadmapTaskCardWithDelete({
   onSkip: (task: RoadmapTask) => void;
   onEdit: (task: RoadmapTask) => void;
   onDelete: (task: RoadmapTask) => void;
+  onDismiss: (task: RoadmapTask) => void;
   isPending?: boolean;
 }) {
-  const { t } = useI18n();
   return (
-    <div className="space-y-2">
-      <RoadmapTaskCard
-        isPending={isPending}
-        onComplete={onComplete}
-        onEdit={onEdit}
-        onSkip={onSkip}
-        task={task}
-      />
-      {task.source_type === "manual" ? (
-        <Button
-          className="text-xs"
-          disabled={isPending}
-          onClick={() => onDelete(task)}
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          {t("roadmap.actions.delete")}
-        </Button>
-      ) : null}
-    </div>
+    <RoadmapTaskCard
+      isPending={isPending}
+      onComplete={onComplete}
+      onDelete={onDelete}
+      onDismiss={onDismiss}
+      onEdit={onEdit}
+      onSkip={onSkip}
+      task={task}
+    />
   );
 }

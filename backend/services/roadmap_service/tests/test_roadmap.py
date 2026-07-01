@@ -424,6 +424,84 @@ class RoadmapApiTests(APITestCase):
         response = self.client.get("/api/roadmap/tasks/", {"category": "activities"})
         self.assertTrue(all(item["category"] == "activities" for item in response.data["results"]))
 
+    def test_task_filters_by_university_application_exam_source_and_kind(self):
+        self.client.force_authenticate(self.user1)
+        plan = RoadmapPlan.objects.create(user=self.user1, title="Filter plan")
+        university = create_university("filter-university")
+        application = ApplicationTrackerItem.objects.create(user=self.user1, university=university)
+        matching = RoadmapTask.objects.create(
+            user=self.user1,
+            plan=plan,
+            title="Register for SAT",
+            description="Confirm SAT timing.",
+            category=RoadmapTask.Category.EXAMS,
+            priority=RoadmapTask.Priority.HIGH,
+            source_type=RoadmapTask.SourceType.PLANNING_WINDOW,
+            linked_university=university,
+            linked_application=application,
+            generated_reason="SAT planning item.",
+        )
+        RoadmapTask.objects.create(
+            user=self.user1,
+            plan=plan,
+            title="Manual counselor email",
+            category=RoadmapTask.Category.RECOMMENDATIONS,
+            priority=RoadmapTask.Priority.LOW,
+            source_type=RoadmapTask.SourceType.MANUAL,
+        )
+
+        response = self.client.get(
+            "/api/roadmap/tasks/",
+            {
+                "linked_university": str(university.id),
+                "linked_application": str(application.id),
+                "exam": "SAT",
+                "source_type": RoadmapTask.SourceType.PLANNING_WINDOW,
+                "task_kind": "generated",
+                "priority": RoadmapTask.Priority.HIGH,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["id"], matching.id)
+        self.assertEqual(response.data["results"][0]["linked_application"], application.id)
+        self.assertEqual(response.data["results"][0]["task_kind"], "generated")
+
+    def test_list_view_excludes_timeline_markers_but_timeline_view_includes_them(self):
+        self.client.force_authenticate(self.user1)
+        today = timezone.now().date()
+        university = create_university(
+            "timeline-marker-university",
+            application_deadline=today + timedelta(days=90),
+        )
+        SavedUniversity.objects.create(user=self.user1, university=university)
+        self.client.post("/api/roadmap/generate/")
+
+        list_response = self.client.get("/api/roadmap/tasks/", {"view": "list"})
+        timeline_response = self.client.get("/api/roadmap/tasks/", {"view": "timeline"})
+
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK, list_response.data)
+        self.assertFalse(any(item["is_timeline_marker"] for item in list_response.data["results"]))
+        self.assertTrue(any(item["is_timeline_marker"] for item in timeline_response.data["results"]))
+        self.assertTrue(
+            any(
+                item["title"] == f"Submit your application to {university.name}"
+                for item in list_response.data["results"]
+            )
+        )
+
+    def test_skipped_generated_task_does_not_appear_in_active_status_filter(self):
+        self.client.force_authenticate(self.user1)
+        self.client.post("/api/roadmap/generate/")
+        task = RoadmapTask.objects.filter(user=self.user1).first()
+        self.client.post(f"/api/roadmap/tasks/{task.id}/skip/")
+
+        response = self.client.get("/api/roadmap/tasks/", {"status": "todo"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn(task.id, [item["id"] for item in response.data["results"]])
+
     def test_generated_task_cannot_change_category_via_patch(self):
         self.client.force_authenticate(self.user1)
         self.client.post("/api/roadmap/generate/")

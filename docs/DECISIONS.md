@@ -289,3 +289,12 @@ University affordability comparisons also separate source values from comparable
 The university fit response is an evidence-based 1-100 `fit_score` with categorical labels (`dream`, `reach`, `competitive`, `target`, `safety`), component subscores, risks, missing data, confidence, and a disclaimer. It is not an admission probability and must not be described as odds, chance, likelihood of acceptance, or a guarantee. Planned retakes may be shown as conditional context only; current IELTS/SAT gaps still remain visible.
 
 Official SAT/AP dates are modeled through `OfficialExamDate` and can be marked verified only with a `collegeboard.org` source. Roadmap generation reads that model when available; otherwise it creates a verification task instead of inventing official exam deadlines.
+
+## ADR-031: Roadmap list/timeline separation and compact suggestions UX
+
+- **Status:** Accepted
+- **Date:** 2026-07-01
+
+Roadmap task management separates actionable work from calendar context. Normal list view shows tasks the student can act on, while generated university deadline countdowns (`60/30/15/14/7` day markers) are classified as `is_timeline_marker=true` and shown only in Timeline View. Existing `14`-day markers remain recognized so production roadmaps do not gain duplicate `15`-day tasks merely because the UI wording changed; future generation policy can migrate that window deliberately if needed. Generated tasks continue to be skipped/dismissed rather than hard-deleted, preserving history, while manual tasks may be deleted by the owner after confirmation.
+
+Source-aware suggestions are compact by default. The frontend groups near-identical exam planning suggestions by exam/source/application context and shows one carousel card at a time, with details/subitems available on demand. IELTS/TOEFL items remain generic planning guidance; SAT/AP official-date claims still require verified College Board-backed `OfficialExamDate` records. Missing official source data is rendered as verification status, not as an invented date.

@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
@@ -46,19 +47,57 @@ class RoadmapTaskViewSet(
     serializer_class = RoadmapTaskSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ("status", "category", "priority", "linked_university")
+    filterset_fields = (
+        "status",
+        "category",
+        "priority",
+        "linked_university",
+        "linked_application",
+        "source_type",
+    )
 
     def get_queryset(self):
         queryset = RoadmapTask.objects.filter(user=self.request.user).select_related(
-            "linked_university", "linked_event"
+            "linked_university",
+            "linked_application__university",
+            "linked_event",
         )
         params = self.request.query_params
         due_before = params.get("due_before")
         due_after = params.get("due_after")
+        exam = (params.get("exam") or "").strip()
+        task_kind = (params.get("task_kind") or "").strip()
+        view = (params.get("view") or "").strip()
         if due_before:
             queryset = queryset.filter(due_date__lte=due_before)
         if due_after:
             queryset = queryset.filter(due_date__gte=due_after)
+        if exam:
+            queryset = queryset.filter(category=RoadmapTask.Category.EXAMS).filter(
+                Q(title__icontains=exam)
+                | Q(description__icontains=exam)
+                | Q(generated_reason__icontains=exam)
+                | Q(evidence_note__icontains=exam)
+            )
+        if task_kind == "manual":
+            queryset = queryset.filter(source_type=RoadmapTask.SourceType.MANUAL)
+        elif task_kind == "generated":
+            queryset = queryset.exclude(source_type=RoadmapTask.SourceType.MANUAL)
+
+        timeline_marker_query = Q(
+            source_type=RoadmapTask.SourceType.UNIVERSITY_DEADLINE,
+            dedup_key__startswith="university_deadline:",
+        ) & (
+            Q(dedup_key__endswith=":60")
+            | Q(dedup_key__endswith=":30")
+            | Q(dedup_key__endswith=":15")
+            | Q(dedup_key__endswith=":14")
+            | Q(dedup_key__endswith=":7")
+        )
+        if view == "list":
+            queryset = queryset.exclude(timeline_marker_query)
+        elif view == "timeline":
+            queryset = queryset.filter(Q(due_date__isnull=False) | timeline_marker_query)
         return queryset.order_by("status", "due_date", "-priority", "created_at")
 
     def get_serializer_class(self):

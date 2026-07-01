@@ -1072,6 +1072,7 @@ def add_suggestion_to_roadmap(suggestion: SuggestedItem) -> RoadmapTask:
             "due_date": due_date,
             "source_type": _source_for_task(suggestion),
             "linked_university": suggestion.linked_university,
+            "linked_application": suggestion.linked_application,
             "generated_reason": f"Added from suggestion #{suggestion.id}.",
             "evidence_note": suggestion.evidence_note,
             "source_url": suggestion.source_url,

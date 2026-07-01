@@ -26,6 +26,8 @@ export type RoadmapSourceType =
   | "planning_window"
   | "event";
 
+export type RoadmapTaskKind = "manual" | "generated";
+
 export type RoadmapTask = {
   id: number;
   title: string;
@@ -39,6 +41,8 @@ export type RoadmapTask = {
   linked_university_name: string | null;
   linked_university_slug: string | null;
   linked_program: number | null;
+  linked_application: number | null;
+  linked_application_university_name: string | null;
   linked_event: number | null;
   linked_event_title: string | null;
   linked_event_slug: string | null;
@@ -46,6 +50,8 @@ export type RoadmapTask = {
   generated_reason: string;
   evidence_note: string;
   source_url: string;
+  task_kind: RoadmapTaskKind;
+  is_timeline_marker: boolean;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -89,8 +95,13 @@ export type RoadmapTaskFilters = {
   category?: string;
   priority?: string;
   linked_university?: string;
+  linked_application?: string;
+  source_type?: string;
+  task_kind?: RoadmapTaskKind | "";
+  exam?: string;
   due_before?: string;
   due_after?: string;
+  view?: "list" | "timeline" | "";
 };
 
 export type ManualRoadmapTaskInput = {

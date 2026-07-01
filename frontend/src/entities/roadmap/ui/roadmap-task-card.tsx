@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, ExternalLink, Pencil, SkipForward } from "lucide-react";
+import { Archive, Check, ChevronDown, ExternalLink, Pencil, SkipForward, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import type { RoadmapTask } from "@/entities/roadmap";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
@@ -22,22 +23,53 @@ export function RoadmapTaskCard({
   onComplete,
   onSkip,
   onEdit,
+  onDelete,
+  onDismiss,
   isPending
 }: {
   task: RoadmapTask;
   onComplete: (task: RoadmapTask) => void;
   onSkip: (task: RoadmapTask) => void;
   onEdit: (task: RoadmapTask) => void;
+  onDelete?: (task: RoadmapTask) => void;
+  onDismiss?: (task: RoadmapTask) => void;
   isPending?: boolean;
 }) {
   const { locale, t } = useI18n();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const isDone = task.status === "completed" || task.status === "skipped";
+  const daysRemaining = useMemo(() => {
+    if (!task.due_date) return null;
+    const due = new Date(`${task.due_date}T00:00:00`);
+    const today = new Date(new Date().toDateString());
+    return Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
+  }, [task.due_date]);
+  const whereToDoIt = task.source_url
+    ? t("roadmap.task.where.source")
+    : task.linked_university_name
+      ? task.linked_university_name
+      : task.linked_event_title
+        ? task.linked_event_title
+        : task.linked_profile_section
+          ? t("roadmap.task.where.profile")
+          : t("roadmap.task.where.default");
+  const verificationStatus = task.source_url
+    ? t("roadmap.task.verification.sourceAvailable")
+    : task.source_type === "planning_window"
+      ? t("roadmap.task.verification.planningOnly")
+      : t("roadmap.task.verification.verifyOfficial");
 
   return (
-    <Card className="flex flex-col gap-2 p-4">
+    <Card className="flex h-full flex-col gap-2 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-sm border bg-surface px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
           {t(`roadmap.category.${task.category}` as TranslationKey)}
+        </span>
+        <span className="rounded-sm border bg-surface px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          {t(`roadmap.task.kind.${task.task_kind}` as TranslationKey)}
+        </span>
+        <span className="rounded-sm border bg-surface px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          {t(`roadmap.source.${task.source_type}` as TranslationKey)}
         </span>
         <span
           className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${PRIORITY_STYLES[task.priority]}`}
@@ -69,6 +101,16 @@ export function RoadmapTaskCard({
             <dd className="inline">{formatDate(task.due_date, locale)}</dd>
           </div>
         ) : null}
+        {daysRemaining !== null ? (
+          <div>
+            <dt className="inline font-semibold">{t("roadmap.task.daysRemaining")}: </dt>
+            <dd className="inline">
+              {daysRemaining >= 0
+                ? t("roadmap.task.daysRemainingValue", { days: daysRemaining })
+                : t("roadmap.task.overdueValue", { days: Math.abs(daysRemaining) })}
+            </dd>
+          </div>
+        ) : null}
         {task.linked_university_name ? (
           <div>
             <dt className="inline font-semibold">{t("roadmap.task.university")}: </dt>
@@ -86,6 +128,12 @@ export function RoadmapTaskCard({
             </dd>
           </div>
         ) : null}
+        {task.linked_application_university_name ? (
+          <div>
+            <dt className="inline font-semibold">{t("roadmap.task.application")}: </dt>
+            <dd className="inline">{task.linked_application_university_name}</dd>
+          </div>
+        ) : null}
         {task.linked_event_title ? (
           <div>
             <dt className="inline font-semibold">{t("roadmap.task.event")}: </dt>
@@ -94,31 +142,57 @@ export function RoadmapTaskCard({
         ) : null}
       </dl>
 
-      {task.generated_reason ? (
-        <p className="border-t pt-2 text-xs leading-5 text-muted-foreground">
-          <span className="font-semibold">{t("roadmap.task.reason")}: </span>
-          {task.generated_reason}
-        </p>
-      ) : null}
-      {task.evidence_note ? (
-        <p className="text-xs leading-5 text-muted-foreground">
-          <span className="font-semibold">{t("roadmap.task.evidence")}: </span>
-          {task.evidence_note}
-        </p>
-      ) : null}
-      {task.source_url ? (
-        <a
-          className="inline-flex items-center gap-1 text-xs font-semibold text-primary-hover hover:underline"
-          href={task.source_url}
-          rel="noreferrer"
-          target="_blank"
-        >
-          {t("roadmap.task.source")}
-          <ExternalLink aria-hidden className="size-3" />
-        </a>
+      <button
+        className="mt-1 flex items-center justify-between border-t pt-2 text-left text-xs font-semibold text-primary-hover"
+        onClick={() => setDetailsOpen((current) => !current)}
+        type="button"
+      >
+        <span>{t("roadmap.task.details")}</span>
+        <ChevronDown
+          aria-hidden
+          className={`size-3.5 shrink-0 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {detailsOpen ? (
+        <div className="grid gap-2 text-xs leading-5 text-muted-foreground">
+          <p>
+            <span className="font-semibold text-foreground">{t("roadmap.task.whatThisMeans")}: </span>
+            {task.description || t("roadmap.task.whatFallback")}
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">{t("roadmap.task.whyThisMatters")}: </span>
+            {task.generated_reason || task.evidence_note || t("roadmap.task.whyFallback")}
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">{t("roadmap.task.whereToDoIt")}: </span>
+            {whereToDoIt}
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">{t("roadmap.task.verificationStatus")}: </span>
+            {verificationStatus}
+          </p>
+          {task.evidence_note ? (
+            <p>
+              <span className="font-semibold text-foreground">{t("roadmap.task.evidence")}: </span>
+              {task.evidence_note}
+            </p>
+          ) : null}
+          {task.source_url ? (
+            <a
+              className="inline-flex items-center gap-1 font-semibold text-primary-hover hover:underline"
+              href={task.source_url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("roadmap.task.source")}
+              <ExternalLink aria-hidden className="size-3" />
+            </a>
+          ) : null}
+        </div>
       ) : null}
 
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-auto flex flex-wrap gap-2 pt-2">
         {!isDone ? (
           <Button disabled={isPending} onClick={() => onComplete(task)} size="sm" type="button">
             <Check aria-hidden className="mr-1.5 size-3.5" />
@@ -141,6 +215,18 @@ export function RoadmapTaskCard({
           <Pencil aria-hidden className="mr-1.5 size-3.5" />
           {t("roadmap.actions.edit")}
         </Button>
+        {task.task_kind === "manual" && onDelete ? (
+          <Button disabled={isPending} onClick={() => onDelete(task)} size="sm" type="button" variant="ghost">
+            <Trash2 aria-hidden className="mr-1.5 size-3.5" />
+            {t("roadmap.actions.delete")}
+          </Button>
+        ) : null}
+        {task.task_kind === "generated" && onDismiss && task.status !== "skipped" ? (
+          <Button disabled={isPending} onClick={() => onDismiss(task)} size="sm" type="button" variant="ghost">
+            <Archive aria-hidden className="mr-1.5 size-3.5" />
+            {t("roadmap.actions.dismiss")}
+          </Button>
+        ) : null}
       </div>
     </Card>
   );

@@ -19,6 +19,11 @@ class RoadmapTaskSerializer(serializers.ModelSerializer):
     linked_event_slug = serializers.CharField(
         source="linked_event.slug", read_only=True, default=None
     )
+    linked_application_university_name = serializers.CharField(
+        source="linked_application.university.name", read_only=True, default=None
+    )
+    task_kind = serializers.CharField(read_only=True)
+    is_timeline_marker = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = RoadmapTask
@@ -35,6 +40,8 @@ class RoadmapTaskSerializer(serializers.ModelSerializer):
             "linked_university_name",
             "linked_university_slug",
             "linked_program",
+            "linked_application",
+            "linked_application_university_name",
             "linked_event",
             "linked_event_title",
             "linked_event_slug",
@@ -42,6 +49,8 @@ class RoadmapTaskSerializer(serializers.ModelSerializer):
             "generated_reason",
             "evidence_note",
             "source_url",
+            "task_kind",
+            "is_timeline_marker",
             "created_at",
             "updated_at",
             "completed_at",
@@ -51,11 +60,14 @@ class RoadmapTaskSerializer(serializers.ModelSerializer):
             "source_type",
             "linked_university",
             "linked_program",
+            "linked_application",
             "linked_event",
             "linked_profile_section",
             "generated_reason",
             "evidence_note",
             "source_url",
+            "task_kind",
+            "is_timeline_marker",
             "created_at",
             "updated_at",
             "completed_at",
@@ -104,7 +116,12 @@ class RoadmapPlanSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_tasks(self, obj):
-        tasks = obj.tasks.select_related("linked_university", "linked_event").order_by(
-            "status", "due_date", "-priority", "created_at"
+        tasks = (
+            obj.tasks.select_related(
+                "linked_university",
+                "linked_application__university",
+                "linked_event",
+            )
+            .order_by("status", "due_date", "-priority", "created_at")
         )
         return RoadmapTaskSerializer(tasks, many=True, context=self.context).data

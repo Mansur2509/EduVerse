@@ -548,7 +548,7 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | GET | `/api/v1/universities/compare/?ids=1,2,3` | Authenticated | Side-by-side detail for 2-4 universities by id |
 | GET | `/api/roadmap/` | Authenticated | Caller's active roadmap plan and tasks, or `{"plan": null}` if none generated yet |
 | POST | `/api/roadmap/generate/` | Authenticated | Generate or refresh the caller's roadmap from current profile/shortlist/exam data |
-| GET/POST | `/api/roadmap/tasks/` | Authenticated | List caller's tasks (filters: `status`, `category`, `priority`, `linked_university`, `due_before`, `due_after`) or create a manual task |
+| GET/POST | `/api/roadmap/tasks/` | Authenticated | List caller's tasks (filters: `status`, `category`, `priority`, `linked_university`, `linked_application`, `source_type`, `task_kind`, `exam`, `due_before`, `due_after`, `view=list\|timeline`) or create a manual task |
 | GET/PATCH/DELETE | `/api/roadmap/tasks/{id}/` | Authenticated, self-only | Read/update any own task; delete only `source_type=manual` tasks (others return 400 — skip instead) |
 | POST | `/api/roadmap/tasks/{id}/complete/` | Authenticated, self-only | Mark a task completed and stamp `completed_at` |
 | POST | `/api/roadmap/tasks/{id}/skip/` | Authenticated, self-only | Mark a task skipped without deleting it |
@@ -647,7 +647,9 @@ Dry-run behavior uses the same `xlsx_import.py` parser as execute but performs o
 - `GET /api/roadmap/` → `{"detail": "...", "plan": RoadmapPlan | null}`.
 - `POST /api/roadmap/generate/` → `{"plan": RoadmapPlan, "missing_data_warnings": string[]}`. The warnings (e.g. `no_graduation_year`, `no_shortlisted_universities`) are also persisted on `plan.readiness_snapshot.missing_data_warnings` so they reappear on the next plain `GET` without needing to regenerate.
 
-Each `RoadmapTask` always reports `generated_reason`, `evidence_note`, and `source_url` (empty string when no official source backs the task) so the UI can show why a task exists and where its claim comes from without a second request. `source_type` distinguishes a real verified deadline (`university_deadline`) from a generated/estimated one (`generated`) — never both implied at once.
+Each `RoadmapTask` always reports `generated_reason`, `evidence_note`, and `source_url` (empty string when no official source backs the task) so the UI can show why a task exists and where its claim comes from without a second request. `source_type` distinguishes a real verified deadline (`university_deadline`) from a generated/estimated one (`generated`) — never both implied at once. Tasks also report `task_kind` (`manual` or `generated`), `is_timeline_marker`, and optional `linked_application` / `linked_application_university_name` so clients can separate actionable list tasks from timeline-only countdown markers and filter by application context.
+
+`view=list` excludes university-deadline countdown markers (`university_deadline:{id}:60/30/15/14/7`) while keeping actionable final-deadline tasks. `view=timeline` keeps dated timeline material, including those markers. Existing generated tasks are dismissed by calling `POST /api/roadmap/tasks/{id}/skip/`; generated tasks are not hard-deleted. Manual tasks may still be deleted by the owner.
 
 The generator additionally reads (read-only) the caller's own `EssayWorkspace` records: any essay with `status` in `not_started`/`needs_revision` produces a `category=essays`, `source_type=essay_status` task (dedup key `essay_workspace:{id}:{status}`), with `due_date`/`source_url` populated from the linked university's verified `application_deadline` when one exists. This requires no schema change to `roadmap_service` — it is a plain cross-service query, the same pattern already used for `user_profile_service`/`university_service`/`event_service`.
 
@@ -675,7 +677,7 @@ Each suggestion includes `suggestion_type`, `priority`, `source_type`, optional 
 - `roadmap_based`: explanatory roadmap guidance.
 - `missing_data_warning`: a verification task because official data is not stored.
 
-`POST /api/suggestions/generate/` is idempotent by `(user, dedup_key)`: active suggestions update in place, dismissed suggestions stay dismissed, and suggestions already added to roadmap stay linked rather than reappearing as new active items. `POST /api/suggestions/{id}/add-to-roadmap/` creates a roadmap task with `source_type=planning_window`, `profile_gap`, `university_deadline`, or `generated` according to the suggestion source, then marks the suggestion `added_to_roadmap`.
+`POST /api/suggestions/generate/` is idempotent by `(user, dedup_key)`: active suggestions update in place, dismissed suggestions stay dismissed, and suggestions already added to roadmap stay linked rather than reappearing as new active items. `POST /api/suggestions/{id}/add-to-roadmap/` creates or reuses exactly one roadmap task with `source_type=planning_window`, `profile_gap`, `university_deadline`, or `generated` according to the suggestion source, preserves `source_url` and `linked_application` when present, then marks the suggestion `added_to_roadmap`.
 
 ## Error behavior
 
