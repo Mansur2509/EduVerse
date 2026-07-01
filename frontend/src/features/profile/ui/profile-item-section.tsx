@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
@@ -86,7 +86,7 @@ export function ProfileItemSection<T extends { id: number }>({
     await submitForm();
   };
 
-  const handleEdit = (item: T) => {
+  const startEdit = (item: T) => {
     setEditingId(item.id);
     const newFormData: Record<string, unknown> = {};
     fields.forEach((field) => {
@@ -95,6 +95,10 @@ export function ProfileItemSection<T extends { id: number }>({
     setFormData(newFormData);
     setInitialFormData(newFormData);
     setIsExpanded(true);
+  };
+
+  const handleEdit = (item: T) => {
+    unsavedGuard.requestLeave(() => startEdit(item));
   };
 
   const handleDelete = async (id: number) => {
@@ -155,8 +159,12 @@ export function ProfileItemSection<T extends { id: number }>({
           variant="secondary"
           disabled={isSubmitting}
         >
-          <Plus aria-hidden className="mr-1 size-3" />
-          {t("profile.sections.add")}
+          {isExpanded ? (
+            <X aria-hidden className="mr-1 size-3" />
+          ) : (
+            <Plus aria-hidden className="mr-1 size-3" />
+          )}
+          {isExpanded ? t("profile.sections.close") : t("profile.sections.add")}
         </Button>
       </div>
 

@@ -40,7 +40,16 @@ export function getApplicationReadinessRequest() {
 }
 
 // Profile item CRUD endpoints
-type ItemType = "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects";
+type ItemType =
+  | "activities"
+  | "honors"
+  | "olympiads"
+  | "sports"
+  | "research-projects"
+  | "essays"
+  | "portfolio-projects"
+  | "volunteering"
+  | "recommenders";
 
 interface ProfileItem {
   id: number;

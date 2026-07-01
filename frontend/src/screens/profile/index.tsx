@@ -16,11 +16,13 @@ import type {
   PlannedExam,
   PortfolioProject,
   ProfileCompletion,
+  Recommender,
   ResearchProject,
   ScholarshipNeed,
   Sport,
   StudentProfileDetails,
-  TestScores
+  TestScores,
+  Volunteer
 } from "@/entities/profile";
 import { useAuth } from "@/features/auth/model/auth-context";
 import {
@@ -46,7 +48,11 @@ import {
   essayFields,
   essayDisplay,
   portfolioFields,
-  portfolioDisplay
+  portfolioDisplay,
+  volunteerFields,
+  volunteerDisplay,
+  recommenderFields,
+  recommenderDisplay
 } from "@/features/profile/lib/profile-items-config";
 import { ProfileItemSection } from "@/features/profile/ui/profile-item-section";
 import { useI18n } from "@/shared/i18n";
@@ -261,6 +267,8 @@ export function ProfileScreen() {
   const [research, setResearch] = useState<ResearchProject[]>([]);
   const [essays, setEssays] = useState<EssayDraft[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioProject[]>([]);
+  const [volunteering, setVolunteering] = useState<Volunteer[]>([]);
+  const [recommenders, setRecommenders] = useState<Recommender[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
 
   const loadProfile = useCallback(async () => {
@@ -286,16 +294,27 @@ export function ProfileScreen() {
   const loadItems = useCallback(async () => {
     setItemsLoading(true);
     try {
-      const [activitiesRes, honorsRes, olympiadsRes, sportsRes, researchRes, essaysRes, portfolioRes] =
-        await Promise.allSettled([
-          getProfileItemsRequest<Activity>("activities"),
-          getProfileItemsRequest<Honor>("honors"),
-          getProfileItemsRequest<Olympiad>("olympiads"),
-          getProfileItemsRequest<Sport>("sports"),
-          getProfileItemsRequest<ResearchProject>("research-projects"),
-          getProfileItemsRequest<EssayDraft>("essays"),
-          getProfileItemsRequest<PortfolioProject>("portfolio-projects")
-        ]);
+      const [
+        activitiesRes,
+        honorsRes,
+        olympiadsRes,
+        sportsRes,
+        researchRes,
+        essaysRes,
+        portfolioRes,
+        volunteeringRes,
+        recommendersRes
+      ] = await Promise.allSettled([
+        getProfileItemsRequest<Activity>("activities"),
+        getProfileItemsRequest<Honor>("honors"),
+        getProfileItemsRequest<Olympiad>("olympiads"),
+        getProfileItemsRequest<Sport>("sports"),
+        getProfileItemsRequest<ResearchProject>("research-projects"),
+        getProfileItemsRequest<EssayDraft>("essays"),
+        getProfileItemsRequest<PortfolioProject>("portfolio-projects"),
+        getProfileItemsRequest<Volunteer>("volunteering"),
+        getProfileItemsRequest<Recommender>("recommenders")
+      ]);
       if (activitiesRes.status === "fulfilled") setActivities(activitiesRes.value.results);
       if (honorsRes.status === "fulfilled") setHonors(honorsRes.value.results);
       if (olympiadsRes.status === "fulfilled") setOlympiads(olympiadsRes.value.results);
@@ -303,6 +322,8 @@ export function ProfileScreen() {
       if (researchRes.status === "fulfilled") setResearch(researchRes.value.results);
       if (essaysRes.status === "fulfilled") setEssays(essaysRes.value.results);
       if (portfolioRes.status === "fulfilled") setPortfolio(portfolioRes.value.results);
+      if (volunteeringRes.status === "fulfilled") setVolunteering(volunteeringRes.value.results);
+      if (recommendersRes.status === "fulfilled") setRecommenders(recommendersRes.value.results);
     } catch {
       // Silent fail for items load
     } finally {
@@ -411,7 +432,7 @@ export function ProfileScreen() {
 
   // Item CRUD handlers
   const createItem = <T extends { id: number }>(
-    type: "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects",
+    type: "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects" | "volunteering" | "recommenders",
     setter: (updater: (prev: T[]) => T[]) => void
   ) =>
     async (data: Record<string, unknown>) => {
@@ -421,7 +442,7 @@ export function ProfileScreen() {
     };
 
   const updateItem = <T extends { id: number }>(
-    type: "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects",
+    type: "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects" | "volunteering" | "recommenders",
     setter: (updater: (prev: T[]) => T[]) => void
   ) =>
     async (id: number, data: Record<string, unknown>) => {
@@ -431,7 +452,7 @@ export function ProfileScreen() {
     };
 
   const deleteItem = <T extends { id: number }>(
-    type: "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects",
+    type: "activities" | "honors" | "olympiads" | "sports" | "research-projects" | "essays" | "portfolio-projects" | "volunteering" | "recommenders",
     setter: (updater: (prev: T[]) => T[]) => void
   ) =>
     async (id: number) => {
@@ -932,6 +953,28 @@ export function ProfileScreen() {
           onDelete={deleteItem("portfolio-projects", setPortfolio)}
           itemDisplay={portfolioDisplay}
           title="profile.sections.portfolio"
+          isLoading={itemsLoading}
+        />
+        <ProfileItemSection
+          description="profile.sections.volunteeringHelp"
+          items={volunteering}
+          fields={volunteerFields}
+          onAdd={createItem("volunteering", setVolunteering)}
+          onUpdate={updateItem("volunteering", setVolunteering)}
+          onDelete={deleteItem("volunteering", setVolunteering)}
+          itemDisplay={volunteerDisplay}
+          title="profile.sections.volunteering"
+          isLoading={itemsLoading}
+        />
+        <ProfileItemSection
+          description="profile.sections.recommendersHelp"
+          items={recommenders}
+          fields={recommenderFields}
+          onAdd={createItem("recommenders", setRecommenders)}
+          onUpdate={updateItem("recommenders", setRecommenders)}
+          onDelete={deleteItem("recommenders", setRecommenders)}
+          itemDisplay={recommenderDisplay}
+          title="profile.sections.recommenders"
           isLoading={itemsLoading}
         />
       </div>

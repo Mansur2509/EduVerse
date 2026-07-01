@@ -245,6 +245,36 @@ export type PortfolioProject = {
   updated_at: string;
 };
 
+export type Volunteer = {
+  id: number;
+  title: string;
+  role: string;
+  organization: string;
+  start_date: string | null;
+  end_date: string | null;
+  hours_per_week: number | null;
+  weeks_per_year: number | null;
+  scale: "school" | "city" | "regional" | "national" | "international";
+  impact_number: string;
+  beneficiaries: string;
+  description: string;
+  proof_link: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Recommender = {
+  id: number;
+  name: string;
+  relationship_role: string;
+  status: "not_started" | "planned" | "requested" | "confirmed" | "submitted";
+  requested_date: string | null;
+  submitted_date: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export {
   majorCatalog,
   recommendationSignals,

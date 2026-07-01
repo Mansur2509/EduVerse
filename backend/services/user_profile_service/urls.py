@@ -11,8 +11,10 @@ from .views import (
     OlympiadViewSet,
     PortfolioProjectViewSet,
     ProfileCompletionView,
+    RecommenderViewSet,
     ResearchProjectViewSet,
     SportViewSet,
+    VolunteerViewSet,
 )
 
 app_name = "profile"
@@ -25,6 +27,8 @@ router.register(r"sports", SportViewSet, basename="sport")
 router.register(r"research-projects", ResearchProjectViewSet, basename="research-project")
 router.register(r"essays", EssayDraftViewSet, basename="essay")
 router.register(r"portfolio-projects", PortfolioProjectViewSet, basename="portfolio-project")
+router.register(r"volunteering", VolunteerViewSet, basename="volunteer")
+router.register(r"recommenders", RecommenderViewSet, basename="recommender")
 
 urlpatterns = [
     path("me/", CurrentProfileView.as_view(), name="me"),

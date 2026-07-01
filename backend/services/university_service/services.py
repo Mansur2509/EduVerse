@@ -194,9 +194,41 @@ def _score_program_fit(profile, university: University, strengths: list[str], mi
     return 58
 
 
+def _structured_evidence_count(profile) -> int:
+    """Total structured admissions-profile entries (activities, honors,
+    olympiads, sports, research, portfolio, volunteering) for this profile's
+    user. Callers such as the recommendation engine invoke the surrounding
+    fit calculation once per candidate university with the *same* profile
+    instance, so the count is cached on that instance to avoid re-querying it
+    once per candidate.
+    """
+
+    cached = getattr(profile, "_structured_evidence_count_cache", None)
+    if cached is not None:
+        return cached
+    user = profile.user
+    count = (
+        user.profile_activities.count()
+        + user.profile_honors.count()
+        + user.profile_olympiads.count()
+        + user.profile_sports.count()
+        + user.profile_research_projects.count()
+        + user.profile_portfolio_projects.count()
+        + user.profile_volunteering.count()
+    )
+    profile._structured_evidence_count_cache = count
+    return count
+
+
 def _score_profile_fit(profile, strengths: list[str], missing: list[str]) -> int:
     activities = profile.activities if isinstance(profile.activities, dict) else {}
     evidence_count = sum(len(value) for value in activities.values() if isinstance(value, list))
+    # Structured admissions-profile entries are richer evidence than the
+    # legacy free-text lists, so a profile that has moved to the structured
+    # form is not scored as if it were empty. Weighted like ~2 legacy items
+    # each; this only broadens what counts as evidence, it does not change
+    # the thresholds below.
+    evidence_count += _structured_evidence_count(profile) * 2
     if evidence_count >= 6:
         strengths.append("profile_depth")
         return 82

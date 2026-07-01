@@ -1,21 +1,48 @@
-import type { Activity, Honor, Olympiad, Sport, ResearchProject, EssayDraft, PortfolioProject } from "@/entities/profile";
+import type {
+  Activity,
+  Honor,
+  Olympiad,
+  Sport,
+  ResearchProject,
+  EssayDraft,
+  PortfolioProject,
+  Volunteer,
+  Recommender
+} from "@/entities/profile";
 import type { ProfileItemField } from "../ui/profile-item-section";
 import type { TranslationKey } from "@/shared/i18n";
+
+const scaleOptions: ProfileItemField["options"] = [
+  { value: "school", label: "activity.scale.school" as TranslationKey },
+  { value: "city", label: "activity.scale.city" as TranslationKey },
+  { value: "regional", label: "activity.scale.regional" as TranslationKey },
+  { value: "national", label: "activity.scale.national" as TranslationKey },
+  { value: "international", label: "activity.scale.international" as TranslationKey }
+];
+
+const activityCategoryOptions: ProfileItemField["options"] = [
+  { value: "leadership", label: "activity.category.leadership" as TranslationKey },
+  { value: "academic", label: "activity.category.academic" as TranslationKey },
+  { value: "community", label: "activity.category.community" as TranslationKey },
+  { value: "arts", label: "activity.category.arts" as TranslationKey },
+  { value: "stem", label: "activity.category.stem" as TranslationKey },
+  { value: "business", label: "activity.category.business" as TranslationKey },
+  { value: "mun_debate", label: "activity.category.munDebate" as TranslationKey },
+  { value: "work", label: "activity.category.work" as TranslationKey },
+  { value: "other", label: "activity.category.other" as TranslationKey }
+];
 
 export const activityFields: ProfileItemField[] = [
   { key: "title", label: "profile.activity.title" as TranslationKey, required: true, maxLength: 150 },
   { key: "role", label: "profile.activity.role" as TranslationKey, maxLength: 150 },
   { key: "organization", label: "profile.activity.organization" as TranslationKey, maxLength: 150 },
-  { key: "category", label: "profile.activity.category" as TranslationKey, maxLength: 100 },
+  { key: "category", label: "profile.activity.category" as TranslationKey, type: "select", options: activityCategoryOptions },
   { key: "start_date", label: "profile.activity.startDate" as TranslationKey, type: "date" },
   { key: "end_date", label: "profile.activity.endDate" as TranslationKey, type: "date" },
-  { key: "scale", label: "profile.activity.scale" as TranslationKey, type: "select", options: [
-    { value: "school", label: "activity.scale.school" as TranslationKey },
-    { value: "city", label: "activity.scale.city" as TranslationKey },
-    { value: "regional", label: "activity.scale.regional" as TranslationKey },
-    { value: "national", label: "activity.scale.national" as TranslationKey },
-    { value: "international", label: "activity.scale.international" as TranslationKey },
-  ]},
+  { key: "hours_per_week", label: "profile.activity.hoursPerWeek" as TranslationKey, type: "number" },
+  { key: "weeks_per_year", label: "profile.activity.weeksPerYear" as TranslationKey, type: "number" },
+  { key: "scale", label: "profile.activity.scale" as TranslationKey, type: "select", options: scaleOptions },
+  { key: "impact_number", label: "profile.activity.impactNumber" as TranslationKey, maxLength: 100 },
   { key: "description", label: "profile.activity.description" as TranslationKey, type: "textarea", maxLength: 1500 },
   { key: "proof_link", label: "proof_link" as TranslationKey, type: "url" },
 ];
@@ -131,8 +158,10 @@ export const researchDisplay = (item: ResearchProject) => (
 
 export const essayDisplay = (item: EssayDraft) => (
   <div>
-    <p className="font-semibold">{item.essay_type || item.school_program || "Essay"}</p>
-    {item.school_program && <p className="text-xs text-muted-foreground">{item.school_program}</p>}
+    <p className="font-semibold">{item.essay_type || item.school_program}</p>
+    {item.essay_type && item.school_program && (
+      <p className="text-xs text-muted-foreground">{item.school_program}</p>
+    )}
   </div>
 );
 
@@ -140,5 +169,49 @@ export const portfolioDisplay = (item: PortfolioProject) => (
   <div>
     <p className="font-semibold">{item.title}</p>
     {item.project_type && <p className="text-xs text-muted-foreground">{item.project_type}</p>}
+  </div>
+);
+
+export const volunteerFields: ProfileItemField[] = [
+  { key: "title", label: "profile.volunteer.title" as TranslationKey, required: true, maxLength: 150 },
+  { key: "role", label: "profile.volunteer.role" as TranslationKey, maxLength: 150 },
+  { key: "organization", label: "profile.volunteer.organization" as TranslationKey, maxLength: 150 },
+  { key: "start_date", label: "profile.volunteer.startDate" as TranslationKey, type: "date" },
+  { key: "end_date", label: "profile.volunteer.endDate" as TranslationKey, type: "date" },
+  { key: "hours_per_week", label: "profile.volunteer.hoursPerWeek" as TranslationKey, type: "number" },
+  { key: "weeks_per_year", label: "profile.volunteer.weeksPerYear" as TranslationKey, type: "number" },
+  { key: "scale", label: "profile.volunteer.scale" as TranslationKey, type: "select", options: scaleOptions },
+  { key: "impact_number", label: "profile.volunteer.impactNumber" as TranslationKey, maxLength: 100 },
+  { key: "beneficiaries", label: "profile.volunteer.beneficiaries" as TranslationKey, maxLength: 150 },
+  { key: "description", label: "profile.volunteer.description" as TranslationKey, type: "textarea", maxLength: 1500 },
+  { key: "proof_link", label: "proof_link" as TranslationKey, type: "url" },
+];
+
+export const recommenderFields: ProfileItemField[] = [
+  { key: "name", label: "profile.recommender.name" as TranslationKey, required: true, maxLength: 150 },
+  { key: "relationship_role", label: "profile.recommender.role" as TranslationKey, maxLength: 150 },
+  { key: "status", label: "profile.recommender.status" as TranslationKey, type: "select", options: [
+    { value: "not_started", label: "recommender.status.not_started" as TranslationKey },
+    { value: "planned", label: "recommender.status.planned" as TranslationKey },
+    { value: "requested", label: "recommender.status.requested" as TranslationKey },
+    { value: "confirmed", label: "recommender.status.confirmed" as TranslationKey },
+    { value: "submitted", label: "recommender.status.submitted" as TranslationKey },
+  ]},
+  { key: "requested_date", label: "profile.recommender.requestedDate" as TranslationKey, type: "date" },
+  { key: "submitted_date", label: "profile.recommender.submittedDate" as TranslationKey, type: "date" },
+  { key: "notes", label: "profile.recommender.notes" as TranslationKey, type: "textarea", maxLength: 1000 },
+];
+
+export const volunteerDisplay = (item: Volunteer) => (
+  <div>
+    <p className="font-semibold">{item.title}</p>
+    {item.organization && <p className="text-xs text-muted-foreground">{item.organization}</p>}
+  </div>
+);
+
+export const recommenderDisplay = (item: Recommender) => (
+  <div>
+    <p className="font-semibold">{item.name}</p>
+    {item.relationship_role && <p className="text-xs text-muted-foreground">{item.relationship_role}</p>}
   </div>
 );

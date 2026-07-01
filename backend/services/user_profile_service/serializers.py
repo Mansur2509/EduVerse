@@ -16,9 +16,11 @@ from .models import (
     Honor,
     Olympiad,
     PortfolioProject,
+    Recommender,
     ResearchProject,
     Sport,
     StudentProfile,
+    Volunteer,
 )
 from .readiness import calculate_application_readiness
 from .services import (
@@ -796,6 +798,46 @@ class PortfolioProjectSerializer(serializers.ModelSerializer):
             "users_impact",
             "status",
             "description",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class VolunteerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Volunteer
+        fields = [
+            "id",
+            "title",
+            "role",
+            "organization",
+            "start_date",
+            "end_date",
+            "hours_per_week",
+            "weeks_per_year",
+            "scale",
+            "impact_number",
+            "beneficiaries",
+            "description",
+            "proof_link",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class RecommenderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recommender
+        fields = [
+            "id",
+            "name",
+            "relationship_role",
+            "status",
+            "requested_date",
+            "submitted_date",
+            "notes",
             "created_at",
             "updated_at",
         ]

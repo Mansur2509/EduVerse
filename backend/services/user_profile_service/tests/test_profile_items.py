@@ -5,6 +5,8 @@ from rest_framework.test import APITestCase
 from services.user_profile_service.models import (
     Activity,
     Honor,
+    Recommender,
+    Volunteer,
 )
 
 User = get_user_model()
@@ -165,3 +167,81 @@ class ProfileItemCRUDTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         activity.refresh_from_db()
         self.assertEqual(activity.title, "Updated Title")
+
+    def test_create_volunteer(self):
+        """Test creating a volunteering entry"""
+        self.client.force_authenticate(user=self.user1)
+        data = {
+            "title": "Community Tutoring Program",
+            "role": "Lead volunteer",
+            "organization": "Local youth center",
+            "scale": "city",
+            "impact_number": "100+ hours",
+            "beneficiaries": "50+ children tutored weekly",
+        }
+        response = self.client.post("/api/profile/volunteering/", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Volunteer.objects.filter(user=self.user1).count(), 1)
+
+    def test_volunteer_self_only(self):
+        Volunteer.objects.create(user=self.user1, title="Mine")
+        Volunteer.objects.create(user=self.user2, title="Not mine")
+
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get("/api/profile/volunteering/", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["title"], "Mine")
+
+    def test_volunteer_description_allows_long_text(self):
+        """Real admissions detail must not be truncated by a tiny character limit."""
+        self.client.force_authenticate(user=self.user1)
+        sentence = (
+            "Founded and led a volunteer program that grew to over 50 active "
+            "volunteers, coordinating weekly tutoring sessions for more than "
+            "100 students across four partner schools."
+        )
+        long_description = (sentence + " ") * 6
+        long_description = long_description[: len(long_description) - 1]  # drop trailing space
+        self.assertGreater(len(long_description), 1000)
+        self.assertLessEqual(len(long_description), 1500)
+        response = self.client.post(
+            "/api/profile/volunteering/",
+            {"title": "Volunteer Leadership Initiative", "description": long_description},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["description"], long_description)
+
+    def test_create_recommender(self):
+        """Test creating a recommender/counselor status entry"""
+        self.client.force_authenticate(user=self.user1)
+        data = {
+            "name": "Ms. Rivera",
+            "relationship_role": "School counselor",
+            "status": "requested",
+        }
+        response = self.client.post("/api/profile/recommenders/", data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Recommender.objects.filter(user=self.user1).count(), 1)
+
+    def test_recommender_self_only(self):
+        Recommender.objects.create(user=self.user1, name="Mine")
+        Recommender.objects.create(user=self.user2, name="Not mine")
+
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get("/api/profile/recommenders/", format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["name"], "Mine")
+
+    def test_cannot_update_another_users_volunteer_entry(self):
+        volunteer = Volunteer.objects.create(user=self.user2, title="Original")
+
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.patch(
+            f"/api/profile/volunteering/{volunteer.id}/",
+            {"title": "Hijacked"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

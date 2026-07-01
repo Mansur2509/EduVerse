@@ -6,7 +6,7 @@ from statistics import mean
 from services.university_service.models import University
 
 from .academic_normalization import normalize_profile_academics
-from .models import StudentProfile, UserPreference
+from .models import EssayDraft, Recommender, StudentProfile, UserPreference
 from .services import calculate_profile_completion
 
 
@@ -89,6 +89,14 @@ def _score_activities(profile):
     ]
     depth = len(activity_counts)
     evidence = sum(activity_counts)
+    # Structured Activity entries are richer evidence than the legacy
+    # free-text lists (onboarding's quick string tags); weight each one like
+    # roughly two legacy items so a profile that has moved to the structured
+    # form is not scored as if it were empty.
+    structured_count = profile.user.profile_activities.count()
+    if structured_count:
+        depth += 1
+        evidence += structured_count * 2
     if depth >= 5 and evidence >= 8:
         return 5
     if depth >= 4 and evidence >= 5:
@@ -100,7 +108,143 @@ def _score_activities(profile):
     return 1
 
 
+NOTABLE_LEVELS = {"international", "national", "regional"}
+LEADERSHIP_ROLE_KEYWORDS = (
+    "president",
+    "captain",
+    "founder",
+    "chair",
+    "head",
+    "lead",
+    "director",
+    "vice president",
+    "vp",
+)
+
+
+def _score_entries(entries: list, *, level_field: str | None = None) -> int:
+    """Generic 1-5 evidence-based score for a list of structured profile
+    entries. Rewards having multiple entries and at least one at a notable
+    scale/level. This is a depth-of-evidence signal only -- never an
+    admissions-outcome claim.
+    """
+
+    count = len(entries)
+    if count == 0:
+        return 1
+    has_notable = bool(level_field) and any(
+        str(getattr(entry, level_field, "") or "").strip().lower() in NOTABLE_LEVELS
+        for entry in entries
+    )
+    if count >= 3 and has_notable:
+        return 5
+    if count >= 3 or (count >= 1 and has_notable):
+        return 4
+    if count >= 2:
+        return 3
+    return 2
+
+
+def _score_honors(profile):
+    return _score_entries(list(profile.user.profile_honors.all()), level_field="level")
+
+
+def _score_olympiads(profile):
+    return _score_entries(list(profile.user.profile_olympiads.all()), level_field="level")
+
+
+def _score_sports(profile):
+    return _score_entries(list(profile.user.profile_sports.all()), level_field="level")
+
+
+def _score_volunteering(profile):
+    return _score_entries(list(profile.user.profile_volunteering.all()), level_field="scale")
+
+
+def _score_research(profile):
+    projects = list(profile.user.profile_research_projects.all())
+    count = len(projects)
+    if count == 0:
+        return 1
+    has_notable = any(
+        project.current_stage == project.Stage.PUBLISHED
+        or str(project.countries_region or "").strip()
+        for project in projects
+    )
+    if count >= 2 and has_notable:
+        return 5
+    if count >= 1 and has_notable:
+        return 4
+    if count >= 2:
+        return 3
+    return 2
+
+
+def _score_portfolio(profile):
+    projects = list(profile.user.profile_portfolio_projects.all())
+    count = len(projects)
+    if count == 0:
+        return 1
+    has_link = any(str(project.link or "").strip() for project in projects)
+    if count >= 2 and has_link:
+        return 5
+    if count >= 1 and has_link:
+        return 4
+    if count >= 2:
+        return 3
+    return 2
+
+
+def _score_leadership(profile):
+    activities = list(profile.user.profile_activities.all())
+    leadership_entries = [
+        activity
+        for activity in activities
+        if "leadership" in str(activity.category or "").strip().lower()
+        or any(
+            keyword in str(activity.role or "").strip().lower()
+            for keyword in LEADERSHIP_ROLE_KEYWORDS
+        )
+    ]
+    return _score_entries(leadership_entries, level_field="scale")
+
+
+def _score_recommenders(profile):
+    recommenders = list(profile.user.profile_recommenders.all())
+    if not recommenders:
+        return 1
+    advanced = sum(
+        1
+        for recommender in recommenders
+        if recommender.status in {Recommender.Status.CONFIRMED, Recommender.Status.SUBMITTED}
+    )
+    if advanced >= 2:
+        return 5
+    if advanced >= 1:
+        return 4
+    if len(recommenders) >= 2:
+        return 3
+    return 2
+
+
 def _score_essays(profile):
+    essays = list(profile.user.profile_essays.all())
+    if essays:
+        advanced = sum(
+            1
+            for essay in essays
+            if essay.status in {EssayDraft.Status.REVIEWED, EssayDraft.Status.SUBMITTED}
+        )
+        if advanced >= 2:
+            return 5
+        if advanced >= 1:
+            return 4
+        if len(essays) >= 2:
+            return 3
+        return 2
+
+    # No structured essay drafts yet -- fall back to the coarse self-reported
+    # onboarding fields so existing profiles are not scored as empty.
     stage = profile.essay_stage.lower()
     if profile.essay_status != StudentProfile.EssayStatus.YES:
         return 2
@@ -180,6 +324,23 @@ def _published_comparison(profile):
     return comparisons, names, sources
 
 
+#  Niche achievement categories that many students genuinely do not have
+# (not every strong applicant has olympiad results or a research project).
+# Their absence must never be averaged in as a weakness -- it only appears
+# under `improvements` as an optional next step, and only ever raises the
+# overall star average when the student actually has entries.
+ENRICHMENT_COMPONENTS = (
+    "leadership",
+    "honors",
+    "olympiads",
+    "sports",
+    "research",
+    "portfolio",
+    "volunteering",
+    "recommenders",
+)
+
+
 def calculate_application_readiness(
     profile: StudentProfile,
     preferences: UserPreference,
@@ -192,12 +353,25 @@ def calculate_application_readiness(
         "activities": _score_activities(profile),
         "essays": _score_essays(profile),
         "timeline": _score_timeline(profile),
+        "leadership": _score_leadership(profile),
+        "honors": _score_honors(profile),
+        "olympiads": _score_olympiads(profile),
+        "sports": _score_sports(profile),
+        "research": _score_research(profile),
+        "portfolio": _score_portfolio(profile),
+        "volunteering": _score_volunteering(profile),
+        "recommenders": _score_recommenders(profile),
     }
     published_scores, compared_universities, sources = _published_comparison(profile)
     if published_scores:
         components["published_ranges"] = round(mean(published_scores))
 
-    stars = max(1, min(5, round(mean(components.values()))))
+    stars_inputs = [
+        value
+        for key, value in components.items()
+        if key not in ENRICHMENT_COMPONENTS or value > 1
+    ]
+    stars = max(1, min(5, round(mean(stars_inputs))))
     strengths = [key for key, value in components.items() if value >= 4]
     improvements = [key for key, value in components.items() if value <= 2]
     return ApplicationReadiness(

@@ -314,3 +314,69 @@ class PortfolioProject(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class Volunteer(models.Model):
+    class Scale(models.TextChoices):
+        SCHOOL = "school", "School-level"
+        CITY = "city", "City-level"
+        REGIONAL = "regional", "Regional-level"
+        NATIONAL = "national", "National-level"
+        INTERNATIONAL = "international", "International-level"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile_volunteering",
+    )
+    title = models.CharField(max_length=150)
+    role = models.CharField(max_length=150, blank=True)
+    organization = models.CharField(max_length=150, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    hours_per_week = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True
+    )
+    weeks_per_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    scale = models.CharField(
+        max_length=20, choices=Scale.choices, default=Scale.SCHOOL, blank=True
+    )
+    # Free-text summary fields for informally-reported totals, e.g. "100+ hours"
+    # or "led a team of 50+ volunteers" -- not every student tracks exact figures.
+    impact_number = models.CharField(max_length=100, blank=True)
+    beneficiaries = models.CharField(max_length=150, blank=True)
+    description = models.TextField(max_length=1500, blank=True)
+    proof_link = models.URLField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class Recommender(models.Model):
+    class Status(models.TextChoices):
+        NOT_STARTED = "not_started", "Not started"
+        PLANNED = "planned", "Planned"
+        REQUESTED = "requested", "Requested"
+        CONFIRMED = "confirmed", "Confirmed"
+        SUBMITTED = "submitted", "Submitted"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile_recommenders",
+    )
+    name = models.CharField(max_length=150)
+    relationship_role = models.CharField(max_length=150, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.NOT_STARTED
+    )
+    requested_date = models.DateField(null=True, blank=True)
+    submitted_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(max_length=1000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]

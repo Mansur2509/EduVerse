@@ -11,9 +11,11 @@ from .models import (
     Honor,
     Olympiad,
     PortfolioProject,
+    Recommender,
     ResearchProject,
     Sport,
     StudentProfile,
+    Volunteer,
 )
 from .serializers import (
     ActivitySerializer,
@@ -24,8 +26,10 @@ from .serializers import (
     PortfolioProjectSerializer,
     ProfileCompletionSerializer,
     ProfileSerializer,
+    RecommenderSerializer,
     ResearchProjectSerializer,
     SportSerializer,
+    VolunteerSerializer,
 )
 from .services import calculate_profile_completion, ensure_profile_records
 
@@ -155,3 +159,13 @@ class EssayDraftViewSet(ProfileItemViewSet):
 class PortfolioProjectViewSet(ProfileItemViewSet):
     serializer_class = PortfolioProjectSerializer
     queryset = PortfolioProject.objects.all()
+
+
+class VolunteerViewSet(ProfileItemViewSet):
+    serializer_class = VolunteerSerializer
+    queryset = Volunteer.objects.all()
+
+
+class RecommenderViewSet(ProfileItemViewSet):
+    serializer_class = RecommenderSerializer
+    queryset = Recommender.objects.all()
