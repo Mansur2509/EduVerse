@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Trash2, Plus } from "lucide-react";
 
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 export type ProfileItemField = {
   key: string;
@@ -45,12 +47,18 @@ export function ProfileItemSection<T extends { id: number }>({
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
+  const [initialFormData, setInitialFormData] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasUnsavedChanges =
+    isExpanded && JSON.stringify(formData) !== JSON.stringify(initialFormData);
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitForm = async () => {
     setError(null);
     setIsSubmitting(true);
 
@@ -62,12 +70,20 @@ export function ProfileItemSection<T extends { id: number }>({
         await onAdd(formData);
       }
       setFormData({});
+      setInitialFormData({});
       setIsExpanded(false);
+      return true;
     } catch {
       setError(t("common.error.generic"));
+      return false;
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitForm();
   };
 
   const handleEdit = (item: T) => {
@@ -77,6 +93,7 @@ export function ProfileItemSection<T extends { id: number }>({
       newFormData[field.key] = item[field.key as keyof T] ?? "";
     });
     setFormData(newFormData);
+    setInitialFormData(newFormData);
     setIsExpanded(true);
   };
 
@@ -93,11 +110,24 @@ export function ProfileItemSection<T extends { id: number }>({
     }
   };
 
-  const handleCancel = () => {
+  const discardForm = () => {
     setEditingId(null);
     setFormData({});
+    setInitialFormData({});
     setIsExpanded(false);
     setError(null);
+  };
+
+  const openNewForm = () => {
+    setEditingId(null);
+    setFormData({});
+    setInitialFormData({});
+    setError(null);
+    setIsExpanded(true);
+  };
+
+  const handleCancel = () => {
+    unsavedGuard.requestLeave(discardForm);
   };
 
   const handleFieldChange = (key: string, value: unknown) => {
@@ -120,7 +150,7 @@ export function ProfileItemSection<T extends { id: number }>({
           <p className="mt-1 text-xs text-muted-foreground">{t(description)}</p>
         </div>
         <Button
-          onClick={() => (isExpanded ? handleCancel() : setIsExpanded(true))}
+          onClick={() => (isExpanded ? handleCancel() : openNewForm())}
           size="sm"
           variant="secondary"
           disabled={isSubmitting}
@@ -251,6 +281,18 @@ export function ProfileItemSection<T extends { id: number }>({
               {t("common.actions.cancel")}
             </Button>
           </div>
+          <UnsavedChangesDialog
+            description={t("common.unsaved.description")}
+            isSaving={isSubmitting}
+            leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+            onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+            onSaveAndLeave={submitForm}
+            onStay={unsavedGuard.stay}
+            open={unsavedGuard.isPromptOpen}
+            saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+            stayLabel={t("common.unsaved.stay")}
+            title={t("common.unsaved.title")}
+          />
         </form>
       )}
     </Card>

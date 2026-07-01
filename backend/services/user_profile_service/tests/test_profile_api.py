@@ -138,6 +138,47 @@ class ProfileApiTests(APITestCase):
         self.assertEqual(self.preferences.interests, ["Research", "Debate"])
         self.assertEqual(self.other_profile.country, "Other country")
 
+    def test_profile_allows_normal_detail_in_onboarding_lists(self):
+        self.client.force_authenticate(self.user)
+        detailed_activity = (
+            "Founded a weekly behavioral finance reading group, coordinated peer "
+            "presentations, and documented how students applied statistics concepts "
+            "to budgeting and university planning decisions."
+        )
+        support_priority = (
+            "I need help turning a broad interest in finance, machine learning, "
+            "and psychology into a realistic university list with sourced deadlines."
+        )
+
+        response = self.client.patch(
+            reverse("profile:me"),
+            {
+                "activities": {"research_projects": [detailed_activity]},
+                "support_priorities": [support_priority],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.profile.refresh_from_db()
+        self.assertEqual(
+            self.profile.activities["research_projects"],
+            [detailed_activity],
+        )
+        self.assertEqual(response.data["support_priorities"], [support_priority])
+
+    def test_profile_rejects_spam_length_on_onboarding_list_items(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.patch(
+            reverse("profile:me"),
+            {"activities": {"honors": ["x" * 501]}},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("activities", response.data)
+
     def test_role_cannot_be_changed_through_profile_endpoint(self):
         self.client.force_authenticate(self.user)
 

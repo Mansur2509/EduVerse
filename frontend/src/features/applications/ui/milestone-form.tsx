@@ -4,8 +4,10 @@ import { useState } from "react";
 
 import type { MilestoneCategory, MilestonePriority } from "@/entities/application";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 const CATEGORIES: MilestoneCategory[] = [
   "essays",
@@ -40,22 +42,39 @@ export function MilestoneForm({
   const [priority, setPriority] = useState<MilestonePriority>("medium");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasUnsavedChanges = Boolean(
+    title.trim() || dueDate || notes.trim() || category !== "essays" || priority !== "medium"
+  );
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  function resetForm() {
+    setTitle("");
+    setCategory("essays");
+    setDueDate("");
+    setPriority("medium");
+    setNotes("");
+  }
+
+  async function submitCurrentValues() {
     // Guard against empty titles and against a double-click creating duplicates:
     // the button is disabled and re-entry blocked until the save resolves.
-    if (!title.trim() || isSubmitting) return;
+    if (!title.trim() || isSubmitting) return false;
     setIsSubmitting(true);
     try {
       await onSubmit({ title: title.trim(), category, due_date: dueDate, priority, notes: notes.trim() });
-      setTitle("");
-      setDueDate("");
-      setPriority("medium");
-      setNotes("");
+      resetForm();
+      return true;
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    await submitCurrentValues();
   }
 
   return (
@@ -107,7 +126,28 @@ export function MilestoneForm({
         <Button disabled={isSubmitting || !title.trim()} size="sm" type="submit" variant="secondary">
           {t("applications.milestones.add")}
         </Button>
+        <Button
+          disabled={isSubmitting || !hasUnsavedChanges}
+          onClick={() => unsavedGuard.requestLeave(resetForm)}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          {t("common.actions.cancel")}
+        </Button>
       </div>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSubmitting}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+        onSaveAndLeave={submitCurrentValues}
+        onStay={unsavedGuard.stay}
+        open={unsavedGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </form>
   );
 }

@@ -40,9 +40,20 @@ ACTIVITY_KEYS = {
     "leadership",
     "work_internships",
 }
+SHORT_LIST_ITEM_MAX_LENGTH = 120
+MAJOR_LIST_ITEM_MAX_LENGTH = 150
+UNIVERSITY_LIST_ITEM_MAX_LENGTH = 180
+PROFILE_LIST_ITEM_MAX_LENGTH = 500
+SUPPORT_LIST_ITEM_MAX_LENGTH = 1000
 
 
-def validate_string_list(value, *, field_name: str, max_items: int = 20) -> list[str]:
+def validate_string_list(
+    value,
+    *,
+    field_name: str,
+    max_items: int = 20,
+    max_length: int = PROFILE_LIST_ITEM_MAX_LENGTH,
+) -> list[str]:
     if not isinstance(value, list):
         raise serializers.ValidationError(f"{field_name} must be a list.")
     if len(value) > max_items:
@@ -55,8 +66,10 @@ def validate_string_list(value, *, field_name: str, max_items: int = 20) -> list
         normalized_item = item.strip()
         if not normalized_item:
             continue
-        if len(normalized_item) > 120:
-            raise serializers.ValidationError(f"Each {field_name} item must be 120 characters or fewer.")
+        if len(normalized_item) > max_length:
+            raise serializers.ValidationError(
+                f"Each {field_name} item must be {max_length} characters or fewer."
+            )
         if normalized_item not in normalized_items:
             normalized_items.append(normalized_item)
     return normalized_items
@@ -128,7 +141,7 @@ class ProfileSerializer(serializers.Serializer):
         required=False,
     )
     intended_majors = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=MAJOR_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     target_universities = serializers.ListField(
@@ -142,7 +155,7 @@ class ProfileSerializer(serializers.Serializer):
         required=False,
     )
     interests = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=PROFILE_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     languages = serializers.ListField(
@@ -152,7 +165,7 @@ class ProfileSerializer(serializers.Serializer):
     test_scores = serializers.JSONField(required=False)
     exam_plans = serializers.JSONField(required=False)
     preparation_needs = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=PROFILE_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     activities = serializers.JSONField(required=False)
@@ -162,19 +175,19 @@ class ProfileSerializer(serializers.Serializer):
     )
     essay_stage = serializers.CharField(required=False, allow_blank=True, max_length=120)
     support_priorities = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=SUPPORT_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     interested_classes = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=UNIVERSITY_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     ap_interests = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=UNIVERSITY_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     career_interests = serializers.ListField(
-        child=serializers.CharField(max_length=120),
+        child=serializers.CharField(max_length=PROFILE_LIST_ITEM_MAX_LENGTH),
         required=False,
     )
     mun_debate_interest = serializers.BooleanField(required=False)
@@ -271,19 +284,41 @@ class ProfileSerializer(serializers.Serializer):
         return value
 
     def validate_target_countries(self, value):
-        return validate_string_list(value, field_name="target countries")
+        return validate_string_list(
+            value,
+            field_name="target countries",
+            max_length=SHORT_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_intended_majors(self, value):
-        return validate_string_list(value, field_name="intended majors")
+        return validate_string_list(
+            value,
+            field_name="intended majors",
+            max_length=MAJOR_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_target_universities(self, value):
-        return validate_string_list(value, field_name="target universities", max_items=30)
+        return validate_string_list(
+            value,
+            field_name="target universities",
+            max_items=30,
+            max_length=UNIVERSITY_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_interests(self, value):
-        return validate_string_list(value, field_name="interests", max_items=30)
+        return validate_string_list(
+            value,
+            field_name="interests",
+            max_items=30,
+            max_length=PROFILE_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_languages(self, value):
-        return validate_string_list(value, field_name="languages")
+        return validate_string_list(
+            value,
+            field_name="languages",
+            max_length=SHORT_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_test_scores(self, value):
         if not isinstance(value, dict):
@@ -307,6 +342,7 @@ class ProfileSerializer(serializers.Serializer):
                     score,
                     field_name=f"{normalized_key} scores",
                     max_items=20,
+                    max_length=SHORT_LIST_ITEM_MAX_LENGTH,
                 )
             else:
                 raise serializers.ValidationError(
@@ -343,7 +379,11 @@ class ProfileSerializer(serializers.Serializer):
         if unknown_keys:
             raise serializers.ValidationError("Exam plans contain unsupported fields.")
 
-        taken = validate_string_list(value.get("taken", []), field_name="taken exams")
+        taken = validate_string_list(
+            value.get("taken", []),
+            field_name="taken exams",
+            max_length=SHORT_LIST_ITEM_MAX_LENGTH,
+        )
         planned = value.get("planned", [])
         if not isinstance(planned, list) or len(planned) > 12:
             raise serializers.ValidationError("Planned exams must be a list with at most 12 items.")
@@ -402,19 +442,44 @@ class ProfileSerializer(serializers.Serializer):
         return {"taken": taken, "planned": normalized_plans}
 
     def validate_preparation_needs(self, value):
-        return validate_string_list(value, field_name="preparation needs", max_items=20)
+        return validate_string_list(
+            value,
+            field_name="preparation needs",
+            max_items=20,
+            max_length=PROFILE_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_support_priorities(self, value):
-        return validate_string_list(value, field_name="support priorities", max_items=20)
+        return validate_string_list(
+            value,
+            field_name="support priorities",
+            max_items=20,
+            max_length=SUPPORT_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_interested_classes(self, value):
-        return validate_string_list(value, field_name="interested classes", max_items=30)
+        return validate_string_list(
+            value,
+            field_name="interested classes",
+            max_items=30,
+            max_length=UNIVERSITY_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_ap_interests(self, value):
-        return validate_string_list(value, field_name="AP interests", max_items=20)
+        return validate_string_list(
+            value,
+            field_name="AP interests",
+            max_items=20,
+            max_length=UNIVERSITY_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_career_interests(self, value):
-        return validate_string_list(value, field_name="career interests", max_items=30)
+        return validate_string_list(
+            value,
+            field_name="career interests",
+            max_items=30,
+            max_length=PROFILE_LIST_ITEM_MAX_LENGTH,
+        )
 
     def validate_activities(self, value):
         if not isinstance(value, dict):
@@ -426,6 +491,7 @@ class ProfileSerializer(serializers.Serializer):
                 value.get(key, []),
                 field_name=key.replace("_", " "),
                 max_items=20,
+                max_length=PROFILE_LIST_ITEM_MAX_LENGTH,
             )
             for key in ACTIVITY_KEYS
         }

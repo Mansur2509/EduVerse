@@ -196,7 +196,7 @@ Academic comparison must use the normalized fields when confidence is high or me
 
 ### PATCH `/api/profile/me/`
 
-Authenticated. Accepts any writable subset of the profile response. Arrays must contain short text values. `test_scores` is a bounded object supporting text, numeric, or text-list values. Known numeric ranges are validated for SAT, IELTS, and TOEFL.
+Authenticated. Accepts any writable subset of the profile response. Arrays remain bounded by item count and field-appropriate item length: taxonomy-like fields such as target countries and languages stay short, university/major/class names allow normal names, and onboarding activity, preparation, support, and career entries allow normal admissions-detail text while still rejecting spam-length values. `test_scores` is a bounded object supporting text, numeric, or text-list values. Known numeric ranges are validated for SAT, IELTS, and TOEFL.
 
 GPA writes should include `original_gpa_value`, `original_gpa_scale`, and `original_gpa_scale_type` where possible. `exam_plans.planned[]` may include `exam_type`, `current_score`, `planned_retake`, `planned_retake_month`, and `test_status`; SAT/AP official-date guidance is generated only from verified `OfficialExamDate` records, not from guessed dates.
 

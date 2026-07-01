@@ -8,9 +8,11 @@ import type {
   RoadmapTask
 } from "@/entities/roadmap";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 const CATEGORIES: RoadmapCategory[] = [
   "profile",
@@ -49,27 +51,39 @@ export function RoadmapTaskForm({
 }) {
   const { t } = useI18n();
   const isManual = !task || task.source_type === "manual";
-  const [values, setValues] = useState<RoadmapTaskFormValues>({
+  const [initialValues] = useState<RoadmapTaskFormValues>({
     title: task?.title ?? "",
     description: task?.description ?? "",
     category: task?.category ?? "recommendations",
     priority: task?.priority ?? "medium",
     due_date: task?.due_date ?? ""
   });
+  const [values, setValues] = useState<RoadmapTaskFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
+  const hasUnsavedChanges = JSON.stringify(values) !== JSON.stringify(initialValues);
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitValues() {
     setError(null);
     if (!values.title.trim()) {
       setError(t("common.error.requiredFields"));
-      return;
+      return false;
     }
     try {
       await onSubmit(values);
+      return true;
     } catch {
       setError(t("common.error.generic"));
+      return false;
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    await submitValues();
   }
 
   return (
@@ -160,11 +174,29 @@ export function RoadmapTaskForm({
           <Button disabled={isSubmitting} size="sm" type="submit">
             {task ? t("roadmap.form.save") : t("roadmap.form.create")}
           </Button>
-          <Button disabled={isSubmitting} onClick={onCancel} size="sm" type="button" variant="ghost">
+          <Button
+            disabled={isSubmitting}
+            onClick={() => unsavedGuard.requestLeave(onCancel)}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
             {t("common.actions.cancel")}
           </Button>
         </div>
       </form>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSubmitting}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+        onSaveAndLeave={submitValues}
+        onStay={unsavedGuard.stay}
+        open={unsavedGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </Card>
   );
 }

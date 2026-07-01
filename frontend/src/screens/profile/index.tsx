@@ -50,10 +50,12 @@ import {
 } from "@/features/profile/lib/profile-items-config";
 import { ProfileItemSection } from "@/features/profile/ui/profile-item-section";
 import { useI18n } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 type ProfileFormState = {
   fullName: string;
@@ -244,6 +246,7 @@ export function ProfileScreen() {
   const [profile, setProfile] = useState<StudentProfileDetails | null>(null);
   const [completion, setCompletion] = useState<ProfileCompletion | null>(null);
   const [form, setForm] = useState<ProfileFormState>(emptyForm);
+  const [savedForm, setSavedForm] = useState<ProfileFormState>(emptyForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -270,7 +273,9 @@ export function ProfileScreen() {
       ]);
       setProfile(profileResponse);
       setCompletion(completionResponse);
-      setForm(profileToForm(profileResponse));
+      const nextForm = profileToForm(profileResponse);
+      setForm(nextForm);
+      setSavedForm(nextForm);
     } catch {
       setLoadFailed(true);
     } finally {
@@ -317,8 +322,13 @@ export function ProfileScreen() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const hasUnsavedProfileChanges = JSON.stringify(form) !== JSON.stringify(savedForm);
+  const unsavedProfileGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedProfileChanges
+  });
+
+  async function saveProfileForm() {
     setIsSaving(true);
     setSaveFailed(false);
     setSaved(false);
@@ -374,14 +384,29 @@ export function ProfileScreen() {
       const updatedCompletion = await getProfileCompletionRequest();
       setProfile(updatedProfile);
       setCompletion(updatedCompletion);
-      setForm(profileToForm(updatedProfile));
+      const nextForm = profileToForm(updatedProfile);
+      setForm(nextForm);
+      setSavedForm(nextForm);
       setSaved(true);
       await refreshUser();
+      return true;
     } catch {
       setSaveFailed(true);
+      return false;
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await saveProfileForm();
+  }
+
+  function discardProfileChanges() {
+    setForm(savedForm);
+    setSaveFailed(false);
+    setSaved(false);
   }
 
   // Item CRUD handlers
@@ -926,11 +951,31 @@ export function ProfileScreen() {
         </Card>
       ) : null}
 
-      <div className="sticky bottom-20 z-10 flex justify-end rounded-sm border bg-surface p-3 shadow-card lg:bottom-4">
+      <div className="sticky bottom-20 z-10 flex flex-wrap justify-end gap-2 rounded-sm border bg-surface p-3 shadow-card lg:bottom-4">
+        <Button
+          disabled={isSaving || !hasUnsavedProfileChanges}
+          onClick={() => unsavedProfileGuard.requestLeave(discardProfileChanges)}
+          type="button"
+          variant="ghost"
+        >
+          {t("common.actions.cancel")}
+        </Button>
         <Button disabled={isSaving} type="submit">
           {isSaving ? t("profile.saving") : t("profile.save")}
         </Button>
       </div>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSaving}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedProfileGuard.leaveWithoutSaving}
+        onSaveAndLeave={saveProfileForm}
+        onStay={unsavedProfileGuard.stay}
+        open={unsavedProfileGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </form>
   );
 }

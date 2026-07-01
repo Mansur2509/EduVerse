@@ -25,12 +25,14 @@ import {
 } from "@/features/suggestions";
 import { getShortlistRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { PaginatedList } from "@/shared/ui/pagination";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 const SCORE_FIELDS: Array<{
   key: "structure_score" | "clarity_score" | "authenticity_score" | "specificity_score" | "grammar_score" | "prompt_fit_score";
@@ -102,6 +104,13 @@ export function EssaysScreen() {
   }, [loadEssays]);
 
   const selectedEssay = essays.find((essay) => essay.id === selectedEssayId) ?? null;
+  const hasUnsavedDraftChanges = Boolean(
+    selectedEssay && draftText !== selectedEssay.draft_text
+  );
+  const draftGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedDraftChanges
+  });
 
   useEffect(() => {
     if (selectedEssay) {
@@ -166,16 +175,25 @@ export function EssaysScreen() {
   }
 
   async function handleSaveDraft() {
-    if (!selectedEssay) return;
+    if (!selectedEssay) return false;
     setIsSavingDraft(true);
     setActionError(false);
     try {
       const updated = await updateEssayRequest(selectedEssay.id, { draft_text: draftText });
       updateEssayInList(updated);
+      setDraftText(updated.draft_text);
+      return true;
     } catch {
       setActionError(true);
+      return false;
     } finally {
       setIsSavingDraft(false);
+    }
+  }
+
+  function discardDraftChanges() {
+    if (selectedEssay) {
+      setDraftText(selectedEssay.draft_text);
     }
   }
 
@@ -429,7 +447,9 @@ export function EssaysScreen() {
               <EssayCard
                 essay={essay}
                 isSelected={essay.id === selectedEssayId}
-                onSelect={(item) => setSelectedEssayId(item.id)}
+                onSelect={(item) =>
+                  draftGuard.requestLeave(() => setSelectedEssayId(item.id))
+                }
               />
             )}
           />
@@ -503,6 +523,15 @@ export function EssaysScreen() {
                       variant="secondary"
                     >
                       {isSavingDraft ? t("essays.actions.saving") : t("essays.actions.saveDraft")}
+                    </Button>
+                    <Button
+                      disabled={isSavingDraft || !hasUnsavedDraftChanges}
+                      onClick={discardDraftChanges}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {t("essays.actions.discardDraft")}
                     </Button>
                     <Button
                       disabled={isGeneratingFeedback}
@@ -651,6 +680,18 @@ export function EssaysScreen() {
         {t("essays.disclaimer")}
       </p>
       <Badge className="text-xs">{t("essays.noGhostwritingNote")}</Badge>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSavingDraft}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={draftGuard.leaveWithoutSaving}
+        onSaveAndLeave={handleSaveDraft}
+        onStay={draftGuard.stay}
+        open={draftGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </div>
   );
 }

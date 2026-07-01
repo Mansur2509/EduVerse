@@ -31,11 +31,13 @@ import {
 } from "@/features/profile";
 import { getApiErrorMessage } from "@/shared/api/client";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { LanguageSwitcher } from "@/shared/ui/language-switcher";
 import { SupportLink } from "@/shared/ui/support-link";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 import { AdmissionsProposals } from "./admissions-proposals";
 import { MajorAssessment } from "./major-assessment";
@@ -401,6 +403,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const { logout } = useAuth();
   const { t } = useI18n();
   const [form, setForm] = useState<OnboardingForm>(emptyForm);
+  const [savedForm, setSavedForm] = useState<OnboardingForm>(emptyForm);
   const [sections, setSections] = useState<OnboardingSection[]>([]);
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -417,7 +420,9 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
         const profile = await getProfileRequest();
         const stored = window.sessionStorage.getItem(DRAFT_KEY);
         const backendForm = profileToForm(profile);
-        setForm(stored ? { ...backendForm, ...JSON.parse(stored) } : backendForm);
+        const nextForm = stored ? { ...backendForm, ...JSON.parse(stored) } : backendForm;
+        setForm(nextForm);
+        setSavedForm(backendForm);
         setSections(profile.onboarding_sections);
       } catch (loadError) {
         setError(getApiErrorMessage(loadError, t("onboarding.error.load")));
@@ -457,6 +462,12 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
       .filter((category) => category.majors.length > 0);
   }, [majorSearch, t]);
 
+  const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(savedForm);
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
+
   async function saveCurrentStep(nextStep: number) {
     setIsSaving(true);
     setError(null);
@@ -469,10 +480,28 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
         setReadiness(await getApplicationReadinessRequest());
       }
       setSections(nextSections);
+      setSavedForm(form);
       setStep(nextStep);
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
     } catch (saveError) {
       setError(getApiErrorMessage(saveError, t("onboarding.error.save")));
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveOnboardingDraft() {
+    setIsSaving(true);
+    setError(null);
+    try {
+      await updateProfileRequest(formPayload(form, sections));
+      setSavedForm(form);
+      return true;
+    } catch (saveError) {
+      setError(getApiErrorMessage(saveError, t("onboarding.error.save")));
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -484,6 +513,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
     setMissing([]);
     try {
       await updateProfileRequest(formPayload(form, sections));
+      setSavedForm(form);
       const completion = await getProfileCompletionRequest();
       if (!completion.can_complete) {
         setMissing([...completion.missing_fields, ...completion.missing_sections]);
@@ -578,7 +608,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
             <button
               aria-label={t("a11y.logout")}
               className="grid size-10 place-items-center border border-white/15 text-white/70 hover:bg-white/10 hover:text-white"
-              onClick={() => void logout()}
+              onClick={() => unsavedGuard.requestLeave(() => logout())}
               type="button"
             >
               <LogOut aria-hidden className="size-4" />
@@ -940,6 +970,18 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
           />
         </aside>
       </div>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSaving}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+        onSaveAndLeave={saveOnboardingDraft}
+        onStay={unsavedGuard.stay}
+        open={unsavedGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </main>
   );
 }

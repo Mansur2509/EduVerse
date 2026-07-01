@@ -24,9 +24,11 @@ import {
   updateOrganizerEventRequest
 } from "@/features/organizer-events";
 import { useI18n } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 type EventFormState = {
   title: string;
@@ -160,6 +162,7 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
   const router = useRouter();
   const { t } = useI18n();
   const [form, setForm] = useState<EventFormState>(emptyForm);
+  const [savedForm, setSavedForm] = useState<EventFormState>(emptyForm);
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [event, setEvent] = useState<OrganizerEvent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,12 +183,16 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
       setCategories(categoryResponse);
       if (eventResponse) {
         setEvent(eventResponse);
-        setForm(fromEvent(eventResponse));
+        const nextForm = fromEvent(eventResponse);
+        setForm(nextForm);
+        setSavedForm(nextForm);
       } else if (categoryResponse[0]) {
-        setForm((current) => ({
-          ...current,
-          categorySlug: current.categorySlug || categoryResponse[0].slug
-        }));
+        const nextForm = { ...emptyForm, categorySlug: categoryResponse[0].slug };
+        setForm(nextForm);
+        setSavedForm(nextForm);
+      } else {
+        setForm(emptyForm);
+        setSavedForm(emptyForm);
       }
     } catch {
       setLoadError(true);
@@ -205,8 +212,15 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function handleSave(submitEvent: FormEvent<HTMLFormElement>) {
-    submitEvent.preventDefault();
+  const isEditable = !event || event.can_edit;
+  const hasUnsavedChanges =
+    isEditable && JSON.stringify(form) !== JSON.stringify(savedForm);
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
+
+  async function saveEventDraft() {
     setIsSaving(true);
     setSaveError(false);
     setSaved(false);
@@ -217,16 +231,25 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
           ? await updateOrganizerEventRequest(slug, input)
           : await createOrganizerEventRequest(input);
       setEvent(response);
-      setForm(fromEvent(response));
+      const nextForm = fromEvent(response);
+      setForm(nextForm);
+      setSavedForm(nextForm);
       setSaved(true);
       if (!slug) {
         router.replace(`/organizer/events/${response.slug}`);
       }
+      return true;
     } catch {
       setSaveError(true);
+      return false;
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleSave(submitEvent: FormEvent<HTMLFormElement>) {
+    submitEvent.preventDefault();
+    await saveEventDraft();
   }
 
   async function handleSubmitForReview() {
@@ -270,7 +293,6 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
     );
   }
 
-  const isEditable = !event || event.can_edit;
   const isOnline = form.format === "online" || form.format === "hybrid";
   const isPaid = form.priceType === "paid";
 
@@ -549,7 +571,9 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
             </Button>
           ) : null}
           <Button
-            onClick={() => router.push("/organizer/events")}
+            onClick={() =>
+              unsavedGuard.requestLeave(() => router.push("/organizer/events"))
+            }
             type="button"
             variant="ghost"
           >
@@ -557,6 +581,18 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
           </Button>
         </div>
       </form>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSaving}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+        onSaveAndLeave={saveEventDraft}
+        onStay={unsavedGuard.stay}
+        open={unsavedGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </div>
   );
 }

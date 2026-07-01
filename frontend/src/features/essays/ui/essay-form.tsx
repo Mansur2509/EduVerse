@@ -5,9 +5,11 @@ import { useState } from "react";
 import { ESSAY_TYPES, type EssayType, type EssayWorkspace } from "@/entities/essay";
 import type { SavedUniversity } from "@/entities/university";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 export type EssayFormValues = {
   title: string;
@@ -31,27 +33,39 @@ export function EssayForm({
   isSubmitting?: boolean;
 }) {
   const { t } = useI18n();
-  const [values, setValues] = useState<EssayFormValues>({
+  const [initialValues] = useState<EssayFormValues>({
     title: essay?.title ?? "",
     essay_type: essay?.essay_type ?? "common_app",
     university: essay?.university ?? null,
     prompt_text: essay?.prompt_text ?? "",
     word_limit: essay?.word_limit ? String(essay.word_limit) : ""
   });
+  const [values, setValues] = useState<EssayFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
+  const hasUnsavedChanges = JSON.stringify(values) !== JSON.stringify(initialValues);
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitValues() {
     setError(null);
     if (!values.title.trim()) {
       setError(t("common.error.requiredFields"));
-      return;
+      return false;
     }
     try {
       await onSubmit(values);
+      return true;
     } catch {
       setError(t("common.error.generic"));
+      return false;
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    await submitValues();
   }
 
   return (
@@ -138,11 +152,29 @@ export function EssayForm({
           <Button disabled={isSubmitting} size="sm" type="submit">
             {essay ? t("essays.form.save") : t("essays.form.create")}
           </Button>
-          <Button disabled={isSubmitting} onClick={onCancel} size="sm" type="button" variant="ghost">
+          <Button
+            disabled={isSubmitting}
+            onClick={() => unsavedGuard.requestLeave(onCancel)}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
             {t("common.actions.cancel")}
           </Button>
         </div>
       </form>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSubmitting}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+        onSaveAndLeave={submitValues}
+        onStay={unsavedGuard.stay}
+        open={unsavedGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </Card>
   );
 }

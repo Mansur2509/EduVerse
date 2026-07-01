@@ -5,9 +5,11 @@ import { useState } from "react";
 import type { ApplicationRound } from "@/entities/application";
 import type { SavedUniversity } from "@/entities/university";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 const ROUNDS: ApplicationRound[] = [
   "early_decision",
@@ -37,25 +39,37 @@ export function ApplicationForm({
   isSubmitting?: boolean;
 }) {
   const { t } = useI18n();
-  const [values, setValues] = useState<ApplicationFormValues>({
+  const [initialValues] = useState<ApplicationFormValues>({
     university: shortlist[0]?.university.id ?? null,
     application_round: "regular_decision",
     deadline: ""
   });
+  const [values, setValues] = useState<ApplicationFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
+  const hasUnsavedChanges = JSON.stringify(values) !== JSON.stringify(initialValues);
+  const unsavedGuard = useUnsavedChangesGuard({
+    browserMessage: t("common.unsaved.browserMessage"),
+    isDirty: hasUnsavedChanges
+  });
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitValues() {
     setError(null);
     if (!values.university) {
       setError(t("common.error.requiredFields"));
-      return;
+      return false;
     }
     try {
       await onSubmit(values);
+      return true;
     } catch {
       setError(t("applications.form.duplicateError"));
+      return false;
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    await submitValues();
   }
 
   return (
@@ -119,11 +133,29 @@ export function ApplicationForm({
           <Button disabled={isSubmitting} size="sm" type="submit">
             {t("applications.form.create")}
           </Button>
-          <Button disabled={isSubmitting} onClick={onCancel} size="sm" type="button" variant="ghost">
+          <Button
+            disabled={isSubmitting}
+            onClick={() => unsavedGuard.requestLeave(onCancel)}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
             {t("common.actions.cancel")}
           </Button>
         </div>
       </form>
+      <UnsavedChangesDialog
+        description={t("common.unsaved.description")}
+        isSaving={isSubmitting}
+        leaveWithoutSavingLabel={t("common.unsaved.leaveWithoutSaving")}
+        onLeaveWithoutSaving={unsavedGuard.leaveWithoutSaving}
+        onSaveAndLeave={submitValues}
+        onStay={unsavedGuard.stay}
+        open={unsavedGuard.isPromptOpen}
+        saveAndLeaveLabel={t("common.unsaved.saveAndLeave")}
+        stayLabel={t("common.unsaved.stay")}
+        title={t("common.unsaved.title")}
+      />
     </Card>
   );
 }
