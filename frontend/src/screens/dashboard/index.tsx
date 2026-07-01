@@ -26,6 +26,7 @@ import {
   type ProfileCompletion,
   type StudentProfileDetails
 } from "@/entities/profile";
+import type { RecommendationItem } from "@/entities/recommendation";
 import type { RoadmapPlan } from "@/entities/roadmap";
 import type { SuggestedItem } from "@/entities/suggestion";
 import { getApplicationsRequest } from "@/features/applications";
@@ -44,6 +45,7 @@ import {
   generateSuggestionsRequest,
   SuggestionPanel
 } from "@/features/suggestions";
+import { getRecommendationsRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
@@ -92,6 +94,7 @@ export function DashboardScreen() {
   const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
   const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
   const [essays, setEssays] = useState<EssayWorkspace[]>([]);
+  const [topRecommendations, setTopRecommendations] = useState<RecommendationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
@@ -108,7 +111,8 @@ export function DashboardScreen() {
       roadmapResult,
       suggestionsResult,
       applicationsResult,
-      essaysResult
+      essaysResult,
+      recommendationsResult
     ] = await Promise.allSettled([
       getProfileCompletionRequest(),
       getProfileRequest(),
@@ -117,7 +121,8 @@ export function DashboardScreen() {
       getRoadmapRequest(),
       generateSuggestionsRequest(),
       getApplicationsRequest(),
-      getEssaysRequest()
+      getEssaysRequest(),
+      getRecommendationsRequest()
     ]);
 
     if (completionResult.status === "fulfilled") {
@@ -159,6 +164,13 @@ export function DashboardScreen() {
       setEssays(essaysResult.value.results);
     } else {
       setHasPartialError(true);
+    }
+    if (recommendationsResult.status === "fulfilled") {
+      setTopRecommendations(
+        [...recommendationsResult.value.recommendations]
+          .sort((a, b) => b.fit_score - a.fit_score)
+          .slice(0, 3)
+      );
     }
     setIsLoading(false);
   }, []);
@@ -530,7 +542,7 @@ export function DashboardScreen() {
         title={t("dashboard.suggestions.title")}
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Card className="p-4">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
             {t("dashboard.applicationsWidget.title")}
@@ -650,6 +662,31 @@ export function DashboardScreen() {
           )}
           <Button asChild className="mt-3" size="sm" variant="ghost">
             <Link href="/profile">{t("dashboard.gapsWidget.strengthenProfile")}</Link>
+          </Button>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+            {t("dashboard.recommendationsWidget.title")}
+          </p>
+          {topRecommendations.length === 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t("dashboard.recommendationsWidget.empty")}
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-1.5 text-xs">
+              {topRecommendations.map((item) => (
+                <li className="flex items-center justify-between gap-2" key={item.university.slug}>
+                  <span className="truncate">{item.university.name}</span>
+                  <span className="shrink-0 rounded-sm border bg-surface px-1.5 py-0.5 text-[0.65rem] font-bold">
+                    {item.fit_score}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button asChild className="mt-3" size="sm" variant="ghost">
+            <Link href="/recommendations">{t("dashboard.recommendationsWidget.open")}</Link>
           </Button>
         </Card>
       </section>

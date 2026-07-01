@@ -1,3 +1,4 @@
+import type { RecommendationsResponse } from "@/entities/recommendation";
 import type {
   SavedUniversity,
   UniversityDetails,
@@ -92,4 +93,8 @@ export async function getShortlistRequest() {
     base: "api"
   });
   return normalizePaginatedResponse<SavedUniversity>(response, "university shortlist");
+}
+
+export function getRecommendationsRequest() {
+  return apiRequest<RecommendationsResponse>("/universities/recommendations/", { base: "api" });
 }
