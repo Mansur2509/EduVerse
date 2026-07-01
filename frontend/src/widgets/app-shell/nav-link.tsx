@@ -34,7 +34,7 @@ export function NavLink({
           ? "min-w-16 flex-col px-2 py-2 text-[0.68rem]"
           : compactHorizontal
             ? "shrink-0 px-3 py-2 text-xs"
-            : "px-3 py-2.5",
+            : "px-3 py-2",
         active
           ? "bg-primary text-primary-foreground"
           : inverse

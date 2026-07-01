@@ -115,3 +115,24 @@ textarea::placeholder {
 .scrollbar-quiet::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Same thin/transparent treatment, but for scroll regions on a dark (navy)
+   background -- the default .scrollbar-quiet thumb color is tuned for light
+   surfaces and washes out to a pale sliver on navy, which is what made the
+   sidebar's scrollbar look wrong rather than merely present. */
+.scrollbar-quiet-inverse {
+  scrollbar-color: hsl(var(--navy-foreground) / 0.25) transparent;
+  scrollbar-width: thin;
+}
+
+.scrollbar-quiet-inverse::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-quiet-inverse::-webkit-scrollbar-thumb {
+  background: hsl(var(--navy-foreground) / 0.25);
+}
+
+.scrollbar-quiet-inverse::-webkit-scrollbar-track {
+  background: transparent;
+}

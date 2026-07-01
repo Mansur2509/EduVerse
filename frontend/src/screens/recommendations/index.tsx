@@ -438,7 +438,7 @@ export function RecommendationsScreen() {
                 </span>
                 <span className="text-sm font-normal text-muted-foreground">({list.length})</span>
               </h2>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="flex flex-wrap gap-3">
                 {list.map((item) => (
                   <RecommendationCard
                     isExpanded={expandedSlug === item.university.slug}
@@ -488,7 +488,7 @@ function RecommendationCard({
 }) {
   const roundLabel = item.application_round.recommended_round;
   return (
-    <Card className="flex flex-col gap-2.5 p-4">
+    <Card className="flex min-w-[17rem] flex-1 flex-col gap-2.5 p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-base font-semibold">{item.university.name}</p>

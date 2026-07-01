@@ -316,21 +316,21 @@ export function DashboardScreen() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <section className="overflow-hidden rounded-sm border bg-card shadow-card">
         <div className="grid lg:grid-cols-[1.35fr_0.65fr]">
-          <div className="p-5 sm:p-7">
+          <div className="p-4 sm:p-5">
             <Badge>{t("dashboard.betaBadge")}</Badge>
-            <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-primary-hover">
+            <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-primary-hover">
               {t("dashboard.eyebrow")}
             </p>
-            <h1 className="mt-2 max-w-3xl text-2xl font-semibold sm:text-4xl">
+            <h1 className="mt-1.5 max-w-3xl text-xl font-semibold sm:text-3xl">
               {t("dashboard.welcome", { name: firstName })}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {t("dashboard.commandCenterDescription")}
             </p>
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-3">
               <Button asChild size="sm">
                 <Link href="/events">
                   <Map aria-hidden className="mr-2 size-4" />
@@ -342,18 +342,18 @@ export function DashboardScreen() {
               </Button>
             </div>
           </div>
-          <div className="border-t bg-surface p-5 lg:border-l lg:border-t-0 lg:p-6">
+          <div className="border-t bg-surface p-4 lg:border-l lg:border-t-0 lg:p-5">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
               {t("dashboard.nextAction.label")}
             </p>
-            <h2 className="mt-2 text-xl font-semibold">
+            <h2 className="mt-1.5 text-lg font-semibold">
               {completionPercentage < 70
                 ? t("dashboard.nextAction.profile")
                 : registrations.length === 0
                   ? t("dashboard.nextAction.event")
                   : t("dashboard.nextAction.roadmap")}
             </h2>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
               {t("dashboard.nextAction.description")}
             </p>
           </div>
@@ -370,7 +370,7 @@ export function DashboardScreen() {
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
@@ -415,7 +415,7 @@ export function DashboardScreen() {
           </Button>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
@@ -467,7 +467,7 @@ export function DashboardScreen() {
         </Card>
       </section>
 
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
@@ -695,13 +695,13 @@ export function DashboardScreen() {
         {readiness ? (
           <ReadinessCard compact readiness={readiness} />
         ) : (
-          <Card className="p-5">
+          <Card className="p-4">
             <p className="text-xs text-muted-foreground">
               {t("profile.loading")}
             </p>
           </Card>
         )}
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
             {t("dashboard.learning.title")}
           </p>
@@ -734,7 +734,7 @@ export function DashboardScreen() {
         </Card>
       </section>
 
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
@@ -752,9 +752,12 @@ export function DashboardScreen() {
           </Button>
         </div>
         {plannedExams.length ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             {plannedExams.slice(0, 3).map((exam) => (
-              <div className="border-l-4 border-primary bg-surface p-3" key={`${exam.name}-${exam.date}`}>
+              <div
+                className="min-w-[15rem] flex-1 border-l-4 border-primary bg-surface p-3"
+                key={`${exam.name}-${exam.date}`}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-serif text-base font-semibold">{exam.name}</p>
@@ -802,7 +805,7 @@ export function DashboardScreen() {
             {t("dashboard.workspace.betaNote")}
           </span>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="flex flex-wrap gap-3">
           <DashboardModuleCard
             detail={t("dashboard.universities.detail")}
             disclaimer={t("beta.disclaimer.admissions")}
@@ -842,7 +845,7 @@ export function DashboardScreen() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="flex items-start gap-3">
             <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
             <div>
@@ -857,7 +860,7 @@ export function DashboardScreen() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
             {t("dashboard.subscription.eyebrow")}
           </p>
@@ -912,7 +915,7 @@ function DashboardModuleCard({
   const { t } = useI18n();
 
   return (
-    <Card className="flex flex-col p-5">
+    <Card className="flex min-w-[14rem] flex-1 flex-col p-4">
       <Icon aria-hidden className="size-4 text-accent" />
       <h3 className="mt-2 text-base font-semibold">{title}</h3>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>

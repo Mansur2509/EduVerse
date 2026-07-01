@@ -52,21 +52,23 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen lg:fixed lg:inset-0 lg:flex lg:min-h-0 lg:overflow-hidden">
-      <aside className="hidden h-dvh w-[17rem] shrink-0 flex-col border-r border-white/10 bg-navy px-4 py-6 text-navy-foreground lg:flex">
-        <Link className="mb-8 flex shrink-0 items-center gap-3 px-2" href="/dashboard">
-          <span className="grid size-10 place-items-center rounded-sm border border-white/20 bg-primary font-serif text-xl font-bold text-primary-foreground">
+      <aside className="hidden h-dvh w-[16rem] shrink-0 flex-col border-r border-white/10 bg-navy px-3 py-5 text-navy-foreground lg:flex">
+        <Link className="mb-6 flex shrink-0 items-center gap-3 px-2" href="/dashboard">
+          <span className="grid size-9 place-items-center rounded-sm border border-white/20 bg-primary font-serif text-lg font-bold text-primary-foreground">
             E
           </span>
           <span>
-            <strong className="block font-serif text-xl">EduVerse</strong>
+            <strong className="block font-serif text-lg">EduVerse</strong>
             <span className="text-xs text-white/55">{t("shell.productSubtitle")}</span>
           </span>
         </Link>
 
         {/* Scrollable nav region: flex-1 + min-h-0 lets the nav scroll within the
             sidebar when the list is taller than the viewport, while the footer
-            below stays pinned to the bottom with no dead space. */}
-        <div className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto">
+            below stays pinned to the bottom with no dead space. The -inverse
+            scrollbar variant matches the navy background instead of the
+            light-surface thumb color washing out to a pale sliver. */}
+        <div className="scrollbar-quiet-inverse min-h-0 flex-1 overflow-y-auto">
           <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
             {t("shell.workspaceNavigation")}
           </p>
@@ -78,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {roleNavigation.length ? (
             <>
-              <div className="my-5 border-t border-white/10" />
+              <div className="my-4 border-t border-white/10" />
               <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
                 {t("shell.roleSection")}
               </p>
@@ -90,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </>
           ) : null}
 
-          <div className="my-5 border-t border-white/10" />
+          <div className="my-4 border-t border-white/10" />
 
           <p className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/45">
             {t("shell.accountSection")}
@@ -101,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
             <button
               aria-label={t("a11y.logout")}
-              className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
               onClick={() => void logout()}
               type="button"
             >
@@ -111,7 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         </div>
 
-        <div className="shrink-0 space-y-3 pt-6">
+        <div className="shrink-0 space-y-3 pt-5">
           <LanguageSwitcher inverse />
           <SupportLink className="w-full justify-center border-white/15 bg-white/5 text-white/70 hover:border-white/35 hover:bg-white/10 hover:text-white" />
           <div className="border-t border-white/10 pt-4">
@@ -126,8 +128,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1 lg:h-dvh lg:overflow-y-auto">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-surface px-4 sm:px-6 lg:px-8">
+      <div className="scrollbar-quiet min-w-0 flex-1 lg:h-dvh lg:overflow-y-auto">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-surface px-4 sm:px-6 lg:px-8">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-hover">
               {t("shell.academicWorkspace")}
@@ -166,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <main className="mx-auto w-full max-w-[84rem] px-4 py-7 pb-28 sm:px-6 lg:px-8 lg:pb-10">
+        <main className="mx-auto w-full max-w-[84rem] px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-6">
           {children}
         </main>
       </div>
