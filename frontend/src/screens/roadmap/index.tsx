@@ -650,6 +650,17 @@ export function RoadmapScreen() {
           />
 
           <Card>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold">{t("roadmap.filters.title")}</h2>
+                <span className="rounded-sm border border-accent/30 bg-accent/10 px-2 py-0.5 text-[0.68rem] font-medium text-accent">
+                  {t("roadmap.filters.autoApply")}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {t("roadmap.filters.resultCount", { count: bucketedTasks.length })}
+              </span>
+            </div>
             <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="block">
                 <span className="text-xs font-semibold">{t("roadmap.filters.category")}</span>

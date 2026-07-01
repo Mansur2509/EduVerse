@@ -41,6 +41,7 @@ import { formatDate } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 
@@ -507,7 +508,10 @@ export function ApplicationsScreen() {
           </label>
 
           <div>
-            <h3 className="text-sm font-semibold">{t("applications.milestones.title")}</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-sm font-semibold">{t("applications.milestones.title")}</h3>
+              <HelpTooltip label={t("applications.milestones.help")} />
+            </div>
             {selected.milestones.length === 0 ? (
               <p className="mt-2 text-sm text-muted-foreground">
                 {t("applications.milestones.empty")}
@@ -558,7 +562,7 @@ export function ApplicationsScreen() {
               </ul>
             )}
             <div className="mt-3">
-              <MilestoneForm onSubmit={(values) => void handleAddMilestone(values)} />
+              <MilestoneForm onSubmit={handleAddMilestone} />
             </div>
           </div>
 

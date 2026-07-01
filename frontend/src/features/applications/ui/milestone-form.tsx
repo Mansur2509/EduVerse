@@ -21,19 +21,31 @@ const CATEGORIES: MilestoneCategory[] = [
 export function MilestoneForm({
   onSubmit
 }: {
-  onSubmit: (values: { title: string; category: MilestoneCategory; due_date: string }) => void;
+  onSubmit: (values: {
+    title: string;
+    category: MilestoneCategory;
+    due_date: string;
+  }) => void | Promise<void>;
 }) {
   const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<MilestoneCategory>("essays");
   const [dueDate, setDueDate] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!title.trim()) return;
-    onSubmit({ title: title.trim(), category, due_date: dueDate });
-    setTitle("");
-    setDueDate("");
+    // Guard against empty titles and against a double-click creating duplicates:
+    // the button is disabled and re-entry blocked until the save resolves.
+    if (!title.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit({ title: title.trim(), category, due_date: dueDate });
+      setTitle("");
+      setDueDate("");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -61,7 +73,7 @@ export function MilestoneForm({
         type="date"
         value={dueDate}
       />
-      <Button size="sm" type="submit" variant="secondary">
+      <Button disabled={isSubmitting || !title.trim()} size="sm" type="submit" variant="secondary">
         {t("applications.milestones.add")}
       </Button>
     </form>
