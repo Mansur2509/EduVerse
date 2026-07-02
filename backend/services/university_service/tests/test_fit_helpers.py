@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
 from django.test import SimpleTestCase
 
 from services.university_service.services import (
+    _planned_target_scores,
     best_sat_score,
     ielts_gap_severity,
     normalize_gpa_to_4,
@@ -60,3 +63,50 @@ class GapSeverityTests(SimpleTestCase):
         self.assertEqual(sat_gap_severity(1410, 1510), "moderate_gap")
         self.assertEqual(sat_gap_severity(1360, 1510), "substantial_gap")
         self.assertEqual(sat_gap_severity(1220, 1510), "significant_gap")
+
+
+class PlannedTargetScoresTests(SimpleTestCase):
+    def _profile(self, planned):
+        return SimpleNamespace(exam_plans={"taken": [], "planned": planned})
+
+    def test_returns_empty_for_non_dict_exam_plans(self):
+        self.assertEqual(_planned_target_scores(SimpleNamespace(exam_plans=None)), {})
+        self.assertEqual(_planned_target_scores(SimpleNamespace(exam_plans=[])), {})
+
+    def test_ignores_malformed_entries_and_unparseable_targets(self):
+        profile = self._profile(
+            [
+                "not-a-dict",
+                {"exam_type": "SAT"},
+                {"exam_type": "SAT", "target_score": "around 1500ish"},
+                {"exam_type": "TOEFL", "target_score": "110"},
+            ]
+        )
+        self.assertEqual(_planned_target_scores(profile), {})
+
+    def test_parses_sat_and_ielts_targets(self):
+        profile = self._profile(
+            [
+                {"exam_type": "SAT", "target_score": "1550+"},
+                {"exam_type": "IELTS", "target_score": "7.5"},
+            ]
+        )
+        self.assertEqual(_planned_target_scores(profile), {"sat": 1550, "ielts": 7.5})
+
+    def test_out_of_range_targets_are_ignored(self):
+        profile = self._profile(
+            [
+                {"exam_type": "SAT", "target_score": "200"},
+                {"exam_type": "IELTS", "target_score": "9.5"},
+            ]
+        )
+        self.assertEqual(_planned_target_scores(profile), {})
+
+    def test_keeps_highest_target_when_multiple_plans_exist(self):
+        profile = self._profile(
+            [
+                {"exam_type": "SAT", "target_score": "1450"},
+                {"name": "SAT retake", "target_score": "1560"},
+            ]
+        )
+        self.assertEqual(_planned_target_scores(profile), {"sat": 1560})

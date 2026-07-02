@@ -10,6 +10,7 @@ import { useI18n } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
 
@@ -21,7 +22,11 @@ const emptyFilters: UniversityFilters = {
   scholarship_available: "",
   verification_status: "",
   include_demo: "",
-  ordering: ""
+  ordering: "",
+  ielts_minimum__lte: "",
+  sat_average__gte: "",
+  sat_average__lte: "",
+  gpa_average__lte: ""
 };
 
 const MAX_COMPARE = 4;
@@ -265,6 +270,90 @@ export function UniversitiesScreen() {
             </span>
           </label>
           <label className="block">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+              {t("universities.filters.ieltsAtMost")}
+              <HelpTooltip label={t("universities.filters.ieltsAtMostHelp")} />
+            </span>
+            <input
+              className={fieldClassName}
+              inputMode="decimal"
+              max={9}
+              min={4}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  ielts_minimum__lte: event.target.value
+                }))
+              }
+              step={0.5}
+              type="number"
+              value={filters.ielts_minimum__lte}
+            />
+          </label>
+          <div className="block">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+              {t("universities.filters.satRange")}
+              <HelpTooltip label={t("universities.filters.satRangeHelp")} />
+            </span>
+            <div className="flex gap-2">
+              <input
+                aria-label={t("universities.filters.satFrom")}
+                className={fieldClassName}
+                inputMode="numeric"
+                max={1600}
+                min={400}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    sat_average__gte: event.target.value
+                  }))
+                }
+                placeholder={t("universities.filters.satFrom")}
+                step={10}
+                type="number"
+                value={filters.sat_average__gte}
+              />
+              <input
+                aria-label={t("universities.filters.satTo")}
+                className={fieldClassName}
+                inputMode="numeric"
+                max={1600}
+                min={400}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    sat_average__lte: event.target.value
+                  }))
+                }
+                placeholder={t("universities.filters.satTo")}
+                step={10}
+                type="number"
+                value={filters.sat_average__lte}
+              />
+            </div>
+          </div>
+          <label className="block">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+              {t("universities.filters.gpaAtMost")}
+              <HelpTooltip label={t("universities.filters.gpaAtMostHelp")} />
+            </span>
+            <input
+              className={fieldClassName}
+              inputMode="decimal"
+              max={4}
+              min={0}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  gpa_average__lte: event.target.value
+                }))
+              }
+              step={0.1}
+              type="number"
+              value={filters.gpa_average__lte}
+            />
+          </label>
+          <label className="block">
             <span className="text-sm font-semibold">{t("universities.filters.sort")}</span>
             <select
               className={fieldClassName}
@@ -280,6 +369,8 @@ export function UniversitiesScreen() {
               <option value="-total_cost_usd_amount">{t("universities.filters.totalUsdHighLow")}</option>
               <option value="qs_ranking">{t("universities.filters.qsHighLow")}</option>
               <option value="-qs_ranking">{t("universities.filters.qsLowHigh")}</option>
+              <option value="acceptance_rate">{t("universities.filters.mostSelective")}</option>
+              <option value="-acceptance_rate">{t("universities.filters.leastSelective")}</option>
             </select>
           </label>
           <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">

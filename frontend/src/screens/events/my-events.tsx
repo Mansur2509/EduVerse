@@ -10,8 +10,15 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
 
+import { MyEventsCalendar } from "./my-events-calendar";
+
+type ViewTab = "list" | "calendar";
+
+const CALENDAR_PAGE_SIZE = 200;
+
 export function MyEventsScreen() {
   const { t } = useI18n();
+  const [view, setView] = useState<ViewTab>("list");
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,10 +29,11 @@ export function MyEventsScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const response = await getMyEventRegistrationsRequest({
-        page: currentPage,
-        page_size: DEFAULT_PAGE_SIZE
-      });
+      const response = await getMyEventRegistrationsRequest(
+        view === "calendar"
+          ? { page: 1, page_size: CALENDAR_PAGE_SIZE }
+          : { page: currentPage, page_size: DEFAULT_PAGE_SIZE }
+      );
       setRegistrations(response.results);
       setTotalCount(response.count);
     } catch {
@@ -33,7 +41,7 @@ export function MyEventsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage]);
+  }, [currentPage, view]);
 
   useEffect(() => {
     void loadRegistrations();
@@ -51,6 +59,20 @@ export function MyEventsScreen() {
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
           {t("events.my.description")}
         </p>
+        <div className="mt-5 flex gap-2" role="tablist">
+          {(["list", "calendar"] as const).map((tab) => (
+            <Button
+              aria-selected={view === tab}
+              key={tab}
+              onClick={() => setView(tab)}
+              role="tab"
+              type="button"
+              variant={view === tab ? "primary" : "ghost"}
+            >
+              {t(tab === "list" ? "events.tabs.list" : "events.tabs.calendar")}
+            </Button>
+          ))}
+        </div>
       </section>
 
       {isLoading ? (
@@ -76,6 +98,8 @@ export function MyEventsScreen() {
             <Link href="/events">{t("events.actions.exploreEvents")}</Link>
           </Button>
         </Card>
+      ) : view === "calendar" ? (
+        <MyEventsCalendar registrations={registrations} />
       ) : (
         <PaginatedGrid
           currentPage={currentPage}

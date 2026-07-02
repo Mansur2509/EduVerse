@@ -1517,5 +1517,29 @@ export const uzCyrl = {
   "activity.category.business": "Бизнес ва тадбиркорлик",
   "activity.category.munDebate": "MUN ва дебат",
   "activity.category.work": "Иш ва амалиётлар",
-  "activity.category.other": "Бошқа"
+  "activity.category.other": "Бошқа",
+
+  "events.tabs.list": "Рўйхат",
+  "events.tabs.calendar": "Календар",
+  "events.calendar.previousMonth": "Олдинги ой",
+  "events.calendar.nextMonth": "Кейинги ой",
+  "events.calendar.today": "Бугун",
+  "events.calendar.emptyMonth": "Бу ойда тадбирлар режалаштирилмаган.",
+  "events.calendar.more": "+{{count}} та яна",
+  "events.calendar.gridLabel": "Рўйхатдан ўтган тадбирларингизнинг ойлик календари",
+
+  "universities.filters.ieltsAtMost": "IELTS талаби (макс.)",
+  "universities.filters.ieltsAtMostHelp": "Эълон қилинган IELTS минимуми шу баллдан юқори бўлмаган университетларни кўрсатади. IELTS маълумотлари эълон қилинмаган университетлар бу фильтр билан яширилади.",
+  "universities.filters.satRange": "Ўртача SAT оралиғи",
+  "universities.filters.satRangeHelp": "Эълон қилинган ўртача SAT шу оралиққа тушадиган университетларни кўрсатади. SAT маълумотлари эълон қилинмаган университетлар бу фильтр билан яширилади.",
+  "universities.filters.satFrom": "Дан",
+  "universities.filters.satTo": "Гача",
+  "universities.filters.gpaAtMost": "Ўртача GPA (макс., 4.0 шкала)",
+  "universities.filters.gpaAtMostHelp": "Эълон қилинган ўртача GPA 4.0 шкалада шу қийматдан юқори бўлмаган университетларни кўрсатади. GPA маълумотлари эълон қилинмаган университетлар бу фильтр билан яширилади.",
+  "universities.filters.mostSelective": "Аввал энг талабчан",
+  "universities.filters.leastSelective": "Аввал энг кам талабчан",
+
+  "recommendations.card.conditionalScore": "Шартли: {{score}}",
+  "recommendations.card.conditionalExplanation": "Жорий мослик {{current}} режалаштирилган {{targets}} натижасига эришсангиз, тахминан {{conditional}} гача яхшиланиши мумкин. Бу баҳо, қабул эҳтимоли эмас.",
+  "recommendations.help.conditionalFit": "Режалаштирилган қайта топшириш мақсад балларига эришилган деб ҳисоблайдиган алоҳида баҳо. У эълон қилинган маълумотларга асосланади ва қабул башорати эмас."
 } satisfies TranslationDictionary;

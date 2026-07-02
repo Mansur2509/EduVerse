@@ -1517,5 +1517,29 @@ export const ru = {
   "activity.category.business": "Бизнес и предпринимательство",
   "activity.category.munDebate": "MUN и дебаты",
   "activity.category.work": "Работа и стажировки",
-  "activity.category.other": "Другое"
+  "activity.category.other": "Другое",
+
+  "events.tabs.list": "Список",
+  "events.tabs.calendar": "Календарь",
+  "events.calendar.previousMonth": "Предыдущий месяц",
+  "events.calendar.nextMonth": "Следующий месяц",
+  "events.calendar.today": "Сегодня",
+  "events.calendar.emptyMonth": "В этом месяце событий не запланировано.",
+  "events.calendar.more": "+{{count}} ещё",
+  "events.calendar.gridLabel": "Месячный календарь ваших зарегистрированных событий",
+
+  "universities.filters.ieltsAtMost": "Требование IELTS (макс.)",
+  "universities.filters.ieltsAtMostHelp": "Показывает университеты, чей опубликованный минимум IELTS не выше этого балла. Университеты без опубликованных данных IELTS скрываются этим фильтром.",
+  "universities.filters.satRange": "Диапазон среднего SAT",
+  "universities.filters.satRangeHelp": "Показывает университеты, чей опубликованный средний SAT попадает в этот диапазон. Университеты без опубликованных данных SAT скрываются этим фильтром.",
+  "universities.filters.satFrom": "От",
+  "universities.filters.satTo": "До",
+  "universities.filters.gpaAtMost": "Средний GPA (макс., шкала 4.0)",
+  "universities.filters.gpaAtMostHelp": "Показывает университеты, чей опубликованный средний GPA не выше этого значения по шкале 4.0. Университеты без опубликованных данных GPA скрываются этим фильтром.",
+  "universities.filters.mostSelective": "Сначала самые селективные",
+  "universities.filters.leastSelective": "Сначала наименее селективные",
+
+  "recommendations.card.conditionalScore": "Условно: {{score}}",
+  "recommendations.card.conditionalExplanation": "Текущее соответствие {{current}} может вырасти примерно до {{conditional}}, если вы достигнете {{targets}}. Это оценка, а не вероятность поступления.",
+  "recommendations.help.conditionalFit": "Отдельная оценка, предполагающая достижение целевых баллов запланированных пересдач. Она основана на опубликованных данных и не является прогнозом поступления."
 } satisfies TranslationDictionary;

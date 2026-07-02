@@ -1516,5 +1516,29 @@ export const en = {
   "activity.category.business": "Business and entrepreneurship",
   "activity.category.munDebate": "Model UN and debate",
   "activity.category.work": "Work and internships",
-  "activity.category.other": "Other"
+  "activity.category.other": "Other",
+
+  "events.tabs.list": "List",
+  "events.tabs.calendar": "Calendar",
+  "events.calendar.previousMonth": "Previous month",
+  "events.calendar.nextMonth": "Next month",
+  "events.calendar.today": "Today",
+  "events.calendar.emptyMonth": "No events scheduled this month.",
+  "events.calendar.more": "+{{count}} more",
+  "events.calendar.gridLabel": "Monthly calendar of your registered events",
+
+  "universities.filters.ieltsAtMost": "IELTS requirement (max)",
+  "universities.filters.ieltsAtMostHelp": "Shows universities whose published IELTS minimum is at or below this score. Universities without published IELTS data are hidden by this filter.",
+  "universities.filters.satRange": "Average SAT range",
+  "universities.filters.satRangeHelp": "Shows universities whose published average SAT falls inside this range. Universities without published SAT data are hidden by this filter.",
+  "universities.filters.satFrom": "From",
+  "universities.filters.satTo": "To",
+  "universities.filters.gpaAtMost": "Average GPA (max, 4.0 scale)",
+  "universities.filters.gpaAtMostHelp": "Shows universities whose published average GPA is at or below this value on a 4.0 scale. Universities without published GPA data are hidden by this filter.",
+  "universities.filters.mostSelective": "Most selective first",
+  "universities.filters.leastSelective": "Least selective first",
+
+  "recommendations.card.conditionalScore": "Conditional: {{score}}",
+  "recommendations.card.conditionalExplanation": "Current fit {{current}} could improve to about {{conditional}} if you reach {{targets}}. This is an estimate, not an admission probability.",
+  "recommendations.help.conditionalFit": "A separate estimate that assumes your planned retake target scores are achieved. It is based on published data and is not an admissions prediction."
 } as const;

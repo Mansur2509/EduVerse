@@ -72,6 +72,8 @@ export type RecommendationItem = {
   missing_data: FitMissingFieldCode[];
   current_academic_subscore: number;
   conditional_notes: string[];
+  conditional_fit_score: number | null;
+  conditional_targets: { sat?: number; ielts?: number } | null;
   source_notes: UniversityFitSourceNote[];
   is_shortlisted: boolean;
   application_id: number | null;

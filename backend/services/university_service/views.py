@@ -40,6 +40,8 @@ SELF_SERVICE_ACTIONS = {
 }
 
 UNIVERSITY_NULLS_LAST_ORDERINGS = {
+    "acceptance_rate": (F("acceptance_rate").asc(nulls_last=True), "name"),
+    "-acceptance_rate": (F("acceptance_rate").desc(nulls_last=True), "name"),
     "qs_ranking": (F("qs_ranking").asc(nulls_last=True), "name"),
     "-qs_ranking": (F("qs_ranking").desc(nulls_last=True), "name"),
     "tuition_usd_amount": (F("tuition_usd_amount").asc(nulls_last=True), "name"),
@@ -54,13 +56,21 @@ class UniversityViewSet(ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     lookup_field = "slug"
     search_fields = ("name", "city", "country", "programs__name")
-    filterset_fields = (
-        "country",
-        "city",
-        "institution_type",
-        "scholarship_available",
-        "test_policy",
-    )
+    filterset_fields = {
+        "country": ["exact"],
+        "city": ["exact"],
+        "institution_type": ["exact"],
+        "scholarship_available": ["exact"],
+        "test_policy": ["exact"],
+        # Requirement-threshold filters: each keeps only universities whose
+        # published number is at/below (or within) what the student enters.
+        # Universities without the published value are excluded by these
+        # filters rather than being guessed at.
+        "ielts_minimum": ["lte"],
+        "sat_average": ["lte", "gte"],
+        "gpa_average": ["lte", "gte"],
+        "acceptance_rate": ["lte", "gte"],
+    }
     ordering_fields = (
         "name",
         "country",

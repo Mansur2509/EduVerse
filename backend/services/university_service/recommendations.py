@@ -409,6 +409,8 @@ def _build_recommendation_item(
         "missing_data": missing_data,
         "current_academic_subscore": fit["academic_subscore"],
         "conditional_notes": fit["conditional_notes"],
+        "conditional_fit_score": fit["conditional_fit_score"],
+        "conditional_targets": fit["conditional_targets"],
         "source_notes": fit["source_notes"],
         "is_shortlisted": university.id in shortlisted_ids,
         "application_id": tracked_by_university.get(university.id),

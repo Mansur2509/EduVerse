@@ -114,6 +114,10 @@ export type UniversityFilters = {
   verification_status?: string;
   include_demo?: string;
   ordering?: string;
+  ielts_minimum__lte?: string;
+  sat_average__gte?: string;
+  sat_average__lte?: string;
+  gpa_average__lte?: string;
 };
 
 export type FitCategory = "dream" | "reach" | "competitive" | "target" | "safety";

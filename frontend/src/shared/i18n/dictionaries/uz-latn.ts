@@ -1517,5 +1517,29 @@ export const uzLatn = {
   "activity.category.business": "Biznes va tadbirkorlik",
   "activity.category.munDebate": "MUN va debat",
   "activity.category.work": "Ish va amaliyotlar",
-  "activity.category.other": "Boshqa"
+  "activity.category.other": "Boshqa",
+
+  "events.tabs.list": "Ro'yxat",
+  "events.tabs.calendar": "Kalendar",
+  "events.calendar.previousMonth": "Oldingi oy",
+  "events.calendar.nextMonth": "Keyingi oy",
+  "events.calendar.today": "Bugun",
+  "events.calendar.emptyMonth": "Bu oyda tadbirlar rejalashtirilmagan.",
+  "events.calendar.more": "+{{count}} ta yana",
+  "events.calendar.gridLabel": "Ro'yxatdan o'tgan tadbirlaringizning oylik kalendari",
+
+  "universities.filters.ieltsAtMost": "IELTS talabi (maks.)",
+  "universities.filters.ieltsAtMostHelp": "E'lon qilingan IELTS minimumi shu balldan yuqori bo'lmagan universitetlarni ko'rsatadi. IELTS ma'lumotlari e'lon qilinmagan universitetlar bu filtr bilan yashiriladi.",
+  "universities.filters.satRange": "O'rtacha SAT oralig'i",
+  "universities.filters.satRangeHelp": "E'lon qilingan o'rtacha SAT shu oraliqqa tushadigan universitetlarni ko'rsatadi. SAT ma'lumotlari e'lon qilinmagan universitetlar bu filtr bilan yashiriladi.",
+  "universities.filters.satFrom": "Dan",
+  "universities.filters.satTo": "Gacha",
+  "universities.filters.gpaAtMost": "O'rtacha GPA (maks., 4.0 shkala)",
+  "universities.filters.gpaAtMostHelp": "E'lon qilingan o'rtacha GPA 4.0 shkalada shu qiymatdan yuqori bo'lmagan universitetlarni ko'rsatadi. GPA ma'lumotlari e'lon qilinmagan universitetlar bu filtr bilan yashiriladi.",
+  "universities.filters.mostSelective": "Avval eng talabchan",
+  "universities.filters.leastSelective": "Avval eng kam talabchan",
+
+  "recommendations.card.conditionalScore": "Shartli: {{score}}",
+  "recommendations.card.conditionalExplanation": "Joriy moslik {{current}} rejalashtirilgan {{targets}} natijasiga erishsangiz, taxminan {{conditional}} gacha yaxshilanishi mumkin. Bu baho, qabul ehtimoli emas.",
+  "recommendations.help.conditionalFit": "Rejalashtirilgan qayta topshirish maqsad ballariga erishilgan deb hisoblaydigan alohida baho. U e'lon qilingan ma'lumotlarga asoslanadi va qabul bashorati emas."
 } satisfies TranslationDictionary;

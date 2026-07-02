@@ -589,6 +589,146 @@ class FitAnalysisTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class ConditionalFitTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="conditional-fit", email="conditional@test.com", password="testpass123"
+        )
+        self.profile, _ = ensure_profile_records(self.user)
+
+    def test_no_conditional_fit_without_planned_targets(self):
+        self.profile.test_scores = {"sat": 1200}
+        self.profile.save()
+        university = create_university(
+            "no-plan-university", acceptance_rate="45.00", sat_p25=1400, sat_p75=1560
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIsNone(fit["conditional_fit_score"])
+        self.assertIsNone(fit["conditional_targets"])
+
+    def test_planned_sat_retake_produces_higher_conditional_fit(self):
+        self.profile.gpa = "4.50"
+        self.profile.gpa_scale = "5.00"
+        self.profile.test_scores = {"sat": 1200, "ielts": 7.5}
+        self.profile.exam_plans = {
+            "taken": [],
+            "planned": [
+                {"exam_type": "SAT", "target_score": "1550", "planned_retake": True}
+            ],
+        }
+        self.profile.save()
+        university = create_university(
+            "sat-retake-university",
+            acceptance_rate="45.00",
+            gpa_average="3.50",
+            sat_p25=1400,
+            sat_p75=1560,
+            ielts_minimum="6.5",
+            ielts_competitive="7.0",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn("sat_below_p25", fit["risks"])
+        self.assertIsNotNone(fit["conditional_fit_score"])
+        self.assertGreater(fit["conditional_fit_score"], fit["fit_score"])
+        self.assertEqual(fit["conditional_targets"], {"sat": 1550})
+
+    def test_planned_ielts_retake_produces_higher_conditional_fit(self):
+        self.profile.test_scores = {"sat": 1500, "ielts": 5.5}
+        self.profile.exam_plans = {
+            "taken": [],
+            "planned": [
+                {"exam_type": "IELTS", "target_score": "7.0", "planned_retake": True}
+            ],
+        }
+        self.profile.save()
+        university = create_university(
+            "ielts-retake-university",
+            acceptance_rate="45.00",
+            sat_average=1400,
+            ielts_minimum="6.5",
+            ielts_competitive="7.0",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn("ielts_below_minimum", fit["risks"])
+        self.assertIsNotNone(fit["conditional_fit_score"])
+        self.assertGreater(fit["conditional_fit_score"], fit["fit_score"])
+        self.assertEqual(fit["conditional_targets"], {"ielts": 7.0})
+
+    def test_target_below_current_score_is_ignored(self):
+        self.profile.test_scores = {"sat": 1200}
+        self.profile.exam_plans = {
+            "taken": [],
+            "planned": [{"exam_type": "SAT", "target_score": "1100"}],
+        }
+        self.profile.save()
+        university = create_university(
+            "low-target-university", acceptance_rate="45.00", sat_p25=1400, sat_p75=1560
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIsNone(fit["conditional_fit_score"])
+        self.assertIsNone(fit["conditional_targets"])
+
+    def test_conditional_fit_hidden_when_target_changes_nothing(self):
+        # A target still deep inside the same severity band produces the same
+        # estimate, and an unchanged estimate must not be presented as an
+        # improvement path.
+        self.profile.test_scores = {"sat": 1200}
+        self.profile.exam_plans = {
+            "taken": [],
+            "planned": [{"exam_type": "SAT", "target_score": "1210"}],
+        }
+        self.profile.save()
+        university = create_university(
+            "same-band-university", acceptance_rate="45.00", sat_p25=1400, sat_p75=1560
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIsNone(fit["conditional_fit_score"])
+        self.assertIsNone(fit["conditional_targets"])
+
+    def test_conditional_fit_flows_into_recommendations_payload(self):
+        from services.university_service.recommendations import (
+            calculate_university_recommendations,
+        )
+
+        self.profile.gpa = "4.50"
+        self.profile.gpa_scale = "5.00"
+        self.profile.test_scores = {"sat": 1200, "ielts": 7.5}
+        self.profile.exam_plans = {
+            "taken": [],
+            "planned": [{"exam_type": "SAT", "target_score": "1550"}],
+        }
+        self.profile.save()
+        create_university(
+            "rec-conditional-university",
+            acceptance_rate="45.00",
+            gpa_average="3.50",
+            sat_p25=1400,
+            sat_p75=1560,
+        )
+
+        payload = calculate_university_recommendations(self.profile)
+
+        items = payload["recommendations"]
+        self.assertTrue(items)
+        item = next(
+            entry for entry in items if entry["university"]["slug"] == "rec-conditional-university"
+        )
+        self.assertIn("conditional_fit_score", item)
+        self.assertIsNotNone(item["conditional_fit_score"])
+        self.assertGreater(item["conditional_fit_score"], item["fit_score"])
+        self.assertEqual(item["conditional_targets"], {"sat": 1550})
+
+
 class CurrencyNormalizationTests(APITestCase):
     def test_non_usd_tuition_converts_when_rate_exists(self):
         ExchangeRate.objects.create(
@@ -625,6 +765,7 @@ class CurrencyNormalizationTests(APITestCase):
         self.assertIsNone(university.tuition_usd_amount)
         self.assertIn("USD conversion not available yet", university.cost_notes)
 
+
     def test_cost_sorting_uses_usd_normalized_field(self):
         high = create_university("high-usd-cost", tuition_usd_amount="200.00")
         low = create_university("low-usd-cost", tuition_usd_amount="100.00")
@@ -641,6 +782,52 @@ class CurrencyNormalizationTests(APITestCase):
 
         slugs = [item["slug"] for item in response.data["results"]]
         self.assertLess(slugs.index(low.slug), slugs.index(high.slug))
+
+
+class RequirementThresholdFilterTests(APITestCase):
+    def test_requirement_threshold_filters(self):
+        create_university(
+            "low-requirement-university",
+            ielts_minimum="6.0",
+            sat_average=1250,
+            gpa_average="3.20",
+            acceptance_rate="60.00",
+        )
+        create_university(
+            "high-requirement-university",
+            ielts_minimum="7.5",
+            sat_average=1520,
+            gpa_average="3.90",
+            acceptance_rate="8.00",
+        )
+        create_university("no-data-university")
+
+        self.client.force_authenticate(
+            User.objects.create_user(
+                username="filterer", email="filterer@test.com", password="testpass123"
+            )
+        )
+
+        response = self.client.get("/api/v1/universities/", {"ielts_minimum__lte": "6.5"})
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertIn("low-requirement-university", slugs)
+        self.assertNotIn("high-requirement-university", slugs)
+        self.assertNotIn("no-data-university", slugs)
+
+        response = self.client.get(
+            "/api/v1/universities/",
+            {"sat_average__gte": "1400", "sat_average__lte": "1600"},
+        )
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertEqual(slugs, ["high-requirement-university"])
+
+        response = self.client.get("/api/v1/universities/", {"gpa_average__lte": "3.50"})
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertEqual(slugs, ["low-requirement-university"])
+
+        response = self.client.get("/api/v1/universities/", {"acceptance_rate__gte": "50"})
+        slugs = [item["slug"] for item in response.data["results"]]
+        self.assertEqual(slugs, ["low-requirement-university"])
 
 
 class RecommendationFoundationTests(APITestCase):

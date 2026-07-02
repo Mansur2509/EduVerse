@@ -554,10 +554,20 @@ function RecommendationCard({
             {item.university.country}
           </p>
         </div>
-        <span className="flex shrink-0 items-center gap-1 rounded-sm border bg-surface px-2 py-1 text-center text-xs font-bold">
-          {item.fit_score}
-          <HelpTooltip label={t("recommendations.help.fitScore")} />
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="flex items-center gap-1 rounded-sm border bg-surface px-2 py-1 text-center text-xs font-bold">
+            {item.fit_score}
+            <HelpTooltip label={t("recommendations.help.fitScore")} />
+          </span>
+          {typeof item.conditional_fit_score === "number" ? (
+            <span className="flex items-center gap-1 rounded-sm border border-accent/35 bg-accent/10 px-2 py-1 text-center text-xs font-bold text-accent">
+              {t("recommendations.card.conditionalScore", {
+                score: item.conditional_fit_score
+              })}
+              <HelpTooltip label={t("recommendations.help.conditionalFit")} />
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -703,9 +713,27 @@ function RecommendationCard({
               </ul>
             </div>
           ) : null}
-          {item.conditional_notes.length > 0 ? (
+          {item.conditional_notes.length > 0 || typeof item.conditional_fit_score === "number" ? (
             <div>
               <p className="font-semibold">{t("recommendations.card.conditionalFit")}</p>
+              {typeof item.conditional_fit_score === "number" ? (
+                <p className="mt-1">
+                  {t("recommendations.card.conditionalExplanation", {
+                    current: item.fit_score,
+                    conditional: item.conditional_fit_score,
+                    targets: [
+                      item.conditional_targets?.sat
+                        ? `SAT ${item.conditional_targets.sat}`
+                        : null,
+                      item.conditional_targets?.ielts
+                        ? `IELTS ${item.conditional_targets.ielts}`
+                        : null
+                    ]
+                      .filter(Boolean)
+                      .join(", ")
+                  })}
+                </p>
+              ) : null}
               {item.conditional_notes.map((note, index) => (
                 <p className="mt-1" key={index}>
                   {note}

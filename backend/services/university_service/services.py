@@ -314,48 +314,26 @@ def _as_int_score(value: float) -> int:
     return max(1, min(100, round(value)))
 
 
-def calculate_university_fit(profile, university: University) -> dict:
-    missing_fields: list[str] = []
-    strengths: list[str] = []
-    risks: list[str] = []
-    next_actions: list[str] = []
+def _assess_academics(
+    profile,
+    university: University,
+    *,
+    student_gpa,
+    student_sat,
+    student_ielts,
+    uni_gpa,
+    uni_sat_midpoint,
+    strengths: list[str],
+    risks: list[str],
+    missing_fields: list[str],
+    next_actions: list[str],
+) -> tuple[float, int, bool, bool]:
+    """Score one set of student scores against this university's published data.
 
-    normalization = normalize_profile_academics(profile)
-    student_gpa = normalization.normalized_gpa_4
-    if student_gpa is None:
-        missing_fields.append("profile_gpa")
-        next_actions.append("add_gpa_to_profile")
-        if normalization.original_gpa_value is not None:
-            risks.append("gpa_scale_not_confirmed")
-
-    student_sat = best_sat_score(profile.test_scores)
-    if student_sat is None:
-        missing_fields.append("profile_sat")
-        next_actions.append("add_sat_to_profile")
-
-    student_ielts = best_ielts_score(profile.test_scores)
-
-    if profile.curriculum_type == profile.CurriculumType.UNKNOWN:
-        missing_fields.append("profile_curriculum")
-        next_actions.append("add_curriculum_context")
-
-    uni_gpa = Decimal(str(university.gpa_average)) if university.gpa_average is not None else None
-    if uni_gpa is None:
-        missing_fields.append("university_gpa_average")
-
-    uni_sat_midpoint = university.sat_average
-    if uni_sat_midpoint is None and university.sat_p25 and university.sat_p75:
-        uni_sat_midpoint = round((university.sat_p25 + university.sat_p75) / 2)
-    if uni_sat_midpoint is None:
-        missing_fields.append("university_sat_average")
-
-    uni_rate = (
-        float(university.acceptance_rate) if university.acceptance_rate is not None else None
-    )
-    if uni_rate is None:
-        missing_fields.append("university_acceptance_rate")
-
-    baseline_index = _acceptance_rate_baseline_index(uni_rate) if uni_rate is not None else None
+    Returns (academic_score, index_shift, compared_any, severe_academic_gap).
+    Callers pass throwaway lists when re-running with hypothetical scores so
+    that bookkeeping from the hypothetical pass never leaks into the response.
+    """
     index_shift = 0
     compared_any = False
     academic_score = 60
@@ -451,6 +429,84 @@ def calculate_university_fit(profile, university: University) -> dict:
     elif profile.curriculum_type == profile.CurriculumType.UNKNOWN:
         academic_score -= 5
 
+    return academic_score, index_shift, compared_any, severe_academic_gap
+
+
+def _planned_target_scores(profile) -> dict[str, float]:
+    """Parseable target scores from planned exams; used for conditional fit only."""
+    targets: dict[str, float] = {}
+    plans = profile.exam_plans.get("planned", []) if isinstance(profile.exam_plans, dict) else []
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        exam_name = str(plan.get("exam_type") or plan.get("name") or "").upper()
+        target = _number(str(plan.get("target_score") or "").replace("+", "").strip())
+        if target is None:
+            continue
+        if "SAT" in exam_name and 400 <= target <= 1600:
+            targets["sat"] = max(targets.get("sat", 0), target)
+        elif "IELTS" in exam_name and 0 < target <= 9:
+            targets["ielts"] = max(targets.get("ielts", 0), target)
+    return targets
+
+
+def calculate_university_fit(profile, university: University) -> dict:
+    missing_fields: list[str] = []
+    strengths: list[str] = []
+    risks: list[str] = []
+    next_actions: list[str] = []
+
+    normalization = normalize_profile_academics(profile)
+    student_gpa = normalization.normalized_gpa_4
+    if student_gpa is None:
+        missing_fields.append("profile_gpa")
+        next_actions.append("add_gpa_to_profile")
+        if normalization.original_gpa_value is not None:
+            risks.append("gpa_scale_not_confirmed")
+
+    student_sat = best_sat_score(profile.test_scores)
+    if student_sat is None:
+        missing_fields.append("profile_sat")
+        next_actions.append("add_sat_to_profile")
+
+    student_ielts = best_ielts_score(profile.test_scores)
+
+    if profile.curriculum_type == profile.CurriculumType.UNKNOWN:
+        missing_fields.append("profile_curriculum")
+        next_actions.append("add_curriculum_context")
+
+    uni_gpa = Decimal(str(university.gpa_average)) if university.gpa_average is not None else None
+    if uni_gpa is None:
+        missing_fields.append("university_gpa_average")
+
+    uni_sat_midpoint = university.sat_average
+    if uni_sat_midpoint is None and university.sat_p25 and university.sat_p75:
+        uni_sat_midpoint = round((university.sat_p25 + university.sat_p75) / 2)
+    if uni_sat_midpoint is None:
+        missing_fields.append("university_sat_average")
+
+    uni_rate = (
+        float(university.acceptance_rate) if university.acceptance_rate is not None else None
+    )
+    if uni_rate is None:
+        missing_fields.append("university_acceptance_rate")
+
+    baseline_index = _acceptance_rate_baseline_index(uni_rate) if uni_rate is not None else None
+
+    academic_score, index_shift, compared_any, severe_academic_gap = _assess_academics(
+        profile,
+        university,
+        student_gpa=student_gpa,
+        student_sat=student_sat,
+        student_ielts=student_ielts,
+        uni_gpa=uni_gpa,
+        uni_sat_midpoint=uni_sat_midpoint,
+        strengths=strengths,
+        risks=risks,
+        missing_fields=missing_fields,
+        next_actions=next_actions,
+    )
+
     conditional_notes, planned_actions = _planned_exam_notes(
         profile,
         university.application_deadline,
@@ -492,6 +548,61 @@ def calculate_university_fit(profile, university: University) -> dict:
     if normalization.confidence == CONFIDENCE_LOW:
         fit_score = min(fit_score, 72)
 
+    # Conditional fit: same estimate re-run with planned retake target scores.
+    # Only exposed when it would actually improve on the current estimate, so
+    # a planned retake never silently lowers or replaces the current fit.
+    conditional_fit_score = None
+    conditional_targets: dict[str, float] = {}
+    planned_targets = _planned_target_scores(profile)
+    conditional_sat = student_sat
+    conditional_ielts = student_ielts
+    if "sat" in planned_targets and (
+        student_sat is None or planned_targets["sat"] > student_sat
+    ):
+        conditional_sat = int(planned_targets["sat"])
+        conditional_targets["sat"] = conditional_sat
+    if "ielts" in planned_targets and (
+        student_ielts is None or planned_targets["ielts"] > student_ielts
+    ):
+        conditional_ielts = planned_targets["ielts"]
+        conditional_targets["ielts"] = planned_targets["ielts"]
+    if conditional_targets:
+        scratch_a: list[str] = []
+        scratch_b: list[str] = []
+        scratch_c: list[str] = []
+        scratch_d: list[str] = []
+        conditional_academic_raw, _shift, _compared, conditional_severe = _assess_academics(
+            profile,
+            university,
+            student_gpa=student_gpa,
+            student_sat=conditional_sat,
+            student_ielts=conditional_ielts,
+            uni_gpa=uni_gpa,
+            uni_sat_midpoint=uni_sat_midpoint,
+            strengths=scratch_a,
+            risks=scratch_b,
+            missing_fields=scratch_c,
+            next_actions=scratch_d,
+        )
+        conditional_raw_score = (
+            _as_int_score(conditional_academic_raw) * 0.35
+            + program_score * 0.15
+            + profile_score * 0.15
+            + essay_score * 0.10
+            + deadline_score * 0.10
+            + cost_score * 0.10
+            + (70 if len(missing_fields) <= 3 else 45) * 0.05
+        )
+        conditional_candidate = _as_int_score(conditional_raw_score)
+        if conditional_severe:
+            conditional_candidate = min(conditional_candidate, 55)
+        if normalization.confidence == CONFIDENCE_LOW:
+            conditional_candidate = min(conditional_candidate, 72)
+        if conditional_candidate > fit_score:
+            conditional_fit_score = conditional_candidate
+        else:
+            conditional_targets = {}
+
     category = _fit_score_category(fit_score, category, university)
     confidence = _confidence_from_missing(missing_fields, normalization.confidence)
 
@@ -516,6 +627,8 @@ def calculate_university_fit(profile, university: University) -> dict:
         "missing_data": missing_fields,
         "next_actions": next_actions,
         "conditional_notes": conditional_notes,
+        "conditional_fit_score": conditional_fit_score,
+        "conditional_targets": conditional_targets or None,
         "student_academic_context": {
             "original_gpa_value": normalization.original_gpa_value,
             "original_gpa_scale": normalization.original_gpa_scale,
