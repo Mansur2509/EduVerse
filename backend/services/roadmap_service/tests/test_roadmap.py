@@ -34,6 +34,10 @@ def create_university(slug, **overrides):
     return University.objects.create(slug=slug, **defaults)
 
 
+def graduation_year_for_cycle_date(value: date) -> int:
+    return value.year + 1 if value.month >= 8 else value.year
+
+
 class RoadmapGenerationTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -104,6 +108,9 @@ class RoadmapGenerationTests(APITestCase):
 
     def test_generate_roadmap_creates_university_deadline_reminders(self):
         deadline = self.today + timedelta(days=90)
+        profile, _ = ensure_profile_records(self.user)
+        profile.expected_graduation_year = graduation_year_for_cycle_date(deadline)
+        profile.save(update_fields=["expected_graduation_year"])
         university = create_university(
             "deadline-university",
             application_deadline=deadline,
@@ -129,6 +136,9 @@ class RoadmapGenerationTests(APITestCase):
 
     def test_application_tracker_counts_as_target_for_roadmap_generation(self):
         deadline = self.today + timedelta(days=90)
+        profile, _ = ensure_profile_records(self.user)
+        profile.expected_graduation_year = graduation_year_for_cycle_date(deadline)
+        profile.save(update_fields=["expected_graduation_year"])
         university = create_university(
             "tracked-deadline-university",
             application_deadline=deadline,
@@ -242,6 +252,9 @@ class RoadmapGenerationTests(APITestCase):
 
     def test_deadline_task_priority_reflects_urgency(self):
         urgent_deadline = self.today + timedelta(days=10)
+        profile, _ = ensure_profile_records(self.user)
+        profile.expected_graduation_year = graduation_year_for_cycle_date(urgent_deadline)
+        profile.save(update_fields=["expected_graduation_year"])
         university = create_university("urgent-university", application_deadline=urgent_deadline)
         SavedUniversity.objects.create(user=self.user, university=university)
 
@@ -471,9 +484,13 @@ class RoadmapApiTests(APITestCase):
     def test_list_view_excludes_timeline_markers_but_timeline_view_includes_them(self):
         self.client.force_authenticate(self.user1)
         today = timezone.now().date()
+        profile, _ = ensure_profile_records(self.user1)
+        deadline = today + timedelta(days=90)
+        profile.expected_graduation_year = graduation_year_for_cycle_date(deadline)
+        profile.save(update_fields=["expected_graduation_year"])
         university = create_university(
             "timeline-marker-university",
-            application_deadline=today + timedelta(days=90),
+            application_deadline=deadline,
         )
         SavedUniversity.objects.create(user=self.user1, university=university)
         self.client.post("/api/roadmap/generate/")

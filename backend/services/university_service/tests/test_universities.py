@@ -456,6 +456,68 @@ class FitAnalysisTests(APITestCase):
             Decimal("3.84"),
         )
 
+    def test_fit_does_not_fail_high_five_point_gpa_against_hundred_point_requirement(self):
+        # Spec example: 4.75/5.0 (~95/100, ~3.80/4.0) is comfortably above an
+        # 87/100 (~3.48/4.0) university requirement; raw-scale comparison would
+        # wrongly read 4.75 as below a "87" benchmark.
+        self.profile.gpa = "4.75"
+        self.profile.gpa_scale = "5.00"
+        self.profile.save()
+
+        university = create_university(
+            "hundred-point-benchmark-university",
+            acceptance_rate="45.00",
+            gpa_average="3.48",
+        )
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
+
+        self.assertIn("gpa_above_average", response.data["strengths"])
+        self.assertNotIn("gpa_below_average", response.data["risks"])
+        self.assertEqual(
+            Decimal(str(response.data["student_academic_context"]["normalized_gpa_4"])),
+            Decimal("3.80"),
+        )
+
+    def test_fit_normalizes_ten_point_gpa_for_comparison(self):
+        # Spec example: 9/10 -> 90/100 -> 3.60/4.0.
+        self.profile.gpa = "9.00"
+        self.profile.gpa_scale = "10.00"
+        self.profile.save()
+
+        university = create_university(
+            "ten-point-benchmark-university",
+            acceptance_rate="45.00",
+            gpa_average="3.50",
+        )
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
+
+        self.assertEqual(
+            Decimal(str(response.data["student_academic_context"]["normalized_gpa_4"])),
+            Decimal("3.60"),
+        )
+
+    def test_fit_normalizes_twenty_point_gpa_for_comparison(self):
+        # Spec example: 17/20 -> 85/100 -> 3.40/4.0.
+        self.profile.gpa = "17.00"
+        self.profile.gpa_scale = "20.00"
+        self.profile.save()
+
+        university = create_university(
+            "twenty-point-benchmark-university",
+            acceptance_rate="45.00",
+            gpa_average="3.10",
+        )
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"/api/v1/universities/{university.slug}/fit/")
+
+        self.assertIn("gpa_above_average", response.data["strengths"])
+        self.assertEqual(
+            Decimal(str(response.data["student_academic_context"]["normalized_gpa_4"])),
+            Decimal("3.40"),
+        )
+
     def test_ielts_below_competitive_is_gap(self):
         self.profile.test_scores = {"ielts": 6.0}
         self.profile.save()

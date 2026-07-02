@@ -8,6 +8,8 @@ from services.user_profile_service.academic_normalization import (
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
     SCALE_5,
+    SCALE_10,
+    SCALE_20,
     SCALE_CUSTOM_UNKNOWN,
     SCALE_PERCENTAGE,
     normalize_academic_record,
@@ -41,13 +43,50 @@ class AcademicNormalizationUnitTests(SimpleTestCase):
 
     def test_unknown_scale_does_not_convert_confidently(self):
         result = normalize_academic_record(
-            original_gpa_value=Decimal("17"),
-            original_gpa_scale=Decimal("20"),
+            original_gpa_value=Decimal("11"),
+            original_gpa_scale=Decimal("13"),
             original_gpa_scale_type=SCALE_CUSTOM_UNKNOWN,
         )
 
         self.assertIsNone(result.normalized_gpa_4)
         self.assertEqual(result.confidence, CONFIDENCE_LOW)
+
+    def test_ten_point_scale_converts_proportionally(self):
+        result = normalize_academic_record(
+            original_gpa_value=Decimal("9"),
+            original_gpa_scale=Decimal("10"),
+            original_gpa_scale_type=SCALE_10,
+        )
+
+        self.assertEqual(result.normalized_percentage, Decimal("90.00"))
+        self.assertEqual(result.normalized_gpa_4, Decimal("3.60"))
+        self.assertEqual(result.confidence, CONFIDENCE_MEDIUM)
+
+    def test_twenty_point_scale_converts_proportionally(self):
+        result = normalize_academic_record(
+            original_gpa_value=Decimal("17"),
+            original_gpa_scale=Decimal("20"),
+            original_gpa_scale_type=SCALE_20,
+        )
+
+        self.assertEqual(result.normalized_percentage, Decimal("85.00"))
+        self.assertEqual(result.normalized_gpa_4, Decimal("3.40"))
+        self.assertEqual(result.confidence, CONFIDENCE_MEDIUM)
+
+    def test_ten_and_twenty_point_scales_infer_from_bare_scale_value(self):
+        ten_point = normalize_academic_record(
+            original_gpa_value=Decimal("9"),
+            original_gpa_scale=Decimal("10"),
+            original_gpa_scale_type=None,
+        )
+        twenty_point = normalize_academic_record(
+            original_gpa_value=Decimal("17"),
+            original_gpa_scale=Decimal("20"),
+            original_gpa_scale_type=None,
+        )
+
+        self.assertEqual(ten_point.normalized_gpa_4, Decimal("3.60"))
+        self.assertEqual(twenty_point.normalized_gpa_4, Decimal("3.40"))
 
 
 class AcademicNormalizationApiTests(APITestCase):

@@ -5,6 +5,7 @@ from datetime import date
 
 from services.application_service.models import ApplicationTrackerItem
 
+from .deadline_normalization import normalize_university_deadline
 from .models import SavedUniversity, University
 from .program_display import format_program_display_names
 from .services import calculate_university_fit
@@ -368,7 +369,8 @@ def _build_recommendation_item(
     exam_ready = not any(
         risk in fit["risks"] for risk in ("sat_below_p25", "sat_below_average", "ielts_below_minimum")
     )
-    deadline = university.application_deadline
+    normalized_deadline = normalize_university_deadline(university, profile)
+    deadline = normalized_deadline.normalized_date
     days_remaining = (deadline - date.today()).days if deadline else None
 
     confidence = fit["confidence"]
@@ -397,6 +399,7 @@ def _build_recommendation_item(
         ),
         "deadline": deadline,
         "deadline_confidence": _deadline_confidence(university),
+        "deadline_cycle_label": normalized_deadline.cycle_label,
         "days_remaining": days_remaining,
         "urgency": _urgency_for_days(days_remaining),
         "estimated_total_cost_usd": fit["cost_context"]["total_cost_usd_amount"]

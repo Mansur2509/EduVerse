@@ -5,7 +5,7 @@ from django.test import SimpleTestCase
 from rest_framework.test import APITestCase
 
 from services.application_service.models import ApplicationTrackerItem
-from services.application_service.timeline import urgency_for_days
+from services.application_service.timeline import build_application_timeline, urgency_for_days
 from services.essay_service.models import EssayWorkspace
 from services.exam_content_service.models import OfficialExamDate
 from services.roadmap_service.models import RoadmapPlan, RoadmapTask
@@ -105,6 +105,39 @@ class ApplicationTimelineApiTests(APITestCase):
         data = self._timeline(application)
         application_deadline = next(d for d in data["deadlines"] if d["kind"] == "application")
         self.assertEqual(application_deadline["confidence"], "verified")
+
+    def test_university_deadline_uses_profile_graduation_cycle(self):
+        university = _create_university(application_deadline=date(2025, 11, 1))
+        application = self._create_application(university)
+        profile, _ = ensure_profile_records(self.user)
+        profile.expected_graduation_year = 2027
+        profile.save(update_fields=["expected_graduation_year"])
+
+        data = build_application_timeline(application, profile, today=date(2026, 7, 1))
+        application_deadline = next(d for d in data["deadlines"] if d["kind"] == "application")
+
+        self.assertEqual(application_deadline["date"], "2026-11-01")
+        self.assertEqual(application_deadline["source_date"], "2025-11-01")
+        self.assertEqual(application_deadline["normalized_year"], 2026)
+        self.assertEqual(application_deadline["cycle_label"], "2026-2027")
+        self.assertEqual(application_deadline["days_remaining"], 123)
+        self.assertTrue(data["suggested_dates"])
+
+    def test_missing_graduation_year_does_not_use_source_year_for_planning(self):
+        university = _create_university(application_deadline=date(2025, 11, 1))
+        application = self._create_application(university)
+        profile, _ = ensure_profile_records(self.user)
+        profile.expected_graduation_year = None
+        profile.save(update_fields=["expected_graduation_year"])
+
+        data = build_application_timeline(application, profile, today=date(2026, 7, 1))
+        application_deadline = next(d for d in data["deadlines"] if d["kind"] == "application")
+
+        self.assertIsNone(application_deadline["date"])
+        self.assertEqual(application_deadline["source_date"], "2025-11-01")
+        self.assertIsNone(application_deadline["days_remaining"])
+        self.assertEqual(application_deadline["urgency"], "unknown")
+        self.assertEqual(data["suggested_dates"], [])
 
     def test_far_away_deadline_does_not_create_urgent_work(self):
         university = _create_university()

@@ -6,6 +6,8 @@ class StudentProfile(models.Model):
     class GpaScaleType(models.TextChoices):
         FOUR_POINT = "4_0", "4.0 scale"
         FIVE_POINT = "5_0", "5.0 scale"
+        TEN_POINT = "10_0", "10.0 scale"
+        TWENTY_POINT = "20_0", "20.0 scale"
         PERCENTAGE_100 = "percentage_100", "100-point percentage"
         IB_45 = "ib_45", "IB / 45"
         A_LEVEL = "a_level", "A-Level"

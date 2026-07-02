@@ -14,6 +14,9 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from services.exam_content_service.models import OfficialExamDate
+from services.university_service.deadline_normalization import (
+    normalize_university_deadline,
+)
 from services.university_service.services import (
     best_sat_score,
     ielts_gap_severity,
@@ -106,23 +109,29 @@ class _Deadline:
     source_url: str
     source_label: str
     last_verified_date: date | None = None
+    source_date: date | None = None
+    normalized_year: int | None = None
+    cycle_label: str | None = None
+    cycle_explanation: str | None = None
 
 
-def _reference_deadline(application) -> tuple[date | None, str]:
+def _reference_deadline(application, profile) -> tuple[date | None, str]:
     """The date suggested planning checkpoints are measured back from.
 
     Prefers the user's tracker deadline (their chosen round), then the
-    university's imported deadline. Returns (date, confidence).
+    university's imported deadline normalized to the student's own
+    graduation cycle. Returns (date, confidence).
     """
     if application.deadline:
         return application.deadline, CONFIDENCE_USER_PROVIDED
     university = application.university
-    if university.application_deadline:
-        return university.application_deadline, _university_deadline_confidence(university)
+    normalized = normalize_university_deadline(university, profile)
+    if normalized.normalized_date:
+        return normalized.normalized_date, _university_deadline_confidence(university)
     return None, CONFIDENCE_MISSING
 
 
-def _collect_deadlines(application, today: date) -> list[_Deadline]:
+def _collect_deadlines(application, today: date, profile) -> list[_Deadline]:
     university = application.university
     deadlines: list[_Deadline] = []
 
@@ -138,13 +147,18 @@ def _collect_deadlines(application, today: date) -> list[_Deadline]:
             )
         )
     elif university.application_deadline:
+        normalized = normalize_university_deadline(university, profile)
         deadlines.append(
             _Deadline(
                 kind="application",
-                date=university.application_deadline,
+                date=normalized.normalized_date,
                 confidence=_university_deadline_confidence(university),
                 source_url=_source_url_for_field(university, "application_deadline"),
                 source_label="university",
+                source_date=normalized.source_date,
+                normalized_year=normalized.normalized_year,
+                cycle_label=normalized.cycle_label,
+                cycle_explanation=normalized.explanation,
             )
         )
     else:
@@ -207,6 +221,10 @@ def _deadline_payload(deadline: _Deadline, today: date) -> dict:
         "source_url": deadline.source_url,
         "source_label": deadline.source_label,
         "last_verified_date": _iso(deadline.last_verified_date),
+        "source_date": _iso(deadline.source_date),
+        "normalized_year": deadline.normalized_year,
+        "cycle_label": deadline.cycle_label,
+        "cycle_explanation": deadline.cycle_explanation,
     }
 
 
@@ -244,8 +262,8 @@ def _aid_active(application) -> bool:
     return application.financial_aid_status in {"researching", "preparing"}
 
 
-def _suggested_dates(application, today: date) -> list[dict]:
-    reference, ref_confidence = _reference_deadline(application)
+def _suggested_dates(application, today: date, profile) -> list[dict]:
+    reference, ref_confidence = _reference_deadline(application, profile)
     if reference is None:
         return []
     days_until = (reference - today).days
@@ -371,7 +389,7 @@ def _exam_after_deadline(official: OfficialExamDate | None, reference: date | No
 
 def _linked_exams(application, profile, today: date) -> list[dict]:
     university = application.university
-    reference, _ = _reference_deadline(application)
+    reference, _ = _reference_deadline(application, profile)
     planned = _planned_exam_types(profile.exam_plans)
     entries: list[dict] = []
 
@@ -574,8 +592,8 @@ def _suggested_events(suggested: list[dict]) -> list[dict]:
 
 def build_application_timeline(application, profile, *, today: date) -> dict:
     """Assemble the full derived timeline payload for one application."""
-    deadlines = _collect_deadlines(application, today)
-    suggested = _suggested_dates(application, today)
+    deadlines = _collect_deadlines(application, today, profile)
+    suggested = _suggested_dates(application, today, profile)
 
     events: list[dict] = []
     events.extend(_deadline_events(deadlines, today))

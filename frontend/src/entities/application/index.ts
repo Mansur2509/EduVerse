@@ -91,6 +91,10 @@ export type TimelineDeadline = {
   source_url: string;
   source_label: string;
   last_verified_date: string | null;
+  source_date?: string | null;
+  normalized_year?: number | null;
+  cycle_label?: string | null;
+  cycle_explanation?: string | null;
 };
 
 export type TimelineEvent = {

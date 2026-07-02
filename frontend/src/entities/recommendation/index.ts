@@ -56,6 +56,7 @@ export type RecommendationItem = {
   application_round: ApplicationRoundInfo;
   deadline: string | null;
   deadline_confidence: DateConfidence;
+  deadline_cycle_label?: string | null;
   days_remaining: number | null;
   urgency: Urgency;
   estimated_total_cost_usd: string | number | null;

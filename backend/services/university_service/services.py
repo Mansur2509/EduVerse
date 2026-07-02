@@ -11,6 +11,7 @@ from services.user_profile_service.academic_normalization import (
 )
 
 from .currency import normalize_university_costs
+from .deadline_normalization import normalize_university_deadline
 from .models import University
 
 CATEGORY_ORDER = ("reach", "competitive", "target", "safety")
@@ -245,11 +246,14 @@ def _score_essay_fit(profile, missing: list[str]) -> int:
     return 45
 
 
-def _score_deadline_fit(university: University, risks: list[str], missing: list[str]) -> int:
-    if university.application_deadline is None:
+def _score_deadline_fit(
+    university: University, risks: list[str], missing: list[str], profile=None
+) -> int:
+    deadline = normalize_university_deadline(university, profile).normalized_date
+    if deadline is None:
         missing.append("university_application_deadline")
         return 52
-    days = (university.application_deadline - date.today()).days
+    days = (deadline - date.today()).days
     if days < 0:
         risks.append("deadline_passed")
         return 20
@@ -509,7 +513,7 @@ def calculate_university_fit(profile, university: University) -> dict:
 
     conditional_notes, planned_actions = _planned_exam_notes(
         profile,
-        university.application_deadline,
+        normalize_university_deadline(university, profile).normalized_date,
     )
     next_actions.extend(action for action in planned_actions if action not in next_actions)
 
@@ -529,7 +533,7 @@ def calculate_university_fit(profile, university: University) -> dict:
     program_score = _score_program_fit(profile, university, strengths, missing_fields)
     profile_score = _score_profile_fit(profile, strengths, missing_fields)
     essay_score = _score_essay_fit(profile, missing_fields)
-    deadline_score = _score_deadline_fit(university, risks, missing_fields)
+    deadline_score = _score_deadline_fit(university, risks, missing_fields, profile)
     cost_score = _score_cost_fit(profile, university, risks, missing_fields)
 
     academic_subscore = _as_int_score(academic_score)

@@ -763,6 +763,9 @@ function RecommendationCard({
             <p className="mt-1">
               {t("recommendations.card.deadlineConfidence")}:{" "}
               {t(`applications.confidence.${item.deadline_confidence}` as TranslationKey)}
+              {item.deadline_cycle_label
+                ? ` · ${t("applications.deadlines.cycleLabel", { cycle: item.deadline_cycle_label })}`
+                : ""}
             </p>
             {item.source_notes.length > 0 ? (
               <ul className="mt-1 space-y-1">

@@ -103,6 +103,16 @@ function DeadlineRow({ deadline }: { deadline: TimelineDeadline }) {
         <ConfidenceBadge confidence={deadline.confidence} />
         <DaysRemaining days={deadline.days_remaining} />
       </div>
+      {deadline.cycle_label ? (
+        <div className="mt-1 flex items-center gap-1">
+          <p className="text-xs text-muted-foreground">
+            {t("applications.deadlines.cycleLabel", { cycle: deadline.cycle_label })}
+          </p>
+          {deadline.cycle_explanation ? (
+            <HelpTooltip label={deadline.cycle_explanation} />
+          ) : null}
+        </div>
+      ) : null}
       {deadline.source_url ? (
         <a
           className="mt-1.5 inline-block text-xs font-semibold text-primary-hover underline"

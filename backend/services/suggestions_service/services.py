@@ -13,6 +13,9 @@ from django.utils import timezone
 from services.application_service.models import ApplicationTrackerItem
 from services.essay_service.models import EssayWorkspace
 from services.roadmap_service.models import RoadmapPlan, RoadmapTask
+from services.university_service.deadline_normalization import (
+    normalize_university_deadline,
+)
 from services.university_service.models import SavedUniversity
 from services.university_service.services import best_sat_score
 from services.user_profile_service.models import (
@@ -173,14 +176,14 @@ def _target_universities(user) -> list[TargetUniversity]:
     return list(targets.values())
 
 
-def _future_deadlines(targets: list[TargetUniversity], today: date) -> list[date]:
+def _future_deadlines(targets: list[TargetUniversity], today: date, profile) -> list[date]:
     deadlines = []
     for target in targets:
         deadline = None
         if target.application and target.application.deadline:
             deadline = target.application.deadline
-        elif target.university.application_deadline:
-            deadline = target.university.application_deadline
+        else:
+            deadline = normalize_university_deadline(target.university, profile).normalized_date
         if deadline and deadline >= today:
             deadlines.append(deadline)
     return sorted(deadlines)
@@ -250,10 +253,12 @@ def _add_university_date_suggestions(
     drafts: dict[str, dict],
     targets: list[TargetUniversity],
     today: date,
+    profile,
 ) -> None:
     for target in targets:
         university = target.university
         application = target.application
+        normalized_deadline = normalize_university_deadline(university, profile).normalized_date
         if application and application.deadline:
             _add_deadline_series(
                 drafts,
@@ -268,13 +273,13 @@ def _add_university_date_suggestions(
                 official=False,
                 title_noun="application",
             )
-        elif university.application_deadline:
+        elif normalized_deadline:
             _add_deadline_series(
                 drafts,
                 key_prefix="application_deadline",
                 suggestion_type=SuggestionType.APPLICATION_DEADLINE,
                 university=university,
-                deadline=university.application_deadline,
+                deadline=normalized_deadline,
                 today=today,
                 source_type=SourceType.VERIFIED_UNIVERSITY_DATA,
                 source_url=_source_url_for_university(university, "application_deadline"),
@@ -303,7 +308,7 @@ def _add_university_date_suggestions(
         deadline_for_documents = (
             application.deadline
             if application and application.deadline
-            else university.application_deadline
+            else normalized_deadline
         )
         if application and deadline_for_documents and application.documents_status not in {
             ApplicationTrackerItem.DocumentsStatus.READY,
@@ -324,9 +329,7 @@ def _add_university_date_suggestions(
                 linked_university=university,
                 linked_application=application,
                 recommended_end_date=doc_due,
-                official_deadline=(
-                    university.application_deadline if university.application_deadline else None
-                ),
+                official_deadline=normalized_deadline,
                 source_url=university.admissions_url or university.official_website,
                 evidence_note=(
                     "Suggested planning date derived from the application deadline; "
@@ -451,13 +454,15 @@ def _add_scholarship_suggestions(
             )
 
 
-def _deadline_for_university(targets: list[TargetUniversity], university_id: int | None) -> date | None:
+def _deadline_for_university(
+    targets: list[TargetUniversity], university_id: int | None, profile
+) -> date | None:
     for target in targets:
         if target.university.id != university_id:
             continue
         if target.application and target.application.deadline:
             return target.application.deadline
-        return target.university.application_deadline
+        return normalize_university_deadline(target.university, profile).normalized_date
     return None
 
 
@@ -466,6 +471,7 @@ def _add_essay_suggestions(
     user,
     targets: list[TargetUniversity],
     today: date,
+    profile,
 ) -> None:
     essays = EssayWorkspace.objects.filter(user=user).select_related("university")
     if not _is_demo_user(user):
@@ -523,7 +529,7 @@ def _add_essay_suggestions(
                 evidence_note="Missing word limit. EduVerse will not guess it.",
             )
 
-        deadline = _deadline_for_university(targets, university.id if university else None)
+        deadline = _deadline_for_university(targets, university.id if university else None, profile)
         if deadline and deadline >= today:
             for days_before in (30, 14, 7):
                 checkpoint = deadline - timedelta(days=days_before)
@@ -690,7 +696,7 @@ def _add_exam_suggestions(
     targets: list[TargetUniversity],
     today: date,
 ) -> None:
-    earliest_deadline = (_future_deadlines(targets, today) or [None])[0]
+    earliest_deadline = (_future_deadlines(targets, today, profile) or [None])[0]
     planned_exams = set()
     for plan in _iter_exam_plans(profile.exam_plans):
         exam_name = _normal_exam_name(plan.get("exam_type") or plan.get("name"))
@@ -1004,9 +1010,9 @@ def generate_suggestions(user) -> list[SuggestedItem]:
     targets = _target_universities(user)
     drafts: dict[str, dict] = {}
 
-    _add_university_date_suggestions(drafts, targets, today)
+    _add_university_date_suggestions(drafts, targets, today, profile)
     _add_scholarship_suggestions(drafts, profile, targets, today)
-    _add_essay_suggestions(drafts, user, targets, today)
+    _add_essay_suggestions(drafts, user, targets, today, profile)
     _add_exam_suggestions(drafts, profile, preferences, targets, today)
     _add_course_suggestions(drafts, profile, preferences)
     _add_profile_gap_suggestions(drafts, user, profile)

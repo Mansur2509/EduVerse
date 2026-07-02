@@ -9,6 +9,8 @@ CONFIDENCE_LOW = "low"
 
 SCALE_4 = "4_0"
 SCALE_5 = "5_0"
+SCALE_10 = "10_0"
+SCALE_20 = "20_0"
 SCALE_PERCENTAGE = "percentage_100"
 SCALE_IB = "ib_45"
 SCALE_A_LEVEL = "a_level"
@@ -27,6 +29,9 @@ FIVE_POINT_SCALES = {
     SCALE_KYRGYZSTAN_LOCAL,
     SCALE_TAJIKISTAN_LOCAL,
 }
+# Fixed-point scales that convert to a 4.0 GPA by straight proportion
+# (value / scale), the same treatment as the 5-point family above.
+PROPORTIONAL_SCALES = FIVE_POINT_SCALES | {SCALE_10, SCALE_20}
 
 ROUNDING = Decimal("0.01")
 
@@ -70,6 +75,10 @@ def infer_gpa_scale_type(
         return SCALE_4
     if decimal_scale == Decimal("5"):
         return SCALE_5
+    if decimal_scale == Decimal("10"):
+        return SCALE_10
+    if decimal_scale == Decimal("20"):
+        return SCALE_20
     if decimal_scale == Decimal("100"):
         return SCALE_PERCENTAGE
     if decimal_scale == Decimal("45"):
@@ -159,7 +168,7 @@ def normalize_academic_record(
             note="GPA is already on a 4.0 scale.",
         )
 
-    if scale_type in FIVE_POINT_SCALES:
+    if scale_type in PROPORTIONAL_SCALES:
         return AcademicNormalizationResult(
             original_gpa_value=value,
             original_gpa_scale=scale,
@@ -167,7 +176,7 @@ def normalize_academic_record(
             normalized_gpa_4=_round(value / scale * Decimal("4")),
             normalized_percentage=percentage,
             confidence=CONFIDENCE_MEDIUM,
-            note="Converted proportionally from a 5-point/local scale for comparison only.",
+            note="Converted proportionally from a fixed-point scale for comparison only.",
         )
 
     if scale_type == SCALE_PERCENTAGE:

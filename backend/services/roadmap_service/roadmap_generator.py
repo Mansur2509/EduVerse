@@ -18,6 +18,9 @@ from services.essay_service.models import EssayWorkspace
 from services.event_service.models import EventRegistration
 from services.event_service.services import ACTIVE_REGISTRATION_STATUSES
 from services.exam_content_service.models import OfficialExamDate
+from services.university_service.deadline_normalization import (
+    normalize_university_deadline,
+)
 from services.university_service.models import SavedUniversity
 from services.university_service.services import best_sat_score, calculate_university_fit
 from services.user_profile_service.models import (
@@ -389,14 +392,15 @@ class RoadmapBuilder:
                 evidence_note=f"Planning window only: AP interests on file: {', '.join(preferences.ap_interests[:6])}. Verify official AP exam dates separately.",
             )
 
-        nearest_application_deadline = min(
-            [
-                university.application_deadline
+        shortlisted_deadlines = [
+            date_value
+            for date_value in (
+                normalize_university_deadline(university, self.profile).normalized_date
                 for university in shortlisted_universities
-                if university.application_deadline
-            ],
-            default=None,
-        )
+            )
+            if date_value
+        ]
+        nearest_application_deadline = min(shortlisted_deadlines, default=None)
         for planned in profile.exam_plans.get("planned", []) if isinstance(profile.exam_plans, dict) else []:
             exam_name = planned.get("name")
             exam_date_str = planned.get("date")
@@ -484,9 +488,9 @@ class RoadmapBuilder:
     def _university_deadlines(self, shortlisted):
         for saved in shortlisted:
             university = saved.university
-            if university.application_deadline:
+            deadline = normalize_university_deadline(university, self.profile).normalized_date
+            if deadline:
                 source_url = _verified_source_url(university, "application_deadline")
-                deadline = university.application_deadline
                 for days_before in DEADLINE_REMINDER_WINDOWS:
                     reminder_date = deadline - timedelta(days=days_before)
                     if reminder_date < self.today:

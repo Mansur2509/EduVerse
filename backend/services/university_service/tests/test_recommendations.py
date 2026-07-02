@@ -22,6 +22,10 @@ User = get_user_model()
 FORBIDDEN_PHRASES = ("probability", "chance", "odds", "guarantee", "you will get in")
 
 
+def _graduation_year_for_cycle_date(value: date) -> int:
+    return value.year + 1 if value.month >= 8 else value.year
+
+
 class RecommendationEngineTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -165,6 +169,7 @@ class RecommendationEngineTests(APITestCase):
     def test_planned_exam_after_deadline_is_flagged(self):
         deadline = date.today() + timedelta(days=30)
         self.profile.test_scores = {"sat": 1100}
+        self.profile.expected_graduation_year = _graduation_year_for_cycle_date(deadline)
         self.profile.exam_plans = {
             "planned": [
                 {
@@ -207,11 +212,14 @@ class RecommendationEngineTests(APITestCase):
         self.assertEqual(item["application_round"]["reason_key"], "round_not_verified")
 
     def test_past_deadline_does_not_recommend_current_cycle_round(self):
+        deadline = date.today() - timedelta(days=30)
+        self.profile.expected_graduation_year = _graduation_year_for_cycle_date(deadline)
+        self.profile.save(update_fields=["expected_graduation_year"])
         create_university(
             "past-deadline-university",
             acceptance_rate="40.00",
             deadlines_text="Regular Decision (RD): January 1",
-            application_deadline=date.today() - timedelta(days=30),
+            application_deadline=deadline,
         )
 
         data = self._get()
@@ -222,9 +230,50 @@ class RecommendationEngineTests(APITestCase):
         self.assertEqual(item["application_round"]["recommended_round"], "unknown")
         self.assertEqual(item["application_round"]["reason_key"], "round_deadline_passed")
 
+    def test_recommendation_deadline_uses_profile_graduation_cycle(self):
+        self.profile.expected_graduation_year = 2027
+        self.profile.save(update_fields=["expected_graduation_year"])
+        create_university(
+            "cycle-deadline-university",
+            acceptance_rate="40.00",
+            deadlines_text="Regular Decision (RD): November 1",
+            application_deadline=date(2025, 11, 1),
+        )
+
+        data = self._get()
+        item = self._item_for(data, "cycle-deadline-university")
+        deadline = item["deadline"]
+
+        self.assertEqual(
+            deadline.isoformat() if hasattr(deadline, "isoformat") else deadline,
+            "2026-11-01",
+        )
+        self.assertEqual(item["deadline_cycle_label"], "2026-2027")
+        self.assertNotEqual(item["urgency"], "overdue")
+
+    def test_missing_graduation_year_keeps_recommendation_deadline_unknown(self):
+        self.profile.expected_graduation_year = None
+        self.profile.save(update_fields=["expected_graduation_year"])
+        create_university(
+            "source-only-deadline-university",
+            acceptance_rate="40.00",
+            deadlines_text="Regular Decision (RD): November 1",
+            application_deadline=date(2025, 11, 1),
+        )
+
+        data = self._get()
+        item = self._item_for(data, "source-only-deadline-university")
+
+        self.assertIsNone(item["deadline"])
+        self.assertIsNone(item["deadline_cycle_label"])
+        self.assertEqual(item["urgency"], "unknown")
+        self.assertEqual(item["application_round"]["reason_key"], "round_single_available")
+
     def test_round_early_too_close_when_not_ready(self):
+        deadline = date.today() + timedelta(days=10)
         self.profile.essay_status = self.profile.EssayStatus.NOT_YET
         self.profile.test_scores = {"sat": 900}
+        self.profile.expected_graduation_year = _graduation_year_for_cycle_date(deadline)
         self.profile.save()
         create_university(
             "close-deadline-university",
@@ -232,7 +281,7 @@ class RecommendationEngineTests(APITestCase):
             sat_p25=1400,
             sat_p75=1500,
             deadlines_text="Early Decision (ED): Nov 1. Regular Decision (RD): Jan 1.",
-            application_deadline=date.today() + timedelta(days=10),
+            application_deadline=deadline,
         )
         data = self._get()
         item = self._item_for(data, "close-deadline-university")
@@ -240,8 +289,10 @@ class RecommendationEngineTests(APITestCase):
         self.assertEqual(item["application_round"]["reason_key"], "round_early_too_close")
 
     def test_round_early_recommended_when_ready(self):
+        deadline = date.today() + timedelta(days=120)
         self.profile.essay_status = self.profile.EssayStatus.YES
         self.profile.test_scores = {"sat": 1550}
+        self.profile.expected_graduation_year = _graduation_year_for_cycle_date(deadline)
         self.profile.save()
         create_university(
             "ready-university",
@@ -249,7 +300,7 @@ class RecommendationEngineTests(APITestCase):
             sat_p25=1400,
             sat_p75=1500,
             deadlines_text="Early Decision (ED): Nov 1. Regular Decision (RD): Jan 1.",
-            application_deadline=date.today() + timedelta(days=120),
+            application_deadline=deadline,
         )
         data = self._get()
         item = self._item_for(data, "ready-university")

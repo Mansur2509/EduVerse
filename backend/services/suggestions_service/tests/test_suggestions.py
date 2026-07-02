@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -30,6 +30,10 @@ def create_university(slug="suggestion-university", **overrides):
     }
     defaults.update(overrides)
     return University.objects.create(slug=slug, **defaults)
+
+
+def graduation_year_for_cycle_date(value: date) -> int:
+    return value.year + 1 if value.month >= 8 else value.year
 
 
 class SuggestionsApiTests(APITestCase):
@@ -95,6 +99,9 @@ class SuggestionsApiTests(APITestCase):
 
     def test_verified_application_deadline_includes_four_reminders_and_final(self):
         deadline = self.today + timedelta(days=100)
+        profile, _ = ensure_profile_records(self.user1)
+        profile.expected_graduation_year = graduation_year_for_cycle_date(deadline)
+        profile.save(update_fields=["expected_graduation_year"])
         university = create_university("verified-deadline", application_deadline=deadline)
         UniversityFieldVerification.objects.create(
             university=university,
@@ -141,7 +148,11 @@ class SuggestionsApiTests(APITestCase):
         )
 
     def test_add_suggestion_to_roadmap_creates_self_owned_task(self):
-        university = create_university("tracked-documents", application_deadline=self.today + timedelta(days=80))
+        deadline = self.today + timedelta(days=80)
+        profile, _ = ensure_profile_records(self.user1)
+        profile.expected_graduation_year = graduation_year_for_cycle_date(deadline)
+        profile.save(update_fields=["expected_graduation_year"])
+        university = create_university("tracked-documents", application_deadline=deadline)
         application = ApplicationTrackerItem.objects.create(user=self.user1, university=university)
 
         self.client.force_authenticate(self.user1)
