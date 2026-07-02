@@ -328,6 +328,9 @@ export function OrganizerEventFormScreen({ slug }: { slug?: string }) {
         <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">
           {t("organizer.form.description")}
         </p>
+        <p className="mt-2 text-xs font-semibold text-muted-foreground">
+          {t("organizer.form.requiredLegend")}
+        </p>
       </section>
 
       {!isEditable ? (
@@ -1033,7 +1036,14 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-semibold">
+        {label}
+        {required ? (
+          <span aria-hidden className="ml-0.5 text-primary-hover">
+            *
+          </span>
+        ) : null}
+      </span>
       <input
         className={fieldClassName}
         disabled={disabled}
@@ -1062,7 +1072,14 @@ function TextAreaField({
 }) {
   return (
     <label className="block md:col-span-2">
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-semibold">
+        {label}
+        {required ? (
+          <span aria-hidden className="ml-0.5 text-primary-hover">
+            *
+          </span>
+        ) : null}
+      </span>
       <textarea
         className={`${fieldClassName} min-h-32 py-3`}
         disabled={disabled}
@@ -1091,7 +1108,14 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-semibold">
+        {label}
+        {required ? (
+          <span aria-hidden className="ml-0.5 text-primary-hover">
+            *
+          </span>
+        ) : null}
+      </span>
       <select
         className={fieldClassName}
         disabled={disabled}

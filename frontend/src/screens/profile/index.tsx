@@ -687,6 +687,7 @@ export function ProfileScreen() {
           <input
             className={fieldClassName}
             onChange={(event) => updateField("gpa", event.target.value)}
+            placeholder={t("onboarding.field.gpaPlaceholder")}
             step="0.01"
             type="number"
             value={form.gpa}
@@ -696,6 +697,7 @@ export function ProfileScreen() {
           <input
             className={fieldClassName}
             onChange={(event) => updateField("gpaScale", event.target.value)}
+            placeholder={t("onboarding.field.gpaScalePlaceholder")}
             step="0.01"
             type="number"
             value={form.gpaScale}
@@ -824,6 +826,7 @@ export function ProfileScreen() {
           <input
             className={fieldClassName}
             onChange={(event) => updateField("targetUniversities", event.target.value)}
+            placeholder={t("profile.targetUniversitiesPlaceholder")}
             value={form.targetUniversities}
           />
         </Field>
@@ -840,6 +843,7 @@ export function ProfileScreen() {
             max={1600}
             min={400}
             onChange={(event) => updateField("sat", event.target.value)}
+            placeholder={t("onboarding.field.satScorePlaceholder")}
             type="number"
             value={form.sat}
           />
@@ -850,6 +854,7 @@ export function ProfileScreen() {
             max={9}
             min={0}
             onChange={(event) => updateField("ielts", event.target.value)}
+            placeholder={t("onboarding.field.ieltsScorePlaceholder")}
             step={0.5}
             type="number"
             value={form.ielts}
@@ -932,6 +937,7 @@ export function ProfileScreen() {
             className={fieldClassName}
             maxLength={33}
             onChange={(event) => updateField("telegramUsername", event.target.value)}
+            placeholder={t("profile.telegramPlaceholder")}
             value={form.telegramUsername}
           />
         </Field>

@@ -55,7 +55,7 @@ export function ApplicationForm({
   async function submitValues() {
     setError(null);
     if (!values.university) {
-      setError(t("common.error.requiredFields"));
+      setError(t("applications.form.error.universityRequired"));
       return false;
     }
     try {
@@ -76,7 +76,12 @@ export function ApplicationForm({
     <Card className="p-4">
       <form className="space-y-3" onSubmit={(event) => void handleSubmit(event)}>
         <label className="block">
-          <span className="text-xs font-semibold">{t("applications.form.university")}</span>
+          <span className="text-xs font-semibold">
+            {t("applications.form.university")}
+            <span aria-hidden className="ml-0.5 text-primary-hover">
+              *
+            </span>
+          </span>
           <select
             className={fieldClassName}
             onChange={(event) =>

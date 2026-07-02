@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { Button } from "@/shared/ui/button";
 
 export function UnsavedChangesDialog({
@@ -25,6 +27,17 @@ export function UnsavedChangesDialog({
   onLeaveWithoutSaving: () => void | Promise<unknown>;
   onStay: () => void;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onStay();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onStay]);
+
   if (!open) return null;
 
   async function handleSaveAndLeave() {

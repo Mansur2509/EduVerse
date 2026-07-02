@@ -42,7 +42,7 @@ export const activityFields: ProfileItemField[] = [
   { key: "hours_per_week", label: "profile.activity.hoursPerWeek" as TranslationKey, type: "number" },
   { key: "weeks_per_year", label: "profile.activity.weeksPerYear" as TranslationKey, type: "number" },
   { key: "scale", label: "profile.activity.scale" as TranslationKey, type: "select", options: scaleOptions },
-  { key: "impact_number", label: "profile.activity.impactNumber" as TranslationKey, maxLength: 100 },
+  { key: "impact_number", label: "profile.activity.impactNumber" as TranslationKey, maxLength: 100, placeholder: "profile.activity.impactNumberPlaceholder" as TranslationKey },
   { key: "description", label: "profile.activity.description" as TranslationKey, type: "textarea", maxLength: 1500 },
   { key: "proof_link", label: "proof_link" as TranslationKey, type: "url" },
 ];
@@ -52,7 +52,7 @@ export const honorFields: ProfileItemField[] = [
   { key: "issuing_organization", label: "profile.honor.organization" as TranslationKey, maxLength: 150 },
   { key: "level", label: "profile.honor.level" as TranslationKey, maxLength: 100 },
   { key: "year", label: "profile.honor.year" as TranslationKey, type: "number" },
-  { key: "result_rank", label: "profile.honor.rank" as TranslationKey, maxLength: 100 },
+  { key: "result_rank", label: "profile.honor.rank" as TranslationKey, maxLength: 100, placeholder: "profile.honor.rankPlaceholder" as TranslationKey },
   { key: "description", label: "profile.honor.description" as TranslationKey, type: "textarea", maxLength: 1500 },
   { key: "proof_link", label: "proof_link" as TranslationKey, type: "url" },
 ];
@@ -93,7 +93,7 @@ export const researchFields: ProfileItemField[] = [
   ]},
   { key: "manuscript_link", label: "profile.research.manuscript" as TranslationKey, type: "url" },
   { key: "publication_status", label: "profile.research.publication" as TranslationKey, maxLength: 100 },
-  { key: "description", label: "profile.research.description" as TranslationKey, type: "textarea", maxLength: 1500 },
+  { key: "description", label: "profile.research.description" as TranslationKey, type: "textarea", maxLength: 1500, placeholder: "profile.research.descriptionPlaceholder" as TranslationKey },
 ];
 
 export const essayFields: ProfileItemField[] = [
@@ -181,7 +181,7 @@ export const volunteerFields: ProfileItemField[] = [
   { key: "hours_per_week", label: "profile.volunteer.hoursPerWeek" as TranslationKey, type: "number" },
   { key: "weeks_per_year", label: "profile.volunteer.weeksPerYear" as TranslationKey, type: "number" },
   { key: "scale", label: "profile.volunteer.scale" as TranslationKey, type: "select", options: scaleOptions },
-  { key: "impact_number", label: "profile.volunteer.impactNumber" as TranslationKey, maxLength: 100 },
+  { key: "impact_number", label: "profile.volunteer.impactNumber" as TranslationKey, maxLength: 100, placeholder: "profile.volunteer.impactNumberPlaceholder" as TranslationKey },
   { key: "beneficiaries", label: "profile.volunteer.beneficiaries" as TranslationKey, maxLength: 150 },
   { key: "description", label: "profile.volunteer.description" as TranslationKey, type: "textarea", maxLength: 1500 },
   { key: "proof_link", label: "proof_link" as TranslationKey, type: "url" },

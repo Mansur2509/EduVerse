@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageCircle, X } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { useI18n } from "@/shared/i18n";
@@ -47,6 +47,18 @@ export function SupportLink({ className }: { className?: string }) {
     setIsOpen(false);
     setStatus(null);
   }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setStatus(null);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,6 +124,9 @@ export function SupportLink({ className }: { className?: string }) {
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">
                   {t("support.description")}
                 </p>
+                <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                  {t("support.requiredLegend")}
+                </p>
               </div>
               <button
                 aria-label={t("support.close")}
@@ -149,7 +164,12 @@ export function SupportLink({ className }: { className?: string }) {
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold">{t("support.message")}</span>
+                <span className="text-xs font-semibold">
+                  {t("support.message")}
+                  <span aria-hidden className="ml-0.5 text-primary-hover">
+                    *
+                  </span>
+                </span>
                 <textarea
                   className={`${fieldClassName} min-h-28 resize-y py-2 leading-5`}
                   maxLength={1500}

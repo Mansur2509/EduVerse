@@ -198,6 +198,11 @@ export function EventDetailScreen({ slug }: { slug: string }) {
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {t("events.registration.customFormDescription")}
                   </p>
+                  {event.registration_form_fields.some((field) => field.is_required) ? (
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                      {t("events.registration.requiredLegend")}
+                    </p>
+                  ) : null}
                 </div>
                 {event.registration_form_fields.map((field) => (
                   <RegistrationField
@@ -295,13 +300,22 @@ function RegistrationField({
   onChange: (value: unknown) => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
-  const label = `${field.label}${field.is_required ? " *" : ""}`;
+  const labelNode = (
+    <>
+      {field.label}
+      {field.is_required ? (
+        <span aria-hidden className="ml-0.5 text-primary-hover">
+          *
+        </span>
+      ) : null}
+    </>
+  );
   const stringValue = typeof value === "string" ? value : "";
 
   if (field.field_type === "long_text") {
     return (
       <label className="block">
-        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-sm font-semibold">{labelNode}</span>
         <textarea
           className={`${fieldClassName} min-h-28 py-3`}
           onChange={(event) => onChange(event.target.value)}
@@ -316,7 +330,7 @@ function RegistrationField({
   if (field.field_type === "single_choice") {
     return (
       <label className="block">
-        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-sm font-semibold">{labelNode}</span>
         <select
           className={fieldClassName}
           onChange={(event) => onChange(event.target.value)}
@@ -341,7 +355,7 @@ function RegistrationField({
       : [];
     return (
       <fieldset>
-        <legend className="text-sm font-semibold">{label}</legend>
+        <legend className="text-sm font-semibold">{labelNode}</legend>
         <div className="mt-2 space-y-2">
           {field.choices.map((choice) => (
             <label className="flex items-center gap-2 text-sm" key={choice}>
@@ -378,7 +392,7 @@ function RegistrationField({
 
   return (
     <label className="block">
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-semibold">{labelNode}</span>
       <input
         className={fieldClassName}
         onChange={(event) => onChange(event.target.value)}

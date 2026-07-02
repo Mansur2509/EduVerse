@@ -106,8 +106,16 @@ export function AuthForm({
     setError(null);
 
     // Validate form before submission
-    if (!email || !password) {
-      setError(t("common.error.requiredFields"));
+    if (!email) {
+      setError(t("auth.error.emailRequired"));
+      return;
+    }
+    if (!password) {
+      setError(t("auth.error.passwordRequired"));
+      return;
+    }
+    if (isRegister && !fullName) {
+      setError(t("auth.error.fullNameRequired"));
       return;
     }
 
@@ -173,6 +181,11 @@ export function AuthForm({
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
         {isRegister ? t("auth.register.description") : t("auth.login.description")}
       </p>
+      {isRegister ? (
+        <p className="mt-2 text-xs font-semibold text-muted-foreground">
+          {t("auth.register.allRequired")}
+        </p>
+      ) : null}
 
       <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
         {isRegister ? (

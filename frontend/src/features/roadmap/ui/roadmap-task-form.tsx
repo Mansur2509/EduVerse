@@ -69,7 +69,7 @@ export function RoadmapTaskForm({
   async function submitValues() {
     setError(null);
     if (!values.title.trim()) {
-      setError(t("common.error.requiredFields"));
+      setError(t("roadmap.form.error.titleRequired"));
       return false;
     }
     try {
@@ -90,7 +90,12 @@ export function RoadmapTaskForm({
     <Card className="p-4">
       <form className="space-y-3" onSubmit={(event) => void handleSubmit(event)}>
         <label className="block">
-          <span className="text-xs font-semibold">{t("roadmap.form.title")}</span>
+          <span className="text-xs font-semibold">
+            {t("roadmap.form.title")}
+            <span aria-hidden className="ml-0.5 text-primary-hover">
+              *
+            </span>
+          </span>
           <input
             className={fieldClassName}
             maxLength={240}

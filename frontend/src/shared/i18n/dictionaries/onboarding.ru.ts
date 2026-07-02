@@ -2,6 +2,7 @@ import type { onboardingEn } from "./onboarding.en";
 
 export const onboardingRu: Record<keyof typeof onboardingEn, string> = {
   "onboarding.required": "Обязательная настройка",
+  "onboarding.requiredLegend": "* Обязательно",
   "onboarding.loading": "Загружаем профиль для настройки…",
   "onboarding.progress": "Шаг {{current}} из {{total}}",
   "onboarding.stepLabel": "Шаг настройки {{number}}",
@@ -36,7 +37,9 @@ export const onboardingRu: Record<keyof typeof onboardingEn, string> = {
   "onboarding.step.6.description": "Подтвердите ключевые решения профиля и завершите обязательную настройку.",
   "onboarding.field.graduationYear": "Ожидаемый год выпуска",
   "onboarding.field.gpa": "Текущий GPA",
+  "onboarding.field.gpaPlaceholder": "Например: 4.75",
   "onboarding.field.gpaScale": "Шкала GPA",
+  "onboarding.field.gpaScalePlaceholder": "Например: 5.0",
   "onboarding.field.universityUnsure": "Я пока не определился с целевыми университетами",
   "onboarding.field.majors": "Предполагаемые специальности",
   "onboarding.field.majorsHelp": "Можно выбрать несколько направлений.",
@@ -45,7 +48,9 @@ export const onboardingRu: Record<keyof typeof onboardingEn, string> = {
   "onboarding.field.takenExams": "Уже сданные экзамены",
   "onboarding.field.interestedClasses": "Любимые предметы и занятия",
   "onboarding.field.satScore": "Результат SAT",
+  "onboarding.field.satScorePlaceholder": "Например: 1450",
   "onboarding.field.ieltsScore": "Результат IELTS",
+  "onboarding.field.ieltsScorePlaceholder": "Например: 7.0",
   "onboarding.field.toeflScore": "Результат TOEFL",
   "onboarding.field.actScore": "Результат ACT",
   "onboarding.field.apScores": "Предметы и результаты AP",

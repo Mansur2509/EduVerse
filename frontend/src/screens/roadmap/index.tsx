@@ -661,157 +661,178 @@ export function RoadmapScreen() {
                 {t("roadmap.filters.resultCount", { count: bucketedTasks.length })}
               </span>
             </div>
-            <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.category")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, category: event.target.value }))
-                  }
-                  value={filters.category}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  {[
-                    "profile",
-                    "exams",
-                    "essays",
-                    "universities",
-                    "scholarships",
-                    "activities",
-                    "research",
-                    "portfolio",
-                    "deadlines",
-                    "events",
-                    "recommendations"
-                  ].map((category) => (
-                    <option key={category} value={category}>
-                      {t(`roadmap.category.${category}` as TranslationKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.priority")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, priority: event.target.value }))
-                  }
-                  value={filters.priority}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  {["low", "medium", "high", "urgent"].map((priority) => (
-                    <option key={priority} value={priority}>
-                      {t(`roadmap.priority.${priority}` as TranslationKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.university")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, university: event.target.value }))
-                  }
-                  value={filters.university}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  {universityOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.application")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, application: event.target.value }))
-                  }
-                  value={filters.application}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  {applicationOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.exam")}</span>
-                <input
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, exam: event.target.value }))
-                  }
-                  placeholder={t("roadmap.filters.examPlaceholder")}
-                  value={filters.exam}
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.sourceType")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, sourceType: event.target.value }))
-                  }
-                  value={filters.sourceType}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  {ROADMAP_SOURCE_TYPES.map((sourceType) => (
-                    <option key={sourceType} value={sourceType}>
-                      {t(`roadmap.source.${sourceType}` as TranslationKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.taskKind")}</span>
-                <select
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, taskKind: event.target.value }))
-                  }
-                  value={filters.taskKind}
-                >
-                  <option value="">{t("roadmap.filters.all")}</option>
-                  <option value="manual">{t("roadmap.task.kind.manual")}</option>
-                  <option value="generated">{t("roadmap.task.kind.generated")}</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.dueAfter")}</span>
-                <input
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, dueAfter: event.target.value }))
-                  }
-                  type="date"
-                  value={filters.dueAfter}
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold">{t("roadmap.filters.dueBefore")}</span>
-                <input
-                  className={fieldClassName}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, dueBefore: event.target.value }))
-                  }
-                  type="date"
-                  value={filters.dueBefore}
-                />
-              </label>
-              <div className="flex items-end">
-                <Button
-                  onClick={clearAllFilters}
-                  type="button"
-                  variant="ghost"
-                >
+            <form className="space-y-4">
+              <section className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                  {t("roadmap.filters.group.taskType")}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.category")}</span>
+                    <select
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, category: event.target.value }))
+                      }
+                      value={filters.category}
+                    >
+                      <option value="">{t("roadmap.filters.all")}</option>
+                      {[
+                        "profile",
+                        "exams",
+                        "essays",
+                        "universities",
+                        "scholarships",
+                        "activities",
+                        "research",
+                        "portfolio",
+                        "deadlines",
+                        "events",
+                        "recommendations"
+                      ].map((category) => (
+                        <option key={category} value={category}>
+                          {t(`roadmap.category.${category}` as TranslationKey)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.priority")}</span>
+                    <select
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, priority: event.target.value }))
+                      }
+                      value={filters.priority}
+                    >
+                      <option value="">{t("roadmap.filters.all")}</option>
+                      {["low", "medium", "high", "urgent"].map((priority) => (
+                        <option key={priority} value={priority}>
+                          {t(`roadmap.priority.${priority}` as TranslationKey)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.taskKind")}</span>
+                    <select
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, taskKind: event.target.value }))
+                      }
+                      value={filters.taskKind}
+                    >
+                      <option value="">{t("roadmap.filters.all")}</option>
+                      <option value="manual">{t("roadmap.task.kind.manual")}</option>
+                      <option value="generated">{t("roadmap.task.kind.generated")}</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section className="space-y-3 border-t pt-4">
+                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                  {t("roadmap.filters.group.linkedItems")}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.university")}</span>
+                    <select
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, university: event.target.value }))
+                      }
+                      value={filters.university}
+                    >
+                      <option value="">{t("roadmap.filters.all")}</option>
+                      {universityOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.application")}</span>
+                    <select
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, application: event.target.value }))
+                      }
+                      value={filters.application}
+                    >
+                      <option value="">{t("roadmap.filters.all")}</option>
+                      {applicationOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.exam")}</span>
+                    <input
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, exam: event.target.value }))
+                      }
+                      placeholder={t("roadmap.filters.examPlaceholder")}
+                      value={filters.exam}
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="space-y-3 border-t pt-4">
+                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                  {t("roadmap.filters.group.timingSource")}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.sourceType")}</span>
+                    <select
+                      className={fieldClassName}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, sourceType: event.target.value }))
+                      }
+                      value={filters.sourceType}
+                    >
+                      <option value="">{t("roadmap.filters.all")}</option>
+                      {ROADMAP_SOURCE_TYPES.map((sourceType) => (
+                        <option key={sourceType} value={sourceType}>
+                          {t(`roadmap.source.${sourceType}` as TranslationKey)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="block">
+                    <span className="text-xs font-semibold">{t("roadmap.filters.dueRange")}</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        aria-label={t("roadmap.filters.dueAfter")}
+                        className={fieldClassName}
+                        onChange={(event) =>
+                          setFilters((current) => ({ ...current, dueAfter: event.target.value }))
+                        }
+                        type="date"
+                        value={filters.dueAfter}
+                      />
+                      <input
+                        aria-label={t("roadmap.filters.dueBefore")}
+                        className={fieldClassName}
+                        onChange={(event) =>
+                          setFilters((current) => ({ ...current, dueBefore: event.target.value }))
+                        }
+                        type="date"
+                        value={filters.dueBefore}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="flex justify-end border-t pt-4">
+                <Button onClick={clearAllFilters} type="button" variant="ghost">
                   {t("roadmap.filters.clear")}
                 </Button>
               </div>

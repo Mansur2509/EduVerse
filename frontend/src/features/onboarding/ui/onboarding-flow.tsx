@@ -254,16 +254,25 @@ function Field({
   label,
   helper,
   children,
-  wide = false
+  wide = false,
+  required = false
 }: {
   label: string;
   helper?: string;
   children: ReactNode;
   wide?: boolean;
+  required?: boolean;
 }) {
   return (
     <label className={wide ? "block md:col-span-2" : "block"}>
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-semibold">
+        {label}
+        {required ? (
+          <span aria-hidden className="ml-0.5 text-primary-hover">
+            *
+          </span>
+        ) : null}
+      </span>
       {children}
       {helper ? (
         <span className="mt-1.5 block text-xs leading-5 text-muted-foreground">
@@ -668,22 +677,26 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
             {stepDescription}
           </p>
 
-          <Card className="mt-7 p-5 sm:p-7">
+          <p className="mt-4 text-xs font-semibold text-muted-foreground">
+            {t("onboarding.requiredLegend")}
+          </p>
+
+          <Card className="mt-3 p-5 sm:p-7">
             {step === 0 ? (
               <div className="grid gap-5 md:grid-cols-2">
-                <Field label={t("auth.fullName")}>
+                <Field label={t("auth.fullName")} required>
                   <input className={fieldClassName} onChange={(event) => update("fullName", event.target.value)} required value={form.fullName} />
                 </Field>
-                <Field label={t("profile.birthDate")}>
+                <Field label={t("profile.birthDate")} required>
                   <input className={fieldClassName} onChange={(event) => update("birthDate", event.target.value)} required type="date" value={form.birthDate} />
                 </Field>
-                <Field label={t("profile.country")}>
+                <Field label={t("profile.country")} required>
                   <input className={fieldClassName} onChange={(event) => update("country", event.target.value)} required value={form.country} />
                 </Field>
-                <Field label={t("profile.city")}>
+                <Field label={t("profile.city")} required>
                   <input className={fieldClassName} onChange={(event) => update("city", event.target.value)} required value={form.city} />
                 </Field>
-                <Field label={t("profile.educationStatus")}>
+                <Field label={t("profile.educationStatus")} required>
                   <select className={fieldClassName} onChange={(event) => update("educationStatus", event.target.value)} required value={form.educationStatus}>
                     <option value="">{t("profile.options.select")}</option>
                     <option value="school_student">{t("profile.options.education.school")}</option>
@@ -693,20 +706,20 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                     <option value="other">{t("profile.options.education.other")}</option>
                   </select>
                 </Field>
-                <Field label={t("profile.schoolOrUniversity")}>
+                <Field label={t("profile.schoolOrUniversity")} required>
                   <input className={fieldClassName} onChange={(event) => update("schoolOrUniversity", event.target.value)} required value={form.schoolOrUniversity} />
                 </Field>
-                <Field label={t("profile.grade")}>
+                <Field label={t("profile.grade")} required>
                   <input className={fieldClassName} onChange={(event) => update("grade", event.target.value)} required value={form.grade} />
                 </Field>
-                <Field label={t("onboarding.field.graduationYear")}>
+                <Field label={t("onboarding.field.graduationYear")} required>
                   <input className={fieldClassName} max={2041} min={2025} onChange={(event) => update("expectedGraduationYear", event.target.value)} required type="number" value={form.expectedGraduationYear} />
                 </Field>
-                <Field label={t("onboarding.field.gpa")}>
-                  <input className={fieldClassName} min={0} onChange={(event) => update("gpa", event.target.value)} required step="0.01" type="number" value={form.gpa} />
+                <Field label={t("onboarding.field.gpa")} required>
+                  <input className={fieldClassName} min={0} onChange={(event) => update("gpa", event.target.value)} placeholder={t("onboarding.field.gpaPlaceholder")} required step="0.01" type="number" value={form.gpa} />
                 </Field>
-                <Field label={t("onboarding.field.gpaScale")}>
-                  <input className={fieldClassName} min={0} onChange={(event) => update("gpaScale", event.target.value)} required step="0.01" type="number" value={form.gpaScale} />
+                <Field label={t("onboarding.field.gpaScale")} required>
+                  <input className={fieldClassName} min={0} onChange={(event) => update("gpaScale", event.target.value)} placeholder={t("onboarding.field.gpaScalePlaceholder")} required step="0.01" type="number" value={form.gpaScale} />
                 </Field>
               </div>
             ) : null}
@@ -714,7 +727,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
             {step === 1 ? (
               <div className="space-y-7">
                 <div className="grid gap-5 md:grid-cols-2">
-                  <Field label={t("profile.intendedDegree")}>
+                  <Field label={t("profile.intendedDegree")} required>
                     <select className={fieldClassName} onChange={(event) => update("intendedDegree", event.target.value)} required value={form.intendedDegree}>
                       <option value="">{t("profile.options.select")}</option>
                       <option value="bachelor">{t("profile.options.degree.bachelor")}</option>
@@ -747,7 +760,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                     </div>
                   </Field>
                   <Field helper={t("profile.targetUniversitiesHelp")} label={t("profile.targetUniversities")}>
-                    <input className={fieldClassName} disabled={form.universityUnsure} onChange={(event) => update("targetUniversities", event.target.value)} value={form.targetUniversities} />
+                    <input className={fieldClassName} disabled={form.universityUnsure} onChange={(event) => update("targetUniversities", event.target.value)} placeholder={t("profile.targetUniversitiesPlaceholder")} value={form.targetUniversities} />
                     <div className="mt-2">
                       <CheckField checked={form.universityUnsure} label={t("onboarding.field.universityUnsure")} onChange={(checked) => update("universityUnsure", checked)} />
                     </div>
@@ -797,12 +810,24 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                   <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.takenExams")}>
                     <input className={fieldClassName} onChange={(event) => update("takenExams", event.target.value)} value={form.takenExams} />
                   </Field>
-                  <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.interestedClasses")}>
+                  <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.interestedClasses")} required>
                     <input className={fieldClassName} onChange={(event) => update("interestedClasses", event.target.value)} required value={form.interestedClasses} />
                   </Field>
                   {(["satScore", "ieltsScore", "toeflScore", "actScore"] as const).map((field) => (
                     <Field key={field} label={t(`onboarding.field.${field}` as TranslationKey)}>
-                      <input className={fieldClassName} onChange={(event) => update(field, event.target.value)} type="number" value={form[field]} />
+                      <input
+                        className={fieldClassName}
+                        onChange={(event) => update(field, event.target.value)}
+                        placeholder={
+                          field === "satScore"
+                            ? t("onboarding.field.satScorePlaceholder")
+                            : field === "ieltsScore"
+                              ? t("onboarding.field.ieltsScorePlaceholder")
+                              : undefined
+                        }
+                        type="number"
+                        value={form[field]}
+                      />
                     </Field>
                   ))}
                   <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.apScores")}>
@@ -811,7 +836,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                   <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.apInterests")}>
                     <input className={fieldClassName} onChange={(event) => update("apInterests", event.target.value)} value={form.apInterests} />
                   </Field>
-                  <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.preparationNeeds")} wide>
+                  <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.preparationNeeds")} required wide>
                     <input className={fieldClassName} onChange={(event) => update("preparationNeeds", event.target.value)} required value={form.preparationNeeds} />
                   </Field>
                 </div>
@@ -881,7 +906,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                 <Field label={t("onboarding.field.essayStage")}>
                   <input className={fieldClassName} onChange={(event) => update("essayStage", event.target.value)} value={form.essayStage} />
                 </Field>
-                <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.supportPriorities")} wide>
+                <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.supportPriorities")} required wide>
                   <input className={fieldClassName} onChange={(event) => update("supportPriorities", event.target.value)} required value={form.supportPriorities} />
                 </Field>
                 <Field helper={t("onboarding.field.commaHelp")} label={t("onboarding.field.careerInterests")} wide>

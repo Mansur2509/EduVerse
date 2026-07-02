@@ -211,7 +211,7 @@ export function ProfileItemSection<T extends { id: number }>({
                   className="rounded px-2 py-1 text-xs font-medium text-danger hover:bg-danger/10"
                   type="button"
                 >
-                  <Trash2 className="size-3" />
+                  <Trash2 aria-hidden className="size-3" />
                 </button>
               </div>
             </div>
