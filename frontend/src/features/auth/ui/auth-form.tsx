@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
 import { ApiError, getApiErrorMessage } from "@/shared/api/client";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
@@ -18,6 +18,25 @@ type AuthFormProps = {
   onModeChange?: (mode: "login" | "register") => void;
   showModeLink?: boolean;
 };
+
+const DEMO_PASSWORD = "EduVerse-Demo-842!";
+const DEMO_ACCOUNTS = [
+  {
+    email: "student.demo@eduverse.local",
+    labelKey: "auth.demo.student",
+    role: "student"
+  },
+  {
+    email: "organizer.demo@eduverse.local",
+    labelKey: "auth.demo.organizer",
+    role: "organizer"
+  },
+  {
+    email: "admin.demo@eduverse.local",
+    labelKey: "auth.demo.admin",
+    role: "admin"
+  }
+] satisfies Array<{ email: string; labelKey: TranslationKey; role: string }>;
 
 export function AuthForm({
   mode,
@@ -34,6 +53,7 @@ export function AuthForm({
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingDemoRole, setPendingDemoRole] = useState<string | null>(null);
   const isRegister = mode === "register";
 
   useEffect(() => {
@@ -41,6 +61,45 @@ export function AuthForm({
     setPasswordConfirm("");
     setError(null);
   }, [mode]);
+
+  function localizedSubmitError(submitError: unknown, errorContext: "login" | "register" = mode) {
+    let errorMessage = t("common.error.generic");
+
+    if (submitError instanceof ApiError) {
+      if (submitError.errorCode === "timeout") {
+        errorMessage = t("common.error.timeout");
+      } else if (submitError.errorCode === "network") {
+        errorMessage = t("common.error.network");
+      } else if (errorContext === "login" && submitError.status === 400) {
+        // Login failures return a single backend validation message
+        // ("Invalid email or password.") in English only; show a stable
+        // localized message instead of leaking that raw text.
+        errorMessage = t("auth.invalidCredentials");
+      } else {
+        errorMessage = getApiErrorMessage(submitError, errorMessage);
+      }
+    }
+
+    // Map common backend errors to user-friendly messages
+    if (typeof submitError === "object" && submitError !== null) {
+      const errorData = Reflect.get(submitError, "data");
+      if (typeof errorData === "object" && errorData !== null) {
+        if (Reflect.has(errorData, "email") && errorContext === "register") {
+          errorMessage = t("auth.emailAlreadyExists");
+        }
+      }
+    }
+
+    return errorMessage;
+  }
+
+  function completeAuth() {
+    if (onAuthenticated) {
+      onAuthenticated();
+    } else {
+      router.replace("/dashboard");
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,41 +134,30 @@ export function AuthForm({
       } else {
         await login({ email, password });
       }
-      if (onAuthenticated) {
-        onAuthenticated();
-      } else {
-        router.replace("/dashboard");
-      }
+      completeAuth();
     } catch (submitError) {
-      let errorMessage = t("common.error.generic");
-
-      if (submitError instanceof ApiError) {
-        if (submitError.errorCode === "timeout") {
-          errorMessage = t("common.error.timeout");
-        } else if (submitError.errorCode === "network") {
-          errorMessage = t("common.error.network");
-        } else if (!isRegister && submitError.status === 400) {
-          // Login failures return a single backend validation message
-          // ("Invalid email or password.") in English only; show a stable
-          // localized message instead of leaking that raw text.
-          errorMessage = t("auth.invalidCredentials");
-        } else {
-          errorMessage = getApiErrorMessage(submitError, errorMessage);
-        }
-      }
-
-      // Map common backend errors to user-friendly messages
-      if (typeof submitError === "object" && submitError !== null) {
-        const errorData = Reflect.get(submitError, "data");
-        if (typeof errorData === "object" && errorData !== null) {
-          if (Reflect.has(errorData, "email") && isRegister) {
-            errorMessage = t("auth.emailAlreadyExists");
-          }
-        }
-      }
-
-      setError(errorMessage);
+      setError(localizedSubmitError(submitError));
     } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDemoLogin(account: (typeof DEMO_ACCOUNTS)[number]) {
+    if (isSubmitting) return;
+    setEmail(account.email);
+    setPassword(DEMO_PASSWORD);
+    setPasswordConfirm("");
+    setError(null);
+    setPendingDemoRole(account.role);
+    setIsSubmitting(true);
+
+    try {
+      await login({ email: account.email, password: DEMO_PASSWORD });
+      completeAuth();
+    } catch (submitError) {
+      setError(localizedSubmitError(submitError, "login"));
+    } finally {
+      setPendingDemoRole(null);
       setIsSubmitting(false);
     }
   }
@@ -204,6 +252,32 @@ export function AuthForm({
               : t("auth.signIn")}
         </Button>
       </form>
+
+      <div className="mt-5 border-t pt-5">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+          {t("auth.demo.title")}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          {t("auth.demo.description")}
+        </p>
+        <div className="mt-3 grid gap-2">
+          {DEMO_ACCOUNTS.map((account) => (
+            <Button
+              disabled={isSubmitting}
+              key={account.email}
+              onClick={() => void handleDemoLogin(account)}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              {pendingDemoRole === account.role ? t("auth.pleaseWait") : t(account.labelKey)}
+            </Button>
+          ))}
+        </div>
+        <p className="mt-3 rounded-sm border border-warning/30 bg-warning/10 p-2 text-xs leading-5 text-warning">
+          {t("auth.demo.warning")}
+        </p>
+      </div>
 
       {showModeLink ? (
         <p className="mt-5 text-center text-sm text-muted-foreground">
