@@ -51,6 +51,7 @@ import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { HelpTooltip } from "@/shared/ui/help-tooltip";
 
 type DashboardUrgency =
   | "overdue"
@@ -729,8 +730,9 @@ export function DashboardScreen() {
         </Card>
 
         <Card className="p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+          <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
             {t("dashboard.deadlineWidget.title")}
+            <HelpTooltip label={t("applications.help.deadlineConfidence")} />
           </p>
           {nextDeadline ? (
             <>
@@ -769,8 +771,9 @@ export function DashboardScreen() {
         </Card>
 
         <Card className="p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+          <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
             {t("dashboard.milestonesWidget.title")}
+            <HelpTooltip label={t("help.roadmapPriority")} />
           </p>
           {nextMilestones.length === 0 ? (
             <p className="mt-3 text-xs text-muted-foreground">
@@ -852,8 +855,9 @@ export function DashboardScreen() {
         </Card>
 
         <Card className="p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+          <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
             {t("dashboard.recommendationsWidget.title")}
+            <HelpTooltip label={t("help.fitSubscores")} />
           </p>
           {topRecommendations.length === 0 ? (
             <div className="mt-3 space-y-1 text-xs text-muted-foreground">

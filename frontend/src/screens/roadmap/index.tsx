@@ -43,6 +43,7 @@ import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid, PaginatedList } from "@/shared/ui/pagination";
 
 type ActiveBucketFilter = Exclude<RoadmapBucket, "completed"> | "all";
@@ -697,7 +698,10 @@ export function RoadmapScreen() {
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold">{t("roadmap.filters.priority")}</span>
+                    <span className="flex items-center gap-1 text-xs font-semibold">
+                      {t("roadmap.filters.priority")}
+                      <HelpTooltip label={t("help.roadmapPriority")} />
+                    </span>
                     <select
                       className={fieldClassName}
                       onChange={(event) =>

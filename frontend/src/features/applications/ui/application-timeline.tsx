@@ -17,9 +17,31 @@ import { getApplicationTimelineRequest } from "@/features/applications";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
+import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 
 const DEFAULT_VISIBLE_EVENTS = 5;
+
+type ZoomMode = "year" | "month" | "week" | "list";
+const ZOOM_MODES: ZoomMode[] = ["year", "month", "week", "list"];
+const ZOOM_WINDOW_DAYS: Record<Exclude<ZoomMode, "list">, number> = {
+  year: 365,
+  month: 30,
+  week: 7
+};
+
+function isWithinZoom(dateStr: string | null, zoom: ZoomMode): boolean {
+  if (zoom === "list" || !dateStr) return true;
+  const target = new Date(dateStr).getTime();
+  if (Number.isNaN(target)) return true;
+  const diffDays = Math.abs((target - Date.now()) / 86_400_000);
+  return diffDays <= ZOOM_WINDOW_DAYS[zoom];
+}
+
+const COMPLETED_STATUSES = new Set(["done", "completed", "complete", "submitted"]);
+function isCompletedEvent(status?: string): boolean {
+  return status ? COMPLETED_STATUSES.has(status.toLowerCase()) : false;
+}
 
 const URGENCY_STYLES: Record<Urgency, string> = {
   overdue: "border-danger/45 bg-danger/10 text-danger",
@@ -187,7 +209,10 @@ function ExamRow({ exam }: { exam: TimelineExam }) {
   return (
     <li className="rounded-sm border bg-surface px-3 py-2 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-semibold">{exam.exam}</span>
+        <span className="flex items-center gap-1 font-semibold">
+          {exam.exam}
+          <HelpTooltip label={t("help.examDateSource")} />
+        </span>
         {exam.severity ? (
           <span className={badgeClass(CONFIDENCE_STYLES.estimated)}>
             {t(`applications.examSeverity.${exam.severity}` as TranslationKey)}
@@ -258,6 +283,8 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [zoom, setZoom] = useState<ZoomMode>("year");
+  const [showCompleted, setShowCompleted] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -286,9 +313,14 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
     return <p className="text-sm text-danger">{t("applications.timeline.error")}</p>;
   }
 
+  const zoomedEvents = timeline.events.filter((event) => isWithinZoom(event.date, zoom));
+  const completionFilteredEvents = showCompleted
+    ? zoomedEvents
+    : zoomedEvents.filter((event) => !isCompletedEvent(event.status));
+  const hiddenCompletedCount = zoomedEvents.length - completionFilteredEvents.length;
   const visibleEvents = expanded
-    ? timeline.events
-    : timeline.events.slice(0, DEFAULT_VISIBLE_EVENTS);
+    ? completionFilteredEvents
+    : completionFilteredEvents.slice(0, DEFAULT_VISIBLE_EVENTS);
 
   return (
     <div className="space-y-4">
@@ -305,12 +337,46 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
       </div>
 
       <div>
-        <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-semibold">{t("applications.timeline.independentTimeline")}</h3>
-          <HelpTooltip label={t("applications.help.timeline")} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold">{t("applications.timeline.independentTimeline")}</h3>
+            <HelpTooltip label={t("applications.help.timeline")} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1 text-xs">
+              <span className="font-semibold text-muted-foreground">
+                {t("applications.timeline.zoom")}
+              </span>
+              <select
+                className={fieldClassName}
+                onChange={(event) => setZoom(event.target.value as ZoomMode)}
+                value={zoom}
+              >
+                {ZOOM_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {t(`applications.timeline.zoom.${mode}` as TranslationKey)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <input
+                checked={showCompleted}
+                onChange={(event) => setShowCompleted(event.target.checked)}
+                type="checkbox"
+              />
+              {t("applications.timeline.showCompleted")}
+            </label>
+          </div>
         </div>
         {timeline.events.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">{t("applications.timeline.empty")}</p>
+        ) : completionFilteredEvents.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {hiddenCompletedCount > 0
+              ? t("applications.timeline.allCompleted")
+              : t("applications.timeline.emptyForZoom")}
+          </p>
         ) : (
           <>
             <ul className="mt-2 space-y-2">
@@ -318,7 +384,7 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
                 <EventRow event={event} key={`${event.type}-${event.date ?? "na"}-${index}`} />
               ))}
             </ul>
-            {timeline.events.length > DEFAULT_VISIBLE_EVENTS ? (
+            {completionFilteredEvents.length > DEFAULT_VISIBLE_EVENTS ? (
               <Button
                 className="mt-2"
                 onClick={() => setExpanded((value) => !value)}
@@ -329,7 +395,7 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
                 {expanded
                   ? t("applications.timeline.showLess")
                   : t("applications.timeline.showMore", {
-                      count: timeline.events.length - DEFAULT_VISIBLE_EVENTS
+                      count: completionFilteredEvents.length - DEFAULT_VISIBLE_EVENTS
                     })}
               </Button>
             ) : null}

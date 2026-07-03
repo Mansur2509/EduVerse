@@ -180,6 +180,7 @@ export function StrategyScreen() {
                       >
                         {t(`strategy.round.${school.round_bucket}` as TranslationKey)}
                       </span>
+                      <HelpTooltip label={t("help.strategyRound")} />
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
