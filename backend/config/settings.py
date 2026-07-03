@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "services.notification_service",
     "services.research_service",
     "services.activity_service",
+    "services.feedback_service",
 ]
 
 MIDDLEWARE = [

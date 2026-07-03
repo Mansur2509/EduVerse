@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogIn,
   Map,
+  MessageSquareWarning,
   Tickets,
   UserPlus,
   Route,
@@ -59,6 +60,11 @@ export const adminNavigation: NavigationItem[] = [
     href: "/admin/events/moderation",
     labelKey: "navigation.eventModeration",
     icon: ShieldCheck
+  },
+  {
+    href: "/admin/feedback",
+    labelKey: "navigation.feedbackInbox",
+    icon: MessageSquareWarning
   }
 ];
 

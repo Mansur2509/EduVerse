@@ -4,6 +4,7 @@ import { MessageCircle, X } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
+import { createFeedbackRequest } from "@/features/feedback";
 import { useI18n } from "@/shared/i18n";
 import { cn } from "@/shared/lib/cn";
 
@@ -15,7 +16,12 @@ const FEEDBACK_STORAGE_KEY = "eduverse.feedback.local.v1";
 const FEEDBACK_TYPES = ["issue", "idea", "confusing", "data"] as const;
 
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];
-type FeedbackStatus = "success" | "error" | null;
+// "success": submitted to the backend, visible to admins.
+// "localFallback": the backend call failed; saved on this device only, NOT
+// submitted to the team — the UI must say so explicitly rather than implying
+// it was received.
+// "error": could not even save locally.
+type FeedbackStatus = "success" | "localFallback" | "error" | null;
 
 type StoredFeedback = {
   id: string;
@@ -60,15 +66,7 @@ export function SupportLink({ className }: { className?: string }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!message.trim()) {
-      setStatus("error");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStatus(null);
+  function saveLocallyOnly(): boolean {
     try {
       const existing = window.localStorage.getItem(FEEDBACK_STORAGE_KEY);
       const parsed = existing ? (JSON.parse(existing) as StoredFeedback[]) : [];
@@ -84,11 +82,41 @@ export function SupportLink({ className }: { className?: string }) {
         FEEDBACK_STORAGE_KEY,
         JSON.stringify([nextItem, ...parsed].slice(0, 25))
       );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!message.trim()) {
+      setStatus("error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatus(null);
+    try {
+      await createFeedbackRequest({
+        feedback_type: feedbackType,
+        page_module: page.trim(),
+        message: message.trim(),
+        contact: contact.trim()
+      });
       setMessage("");
       setContact("");
       setStatus("success");
     } catch {
-      setStatus("error");
+      // Backend unreachable or rejected the request: never claim it was
+      // submitted. Fall back to a local-only save and say so plainly.
+      if (saveLocallyOnly()) {
+        setMessage("");
+        setContact("");
+        setStatus("localFallback");
+      } else {
+        setStatus("error");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -200,6 +228,11 @@ export function SupportLink({ className }: { className?: string }) {
               {status === "success" ? (
                 <p className="rounded-sm border border-success/35 bg-success/10 p-2 text-xs text-success">
                   {t("support.success")}
+                </p>
+              ) : null}
+              {status === "localFallback" ? (
+                <p className="rounded-sm border border-warning/35 bg-warning/10 p-2 text-xs text-warning">
+                  {t("support.localFallback")}
                 </p>
               ) : null}
               {status === "error" ? (
