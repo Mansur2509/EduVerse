@@ -96,6 +96,15 @@ class University(models.Model):
 
     qs_ranking = models.PositiveIntegerField(null=True, blank=True)
     qs_ranking_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    global_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    the_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    national_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    ranking_source = models.CharField(max_length=120, blank=True)
+    ranking_source_url = models.URLField(blank=True, validators=[validate_http_url])
+    ranking_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    ranking_last_verified_date = models.DateField(null=True, blank=True)
+    ranking_confidence = models.CharField(max_length=20, blank=True)
+    national_ranking_source = models.CharField(max_length=120, blank=True)
 
     admissions_url = models.URLField(blank=True, validators=[validate_http_url])
     financial_aid_url = models.URLField(blank=True, validators=[validate_http_url])
@@ -154,10 +163,133 @@ class ExchangeRate(models.Model):
 
 
 class UniversityProgram(models.Model):
+    class MajorCluster(models.TextChoices):
+        STEM = "stem", "STEM"
+        BUSINESS_ECONOMICS_FINANCE = (
+            "business_economics_finance",
+            "Business / Economics / Finance",
+        )
+        SOCIAL_SCIENCES = "social_sciences", "Social sciences"
+        HUMANITIES = "humanities", "Humanities"
+        LAW_POLITICS_IR = "law_politics_ir", "Law / Politics / IR"
+        MEDICINE_BIOLOGY_HEALTH = (
+            "medicine_biology_health",
+            "Medicine / Biology / Health",
+        )
+        ENGINEERING = "engineering", "Engineering"
+        COMPUTER_SCIENCE_AI_DATA = (
+            "computer_science_ai_data",
+            "Computer science / AI / Data",
+        )
+        DESIGN_ARTS = "design_arts", "Design / Arts"
+        EDUCATION = "education", "Education"
+        ENVIRONMENTAL_SUSTAINABILITY = (
+            "environmental_sustainability",
+            "Environmental / Sustainability",
+        )
+        PUBLIC_POLICY_SOCIAL_IMPACT = (
+            "public_policy_social_impact",
+            "Public policy / Social impact",
+        )
+        PSYCHOLOGY_COGNITIVE_SCIENCE = (
+            "psychology_cognitive_science",
+            "Psychology / Cognitive science",
+        )
+        UNDECIDED_INTERDISCIPLINARY = (
+            "undecided_interdisciplinary",
+            "Undecided / Interdisciplinary",
+        )
+        OTHER = "other", "Other"
+
+    class SourceConfidence(models.TextChoices):
+        VERIFIED = "verified", "Verified"
+        PARTIAL = "partial", "Partial"
+        ESTIMATED = "estimated", "Estimated"
+
     university = models.ForeignKey(University, on_delete=models.CASCADE, related_name="programs")
     name = models.CharField(max_length=240)
+    major_cluster = models.CharField(
+        max_length=60,
+        choices=MajorCluster.choices,
+        blank=True,
+        db_index=True,
+    )
     degree_level = models.CharField(max_length=80, blank=True)
+    department_or_school = models.CharField(max_length=180, blank=True)
     official_url = models.URLField(blank=True, validators=[validate_http_url])
+    source_url = models.URLField(blank=True, validators=[validate_http_url])
+    program_requirements_summary = models.TextField(blank=True)
+    essay_requirements = models.TextField(blank=True)
+    portfolio_required = models.BooleanField(null=True, blank=True)
+    research_heavy = models.BooleanField(default=False)
+    stem_heavy = models.BooleanField(default=False)
+    interdisciplinary = models.BooleanField(default=False)
+    source_confidence = models.CharField(
+        max_length=20,
+        choices=SourceConfidence.choices,
+        blank=True,
+    )
+    last_verified_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("name",)
+        indexes = [
+            models.Index(fields=("university", "major_cluster")),
+            models.Index(fields=("portfolio_required", "major_cluster")),
+        ]
+
+
+class UniversitySubjectRanking(models.Model):
+    class Confidence(models.TextChoices):
+        VERIFIED = "verified", "Verified"
+        PARTIAL = "partial", "Partial"
+        ESTIMATED = "estimated", "Estimated"
+
+    university = models.ForeignKey(
+        University, on_delete=models.CASCADE, related_name="subject_rankings"
+    )
+    program = models.ForeignKey(
+        UniversityProgram,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subject_rankings",
+    )
+    subject_area = models.CharField(max_length=160, db_index=True)
+    major_cluster = models.CharField(
+        max_length=60,
+        choices=UniversityProgram.MajorCluster.choices,
+        blank=True,
+        db_index=True,
+    )
+    rank = models.PositiveIntegerField(db_index=True)
+    source_name = models.CharField(max_length=120, db_index=True)
+    source_url = models.URLField(validators=[validate_http_url])
+    ranking_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    last_verified_date = models.DateField()
+    confidence = models.CharField(
+        max_length=20,
+        choices=Confidence.choices,
+        default=Confidence.PARTIAL,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("rank", "subject_area")
+        indexes = [
+            models.Index(fields=("major_cluster", "rank")),
+            models.Index(fields=("source_name", "rank")),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("university", "subject_area", "source_name", "ranking_year"),
+                name="unique_university_subject_ranking_year",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.university.name}: {self.subject_area} #{self.rank}"
 
 
 class UniversityRequirement(models.Model):

@@ -13,6 +13,7 @@ from services.university_service.models import (
     UniversityFieldVerification,
     UniversityProgram,
     UniversityScholarship,
+    UniversitySubjectRanking,
 )
 from services.university_service.tests.test_universities import create_university
 from services.user_profile_service.services import ensure_profile_records
@@ -98,15 +99,51 @@ class RecommendationEngineTests(APITestCase):
         self.assertEqual(item["recommended_programs"][0]["match_type"], "exact")
         self.assertEqual(item["recommended_programs"][0]["fit_reason_key"], "program_exact_match")
 
-    def test_program_related_cluster_match_when_no_exact_program(self):
+    def test_recommendation_includes_major_matching_and_subject_ranking_context(self):
+        self.profile.intended_majors = ["Computer Science"]
+        self.profile.save()
+        university = create_university("subject-context-university", acceptance_rate="40.00")
+        program = UniversityProgram.objects.create(
+            university=university,
+            name="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            source_confidence=UniversityProgram.SourceConfidence.VERIFIED,
+        )
+        UniversitySubjectRanking.objects.create(
+            university=university,
+            program=program,
+            subject_area="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            rank=30,
+            source_name="QS Subject",
+            source_url="https://example.com/cs-subject",
+            ranking_year=2026,
+            last_verified_date=date.today(),
+            confidence=UniversitySubjectRanking.Confidence.VERIFIED,
+        )
+
+        data = self._get()
+        item = self._item_for(data, "subject-context-university")
+
+        self.assertTrue(item["matched_programs"])
+        self.assertEqual(item["best_program_fit_score"], item["matched_programs"][0]["program_fit_score"])
+        self.assertTrue(item["major_cluster_match"])
+        self.assertEqual(item["program_fit_confidence"], "high")
+        self.assertEqual(item["subject_ranking_context"]["rank"], 30)
+        self.assertEqual(
+            item["major_inference"]["primary_major_cluster"],
+            UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+        )
+
+    def test_program_cluster_match_when_no_exact_program(self):
         self.profile.intended_majors = ["Political Science"]
         self.profile.save()
         university = create_university("related-match-university", acceptance_rate="40.00")
         UniversityProgram.objects.create(university=university, name="International Relations")
         data = self._get()
         item = self._item_for(data, "related-match-university")
-        self.assertEqual(item["recommended_programs"][0]["match_type"], "related")
-        self.assertEqual(item["recommended_programs"][0]["fit_reason_key"], "program_related_match")
+        self.assertEqual(item["recommended_programs"][0]["match_type"], "cluster")
+        self.assertEqual(item["recommended_programs"][0]["fit_reason_key"], "program_cluster_match")
 
     def test_no_program_match_returns_empty_not_invented(self):
         self.profile.intended_majors = ["Basket Weaving"]

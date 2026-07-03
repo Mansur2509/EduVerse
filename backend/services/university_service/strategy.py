@@ -57,6 +57,8 @@ def build_application_strategy(profile, preferences=None) -> dict:
 
     by_category: dict[str, list[dict]] = {category: [] for category in CATEGORY_ORDER_FOR_LIST}
     by_round: dict[str, list[dict]] = {label: [] for label in ROUND_BUCKET_ORDER}
+    by_country: dict[str, list[dict]] = {}
+    by_major_cluster: dict[str, list[dict]] = {}
     schools: list[dict] = []
 
     for item in data["recommendations"]:
@@ -70,13 +72,20 @@ def build_application_strategy(profile, preferences=None) -> dict:
         schools.append(enriched_item)
         by_category.setdefault(item["category"], []).append(enriched_item)
         by_round[round_label].append(enriched_item)
+        by_country.setdefault(item["university"]["country"], []).append(enriched_item)
+        major_cluster = item.get("matched_programs", [{}])[0].get("major_cluster") if item.get("matched_programs") else None
+        by_major_cluster.setdefault(major_cluster or "program_data_not_verified", []).append(enriched_item)
 
     return {
         "schools": schools,
         "by_category": by_category,
         "by_round": by_round,
+        "by_country": by_country,
+        "by_major_cluster": by_major_cluster,
         "round_bucket_order": list(ROUND_BUCKET_ORDER),
         "category_order": list(CATEGORY_ORDER_FOR_LIST),
+        "country_order": sorted(by_country),
+        "major_cluster_order": sorted(by_major_cluster),
         "counts": data["counts"],
         "target_range": {
             "minimum": STRATEGY_TARGET_MINIMUM,

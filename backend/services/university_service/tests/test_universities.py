@@ -12,6 +12,7 @@ from services.university_service.models import (
     University,
     UniversityFieldVerification,
     UniversityProgram,
+    UniversitySubjectRanking,
 )
 from services.university_service.services import calculate_university_fit
 from services.user_profile_service.models import (
@@ -122,6 +123,23 @@ class UniversityCatalogTests(APITestCase):
             source_url="https://example.com/source",
             last_verified_date=timezone.now().date(),
         )
+        program = UniversityProgram.objects.create(
+            university=self.published,
+            name="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+        )
+        UniversitySubjectRanking.objects.create(
+            university=self.published,
+            program=program,
+            subject_area="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            rank=25,
+            source_name="QS Subject",
+            source_url="https://example.com/qs-subject",
+            ranking_year=2026,
+            last_verified_date=timezone.now().date(),
+            confidence=UniversitySubjectRanking.Confidence.PARTIAL,
+        )
         self.client.force_authenticate(self.user)
 
         response = self.client.get("/api/v1/universities/filter-options/")
@@ -132,6 +150,13 @@ class UniversityCatalogTests(APITestCase):
         self.assertIn("private", response.data["institution_types"])
         self.assertIn("medium", response.data["cost_confidences"])
         self.assertIn("partial", response.data["verification_statuses"])
+        self.assertIn(
+            UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            response.data["major_clusters"],
+        )
+        self.assertIn("Computer Science", response.data["program_names"])
+        self.assertIn("Computer Science", response.data["subject_areas"])
+        self.assertIn("QS Subject", response.data["ranking_sources"])
         slugs = [item["slug"] for item in response.data["universities"]]
         self.assertIn("option-private-university", slugs)
         self.assertNotIn(demo.slug, slugs)
@@ -214,6 +239,88 @@ class UniversityCatalogTests(APITestCase):
         slugs = [item["slug"] for item in response.data["results"]]
         self.assertLess(slugs.index(lower_ranked.slug), slugs.index(top_ranked.slug))
         self.assertLess(slugs.index(top_ranked.slug), slugs.index(unranked.slug))
+
+    def test_program_and_ranking_filters(self):
+        ranked = create_university(
+            "ranked-program-university",
+            global_rank=12,
+            the_rank=18,
+            national_rank=2,
+        )
+        program = UniversityProgram.objects.create(
+            university=ranked,
+            name="Data Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            portfolio_required=True,
+            research_heavy=True,
+            source_confidence=UniversityProgram.SourceConfidence.VERIFIED,
+        )
+        UniversitySubjectRanking.objects.create(
+            university=ranked,
+            program=program,
+            subject_area="Data Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            rank=40,
+            source_name="QS Subject",
+            source_url="https://example.com/data-ranking",
+            ranking_year=2026,
+            last_verified_date=timezone.now().date(),
+            confidence=UniversitySubjectRanking.Confidence.VERIFIED,
+        )
+        create_university("unranked-program-university", global_rank=220)
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(
+            "/api/v1/universities/",
+            {
+                "major_cluster": UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+                "program_search": "data",
+                "subject_rank_max": "50",
+                "global_rank_max": "50",
+                "portfolio_required": "true",
+                "research_heavy": "true",
+                "source_confidence": "verified",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [item["slug"] for item in response.data["results"]],
+            [ranked.slug],
+        )
+
+    def test_retrieve_serializes_missing_and_present_program_ranking_data(self):
+        profile, _ = ensure_profile_records(self.user)
+        profile.intended_majors = ["Computer Science"]
+        profile.save(update_fields=["intended_majors"])
+        program = UniversityProgram.objects.create(
+            university=self.published,
+            name="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            source_confidence=UniversityProgram.SourceConfidence.VERIFIED,
+        )
+        UniversitySubjectRanking.objects.create(
+            university=self.published,
+            program=program,
+            subject_area="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            rank=35,
+            source_name="QS Subject",
+            source_url="https://example.com/cs-ranking",
+            ranking_year=2026,
+            last_verified_date=timezone.now().date(),
+            confidence=UniversitySubjectRanking.Confidence.VERIFIED,
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(f"/api/v1/universities/{self.published.slug}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["programs"][0]["subject_rankings"][0]["rank"], 35)
+        self.assertEqual(
+            response.data["program_matching"]["recommended_programs"][0]["major_cluster"],
+            UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+        )
 
     def test_retrieve_by_slug(self):
         self.client.force_authenticate(self.user)

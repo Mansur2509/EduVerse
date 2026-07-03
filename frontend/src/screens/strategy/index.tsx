@@ -28,7 +28,7 @@ function badgeClass(base: string) {
   return `inline-flex items-center rounded-sm border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${base}`;
 }
 
-type GroupMode = "category" | "round";
+type GroupMode = "category" | "round" | "country" | "major_cluster";
 
 export function StrategyScreen() {
   const { t } = useI18n();
@@ -37,6 +37,7 @@ export function StrategyScreen() {
   const [hasError, setHasError] = useState(false);
   const [groupMode, setGroupMode] = useState<GroupMode>("category");
   const [countryFilter, setCountryFilter] = useState("all");
+  const [majorClusterFilter, setMajorClusterFilter] = useState("all");
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -57,8 +58,12 @@ export function StrategyScreen() {
 
   const countries = useMemo(() => {
     if (!data) return [];
-    return Array.from(new Set(data.schools.map((school) => school.university.country))).sort();
+    return data.country_order.length
+      ? data.country_order
+      : Array.from(new Set(data.schools.map((school) => school.university.country))).sort();
   }, [data]);
+
+  const majorClusters = useMemo(() => data?.major_cluster_order ?? [], [data]);
 
   if (isLoading) {
     return <LoadingNotice message={t("strategy.states.loading")} />;
@@ -76,19 +81,42 @@ export function StrategyScreen() {
 
   const matchesCountry = (school: StrategySchool) =>
     countryFilter === "all" || school.university.country === countryFilter;
+  const matchesMajorCluster = (school: StrategySchool) =>
+    majorClusterFilter === "all" ||
+    (school.matched_programs[0]?.major_cluster ?? "program_data_not_verified") === majorClusterFilter;
+  const filterSchool = (school: StrategySchool) => matchesCountry(school) && matchesMajorCluster(school);
 
-  const groups: { key: string; label: string; schools: StrategySchool[] }[] =
-    groupMode === "category"
-      ? data.category_order.map((category) => ({
-          key: category,
-          label: t(`universities.fit.category.${category}` as TranslationKey),
-          schools: (data.by_category[category] ?? []).filter(matchesCountry)
-        }))
-      : data.round_bucket_order.map((round) => ({
-          key: round,
-          label: t(`strategy.round.${round}` as TranslationKey),
-          schools: (data.by_round[round] ?? []).filter(matchesCountry)
-        }));
+  const groups: { key: string; label: string; schools: StrategySchool[] }[] = (() => {
+    if (groupMode === "category") {
+      return data.category_order.map((category) => ({
+        key: category,
+        label: t(`universities.fit.category.${category}` as TranslationKey),
+        schools: (data.by_category[category] ?? []).filter(filterSchool)
+      }));
+    }
+    if (groupMode === "round") {
+      return data.round_bucket_order.map((round) => ({
+        key: round,
+        label: t(`strategy.round.${round}` as TranslationKey),
+        schools: (data.by_round[round] ?? []).filter(filterSchool)
+      }));
+    }
+    if (groupMode === "country") {
+      return countries.map((country) => ({
+        key: country,
+        label: country,
+        schools: (data.by_country[country] ?? []).filter(filterSchool)
+      }));
+    }
+    return majorClusters.map((cluster) => ({
+      key: cluster,
+      label:
+        cluster === "program_data_not_verified"
+          ? t("strategy.group.programDataNotVerified")
+          : t(`universities.majorCluster.${cluster}` as TranslationKey),
+      schools: (data.by_major_cluster[cluster] ?? []).filter(filterSchool)
+    }));
+  })();
 
   const visibleGroups = groups.filter((group) => group.schools.length > 0);
 
@@ -127,6 +155,8 @@ export function StrategyScreen() {
             >
               <option value="category">{t("strategy.groupBy.category")}</option>
               <option value="round">{t("strategy.groupBy.round")}</option>
+              <option value="country">{t("strategy.groupBy.country")}</option>
+              <option value="major_cluster">{t("strategy.groupBy.majorCluster")}</option>
             </select>
           </label>
           <label className="block">
@@ -140,6 +170,23 @@ export function StrategyScreen() {
               {countries.map((country) => (
                 <option key={country} value={country}>
                   {country}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-sm font-semibold">{t("strategy.filterMajorCluster")}</span>
+            <select
+              className={fieldClassName}
+              onChange={(event) => setMajorClusterFilter(event.target.value)}
+              value={majorClusterFilter}
+            >
+              <option value="all">{t("applications.filters.all")}</option>
+              {majorClusters.map((cluster) => (
+                <option key={cluster} value={cluster}>
+                  {cluster === "program_data_not_verified"
+                    ? t("strategy.group.programDataNotVerified")
+                    : t(`universities.majorCluster.${cluster}` as TranslationKey)}
                 </option>
               ))}
             </select>
@@ -196,6 +243,14 @@ export function StrategyScreen() {
                       <span>{t(`applications.urgency.${school.urgency}` as TranslationKey)}</span>
                     ) : null}
                     <span>{t(`recommendations.costRisk.${school.cost_risk}` as TranslationKey)}</span>
+                    {school.matched_programs[0] ? (
+                      <span>
+                        {t("strategy.programFit", {
+                          program: school.matched_programs[0].name,
+                          score: school.matched_programs[0].program_fit_score
+                        })}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               ))}

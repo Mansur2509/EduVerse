@@ -3,6 +3,10 @@ import type {
   FitNextActionCode,
   FitRiskCode,
   FitStrengthCode,
+  MajorCluster,
+  MajorInference,
+  ProgramFitItem,
+  UniversitySubjectRanking,
   UniversityFitSourceNote
 } from "@/entities/university";
 
@@ -23,13 +27,16 @@ export type CostRisk = "low" | "moderate" | "high" | "unknown";
 
 export type RiskLevel = "low" | "moderate" | "high";
 
-export type ProgramMatchType = "exact" | "related";
+export type ProgramMatchType = "exact" | "cluster" | "related";
 
 export type RecommendedProgram = {
   name: string;
   fit_reason_key: string;
   match_type: ProgramMatchType;
-  confidence: "high" | "medium";
+  confidence: "low" | "medium" | "high";
+  program_fit_score: number;
+  major_cluster: MajorCluster | "other";
+  subject_ranking: ProgramFitItem["subject_ranking"];
 };
 
 export type ApplicationRoundInfo = {
@@ -52,7 +59,16 @@ export type RecommendationItem = {
   fit_score: number;
   confidence: "low" | "medium" | "high";
   recommended_programs: RecommendedProgram[];
+  matched_programs: RecommendedProgram[];
   program_data_verified: boolean;
+  best_program_fit_score: number | null;
+  major_cluster_match: boolean;
+  program_fit_confidence: "low" | "medium" | "high";
+  program_strengths: string[];
+  program_gaps: string[];
+  subject_ranking_context: Omit<UniversitySubjectRanking, "id" | "program" | "program_name" | "notes"> | null;
+  missing_program_data: string[];
+  major_inference: MajorInference;
   application_round: ApplicationRoundInfo;
   deadline: string | null;
   deadline_confidence: DateConfidence;

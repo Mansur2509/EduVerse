@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from services.university_service.models import UniversityProgram
 from services.university_service.strategy import ROUND_BUCKET_ORDER, build_application_strategy
 from services.university_service.tests.test_universities import create_university
 from services.user_profile_service.services import ensure_profile_records
@@ -28,7 +29,36 @@ class ApplicationStrategyTests(APITestCase):
         data = response.data
         self.assertIn("by_category", data)
         self.assertIn("by_round", data)
+        self.assertIn("by_country", data)
+        self.assertIn("by_major_cluster", data)
         self.assertEqual(set(data["by_round"].keys()), set(ROUND_BUCKET_ORDER))
+
+    def test_strategy_groups_by_country_and_major_cluster(self):
+        self.profile.intended_majors = ["Computer Science"]
+        self.profile.save(update_fields=["intended_majors"])
+        university = create_university(
+            "strategy-cs-school",
+            country="United States",
+            acceptance_rate="40.00",
+        )
+        UniversityProgram.objects.create(
+            university=university,
+            name="Computer Science",
+            major_cluster=UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+        )
+
+        data = build_application_strategy(self.profile, self.preferences)
+
+        self.assertIn("United States", data["by_country"])
+        self.assertIn(
+            UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            data["by_major_cluster"],
+        )
+        self.assertIn("United States", data["country_order"])
+        self.assertIn(
+            UniversityProgram.MajorCluster.COMPUTER_SCIENCE_AI_DATA,
+            data["major_cluster_order"],
+        )
 
     def test_unverified_round_goes_to_unknown_bucket(self):
         create_university("strategy-no-round-text", acceptance_rate="40.00")

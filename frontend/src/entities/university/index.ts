@@ -4,13 +4,58 @@ export type CurriculumRigorSummary = CurriculumRigor;
 export type MajorCurriculumFitSummary = MajorCurriculumFit;
 
 export type InstitutionType = "public" | "private" | "";
+export type SourceConfidence = "" | "verified" | "partial" | "estimated";
+
+export type MajorCluster =
+  | "stem"
+  | "business_economics_finance"
+  | "social_sciences"
+  | "humanities"
+  | "law_politics_ir"
+  | "medicine_biology_health"
+  | "engineering"
+  | "computer_science_ai_data"
+  | "design_arts"
+  | "education"
+  | "environmental_sustainability"
+  | "public_policy_social_impact"
+  | "psychology_cognitive_science"
+  | "undecided_interdisciplinary"
+  | "other";
+
+export type UniversitySubjectRanking = {
+  id: number;
+  program: number | null;
+  program_name: string | null;
+  subject_area: string;
+  major_cluster: MajorCluster | "";
+  rank: number;
+  source_name: string;
+  source_url: string;
+  ranking_year: number | null;
+  last_verified_date: string;
+  confidence: SourceConfidence;
+  notes: string;
+};
 
 export type UniversityProgram = {
   id: number;
   name: string;
   display_name?: string;
+  major_cluster: MajorCluster | "";
   degree_level: string;
+  department_or_school: string;
   official_url: string;
+  source_url: string;
+  program_requirements_summary: string;
+  essay_requirements: string;
+  portfolio_required: boolean | null;
+  research_heavy: boolean;
+  stem_heavy: boolean;
+  interdisciplinary: boolean;
+  source_confidence: SourceConfidence;
+  last_verified_date: string | null;
+  subject_rankings: UniversitySubjectRanking[];
 };
 
 export type UniversityRequirementItem = {
@@ -63,6 +108,52 @@ export type UniversityFieldVerification = {
 
 export type TestPolicy = "required" | "optional" | "blind" | "varies" | "";
 
+export type ProgramFitMatchType = "exact" | "cluster" | "keyword" | "low_context";
+
+export type ProgramFitItem = {
+  id: number;
+  name: string;
+  display_name: string;
+  major_cluster: MajorCluster | "other";
+  degree_level: string;
+  department_or_school: string;
+  official_url: string;
+  program_fit_score: number;
+  preparation_strengths: string[];
+  preparation_gaps: string[];
+  profile_relevance_notes: string[];
+  missing_requirements: string[];
+  confidence: "low" | "medium" | "high";
+  subject_ranking: Omit<UniversitySubjectRanking, "id" | "program" | "program_name" | "notes"> | null;
+  source_confidence: SourceConfidence;
+  last_verified_date: string | null;
+  portfolio_required: boolean | null;
+  requirements_available: boolean;
+  essay_requirements_available: boolean;
+  data_notes: string[];
+  match_type: ProgramFitMatchType;
+  fit_reason_key: string;
+};
+
+export type MajorInference = {
+  primary_major_cluster: MajorCluster | null;
+  secondary_major_clusters: MajorCluster[];
+  possible_program_keywords: string[];
+  strong_preparation_signals: string[];
+  weak_preparation_signals: string[];
+  missing_data: string[];
+  confidence: "low" | "medium" | "high";
+  clusters: MajorCluster[];
+};
+
+export type ProgramMatchingSummary = {
+  major_inference: MajorInference;
+  recommended_programs: ProgramFitItem[];
+  program_data_verified: boolean;
+  missing_data: string[];
+  confidence: "low" | "medium" | "high";
+};
+
 export type UniversitySummary = {
   id: number;
   name: string;
@@ -111,10 +202,21 @@ export type UniversitySummary = {
   data_quality_notes: string;
   qs_ranking: number | null;
   qs_ranking_year: number | null;
+  global_rank: number | null;
+  the_rank: number | null;
+  national_rank: number | null;
+  ranking_source: string;
+  ranking_source_url: string;
+  ranking_year: number | null;
+  ranking_last_verified_date: string | null;
+  ranking_confidence: SourceConfidence;
+  national_ranking_source: string;
   is_shortlisted: boolean;
   budget_comparison: BudgetComparison | null;
   program_display_names?: string[];
   programs: UniversityProgram[];
+  subject_rankings: UniversitySubjectRanking[];
+  program_matching: ProgramMatchingSummary | null;
   requirements: UniversityRequirementItem[];
   scholarships: UniversityScholarshipItem[];
   data_sources: UniversityDataSourceItem[];
@@ -140,6 +242,26 @@ export type UniversityFilters = {
   gpa_average__lte?: string;
   currency_conversion_confidence?: string;
   cost_status?: "within_budget" | "above_budget" | "needs_aid";
+  major_cluster?: string;
+  program_search?: string;
+  subject_area?: string;
+  ranking_source?: string;
+  subject_rank_min?: string;
+  subject_rank_max?: string;
+  has_subject_ranking?: string;
+  portfolio_required?: string;
+  research_heavy?: string;
+  stem_heavy?: string;
+  interdisciplinary?: string;
+  source_confidence?: string;
+  global_rank_min?: string;
+  global_rank_max?: string;
+  qs_ranking_min?: string;
+  qs_ranking_max?: string;
+  the_rank_min?: string;
+  the_rank_max?: string;
+  national_rank_min?: string;
+  national_rank_max?: string;
 };
 
 export type UniversityFilterOptionSummary = {
@@ -155,6 +277,10 @@ export type UniversityFilterOptions = {
   institution_types: string[];
   cost_confidences: string[];
   verification_statuses: string[];
+  major_clusters: MajorCluster[];
+  program_names: string[];
+  subject_areas: string[];
+  ranking_sources: string[];
   universities: UniversityFilterOptionSummary[];
 };
 

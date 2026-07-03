@@ -10,6 +10,7 @@ from .models import (
     UniversityProgram,
     UniversityRequirement,
     UniversityScholarship,
+    UniversitySubjectRanking,
 )
 
 
@@ -23,6 +24,34 @@ class UniversityFieldVerificationInline(admin.TabularInline):
     extra = 0
 
 
+class UniversityProgramInline(admin.TabularInline):
+    model = UniversityProgram
+    extra = 0
+    fields = (
+        "name",
+        "major_cluster",
+        "degree_level",
+        "department_or_school",
+        "official_url",
+        "source_confidence",
+    )
+
+
+class UniversitySubjectRankingInline(admin.TabularInline):
+    model = UniversitySubjectRanking
+    extra = 0
+    fields = (
+        "subject_area",
+        "major_cluster",
+        "rank",
+        "source_name",
+        "ranking_year",
+        "confidence",
+        "source_url",
+        "last_verified_date",
+    )
+
+
 @admin.register(University)
 class UniversityAdmin(admin.ModelAdmin):
     list_display = (
@@ -34,10 +63,15 @@ class UniversityAdmin(admin.ModelAdmin):
         "is_published",
         "updated_at",
     )
-    list_filter = ("country", "institution_type", "is_demo", "is_published")
+    list_filter = ("country", "institution_type", "ranking_confidence", "is_demo", "is_published")
     search_fields = ("name", "city")
     prepopulated_fields = {"slug": ("name",)}
-    inlines = [UniversityFieldVerificationInline, UniversityDataSourceInline]
+    inlines = [
+        UniversityProgramInline,
+        UniversitySubjectRankingInline,
+        UniversityFieldVerificationInline,
+        UniversityDataSourceInline,
+    ]
 
 
 @admin.register(ExchangeRate)
@@ -96,6 +130,41 @@ class UniversityImportJobAdmin(admin.ModelAdmin):
     )
 
 
-admin.site.register(UniversityProgram)
+@admin.register(UniversityProgram)
+class UniversityProgramAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "university",
+        "major_cluster",
+        "degree_level",
+        "source_confidence",
+    )
+    list_filter = (
+        "major_cluster",
+        "degree_level",
+        "portfolio_required",
+        "research_heavy",
+        "stem_heavy",
+        "interdisciplinary",
+        "source_confidence",
+    )
+    search_fields = ("name", "university__name", "department_or_school")
+
+
+@admin.register(UniversitySubjectRanking)
+class UniversitySubjectRankingAdmin(admin.ModelAdmin):
+    list_display = (
+        "university",
+        "subject_area",
+        "major_cluster",
+        "rank",
+        "source_name",
+        "ranking_year",
+        "confidence",
+    )
+    list_filter = ("major_cluster", "source_name", "ranking_year", "confidence")
+    search_fields = ("university__name", "subject_area", "source_name")
+
+
 admin.site.register(UniversityRequirement)
 admin.site.register(UniversityScholarship)

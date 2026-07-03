@@ -22,6 +22,8 @@ import {
   formatTuitionAmount,
   getFieldVerification,
   type BudgetComparisonStatus,
+  type ProgramFitItem,
+  type ProgramMatchingSummary,
   type UniversityDetails,
   type UniversityFitAnalysis
 } from "@/entities/university";
@@ -659,6 +661,7 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                     ))}
                   </ul>
                 )}
+                <ProgramMatchingPanel summary={university.program_matching} />
               </Card>
             </>
           ) : null}
@@ -1378,6 +1381,165 @@ function RawTextBlock({ title, text }: { title: string; text: string }) {
       </h3>
       <p className="mt-2 whitespace-pre-line text-sm leading-6">{text}</p>
     </div>
+  );
+}
+
+function ProgramMatchingPanel({ summary }: { summary: ProgramMatchingSummary | null }) {
+  const { t } = useI18n();
+  if (!summary) {
+    return null;
+  }
+  const inferredClusters = summary.major_inference.clusters.slice(0, 7);
+  return (
+    <div className="mt-5 border-t pt-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            {t("universities.programMatching.title")}
+          </h3>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+            {t("universities.programMatching.description")}
+          </p>
+        </div>
+        <span className="rounded-sm border bg-surface px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          {t(`universities.fit.confidence.${summary.confidence}` as TranslationKey)}
+        </span>
+      </div>
+
+      {!summary.program_data_verified ? (
+        <p className="mt-3 rounded-sm border bg-surface px-3 py-2 text-sm italic text-muted-foreground">
+          {t("universities.programMatching.notVerified")}
+        </p>
+      ) : null}
+
+      {summary.major_inference.primary_major_cluster ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {inferredClusters.map((cluster) => (
+            <span
+              className="rounded-sm border bg-surface px-2 py-1 text-xs font-semibold text-muted-foreground"
+              key={cluster}
+            >
+              {t(`universities.majorCluster.${cluster}` as TranslationKey)}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-sm border border-warning/35 bg-warning/10 px-3 py-2 text-sm">
+          <p className="font-semibold">{t("universities.programMatching.noMajorTitle")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("universities.programMatching.noMajorDescription")}
+          </p>
+          <Link
+            className="mt-2 inline-flex text-xs font-semibold text-primary-hover underline"
+            href="/profile#profile-foundation-admissions"
+          >
+            {t("universities.programMatching.exploreMajors")}
+          </Link>
+        </div>
+      )}
+
+      {summary.recommended_programs.length > 0 ? (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {summary.recommended_programs.map((program) => (
+            <ProgramFitCard key={program.id} program={program} />
+          ))}
+        </div>
+      ) : summary.program_data_verified ? (
+        <p className="mt-3 rounded-sm border bg-surface px-3 py-2 text-sm text-muted-foreground">
+          {t("universities.programMatching.noMatch")}
+        </p>
+      ) : null}
+
+      {summary.missing_data.length > 0 ? (
+        <ul className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {summary.missing_data.map((item) => (
+            <li className="rounded-sm border bg-surface px-2 py-1" key={item}>
+              {t(`universities.programMatching.missing.${item}` as TranslationKey)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function ProgramFitCard({ program }: { program: ProgramFitItem }) {
+  const { locale, t } = useI18n();
+  return (
+    <article className="rounded-sm border bg-surface p-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h4 className="font-semibold">{program.display_name}</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t(`universities.majorCluster.${program.major_cluster}` as TranslationKey)}
+            {program.department_or_school ? ` · ${program.department_or_school}` : ""}
+          </p>
+        </div>
+        <span className="rounded-sm border bg-card px-2 py-1 text-xs font-bold">
+          {t("universities.programMatching.score", { score: program.program_fit_score })}
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <span className="rounded-sm border bg-card px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          {t(`universities.fit.confidence.${program.confidence}` as TranslationKey)}
+        </span>
+        {program.source_confidence ? (
+          <span className="rounded-sm border bg-card px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t(`universities.verification.status.${program.source_confidence}` as TranslationKey)}
+          </span>
+        ) : null}
+        {program.last_verified_date ? (
+          <span className="rounded-sm border bg-card px-2 py-0.5 text-[0.65rem] font-semibold text-muted-foreground">
+            {formatDate(program.last_verified_date, locale)}
+          </span>
+        ) : null}
+      </div>
+      {program.subject_ranking ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t("universities.programMatching.subjectRanking", {
+            subject: program.subject_ranking.subject_area,
+            rank: program.subject_ranking.rank,
+            source: program.subject_ranking.source_name
+          })}
+        </p>
+      ) : null}
+      {program.preparation_strengths.length > 0 ? (
+        <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-success">
+          {program.preparation_strengths.slice(0, 3).map((signal) => (
+            <li key={signal}>
+              {t(`universities.programMatching.signal.${signal}` as TranslationKey)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {program.preparation_gaps.length > 0 ? (
+        <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-warning">
+          {program.preparation_gaps.slice(0, 3).map((signal) => (
+            <li key={signal}>
+              {t(`universities.programMatching.signal.${signal}` as TranslationKey)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {program.data_notes.length > 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {program.data_notes
+            .map((note) => t(`universities.programMatching.note.${note}` as TranslationKey))
+            .join(" ")}
+        </p>
+      ) : null}
+      {program.official_url ? (
+        <a
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-hover hover:underline"
+          href={program.official_url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {t("universities.programMatching.openProgram")}
+          <ExternalLink aria-hidden className="size-3" />
+        </a>
+      ) : null}
+    </article>
   );
 }
 

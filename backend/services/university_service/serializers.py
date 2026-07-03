@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from .budget import compare_cost_to_budget
 from .import_jobs import MAX_IMPORT_UPLOAD_BYTES
+from .major_matching import build_program_recommendation_summary
 from .models import (
     SavedUniversity,
     University,
@@ -11,6 +12,7 @@ from .models import (
     UniversityProgram,
     UniversityRequirement,
     UniversityScholarship,
+    UniversitySubjectRanking,
 )
 from .program_display import format_program_display_names
 
@@ -23,13 +25,56 @@ class UniversityDataSourceSerializer(serializers.ModelSerializer):
 
 class UniversityProgramSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
+    subject_rankings = serializers.SerializerMethodField()
 
     class Meta:
         model = UniversityProgram
-        fields = ("id", "name", "display_name", "degree_level", "official_url")
+        fields = (
+            "id",
+            "name",
+            "display_name",
+            "major_cluster",
+            "degree_level",
+            "department_or_school",
+            "official_url",
+            "source_url",
+            "program_requirements_summary",
+            "essay_requirements",
+            "portfolio_required",
+            "research_heavy",
+            "stem_heavy",
+            "interdisciplinary",
+            "source_confidence",
+            "last_verified_date",
+            "subject_rankings",
+        )
 
     def get_display_name(self, obj) -> str:
         return (format_program_display_names([obj.name]) or [obj.name])[0]
+
+    def get_subject_rankings(self, obj):
+        return UniversitySubjectRankingSerializer(obj.subject_rankings.all(), many=True).data
+
+
+class UniversitySubjectRankingSerializer(serializers.ModelSerializer):
+    program_name = serializers.CharField(source="program.name", read_only=True, default=None)
+
+    class Meta:
+        model = UniversitySubjectRanking
+        fields = (
+            "id",
+            "program",
+            "program_name",
+            "subject_area",
+            "major_cluster",
+            "rank",
+            "source_name",
+            "source_url",
+            "ranking_year",
+            "last_verified_date",
+            "confidence",
+            "notes",
+        )
 
 
 class UniversityRequirementSerializer(serializers.ModelSerializer):
@@ -53,6 +98,8 @@ class UniversityFieldVerificationSerializer(serializers.ModelSerializer):
 class UniversitySerializer(serializers.ModelSerializer):
     programs = UniversityProgramSerializer(many=True, read_only=True)
     program_display_names = serializers.SerializerMethodField()
+    subject_rankings = UniversitySubjectRankingSerializer(many=True, read_only=True)
+    program_matching = serializers.SerializerMethodField()
     requirements = UniversityRequirementSerializer(many=True, read_only=True)
     scholarships = UniversityScholarshipSerializer(many=True, read_only=True)
     data_sources = UniversityDataSourceSerializer(many=True, read_only=True)
@@ -89,6 +136,16 @@ class UniversitySerializer(serializers.ModelSerializer):
         return format_program_display_names(
             program.name for program in obj.programs.order_by("id")
         )
+
+    def get_program_matching(self, obj):
+        if not self.context.get("include_program_matching"):
+            return None
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        profile = getattr(user, "student_profile", None) if user and user.is_authenticated else None
+        if profile is None:
+            return None
+        return build_program_recommendation_summary(profile, obj)
 
 
 class SavedUniversitySerializer(serializers.ModelSerializer):

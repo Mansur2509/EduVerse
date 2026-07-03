@@ -604,6 +604,23 @@ function RecommendationCard({
                 <span className="ml-1.5 text-muted-foreground">
                   ({t(`recommendations.programReason.${program.fit_reason_key}` as TranslationKey)})
                 </span>
+                <span className="ml-1.5 text-muted-foreground">
+                  {t("recommendations.card.programFitScore", {
+                    score: program.program_fit_score
+                  })}
+                </span>
+                <span className="ml-1.5 text-muted-foreground">
+                  {t(`universities.majorCluster.${program.major_cluster}` as TranslationKey)}
+                </span>
+                {isExpanded && program.subject_ranking ? (
+                  <span className="mt-0.5 block text-muted-foreground">
+                    {t("recommendations.card.subjectRanking", {
+                      subject: program.subject_ranking.subject_area,
+                      rank: program.subject_ranking.rank,
+                      source: program.subject_ranking.source_name
+                    })}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -729,6 +746,28 @@ function RecommendationCard({
                 ))}
               </ul>
             </div>
+          ) : null}
+          {item.missing_program_data.length > 0 ? (
+            <div>
+              <p className="font-semibold">{t("recommendations.card.programDataContext")}</p>
+              <ul className="mt-1 list-inside list-disc space-y-0.5">
+                {item.missing_program_data.map((code) => (
+                  <li key={code}>
+                    {t(`universities.programMatching.missing.${code}` as TranslationKey)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {item.subject_ranking_context ? (
+            <p>
+              <span className="font-semibold">{t("recommendations.card.subjectRankingLabel")}: </span>
+              {t("recommendations.card.subjectRanking", {
+                subject: item.subject_ranking_context.subject_area,
+                rank: item.subject_ranking_context.rank,
+                source: item.subject_ranking_context.source_name
+              })}
+            </p>
           ) : null}
           {item.conditional_notes.length > 0 || typeof item.conditional_fit_score === "number" ? (
             <div>

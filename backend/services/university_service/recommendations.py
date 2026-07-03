@@ -6,6 +6,7 @@ from datetime import date
 from services.application_service.models import ApplicationTrackerItem
 
 from .deadline_normalization import normalize_university_deadline
+from .major_matching import match_programs_to_profile, subject_ranking_context
 from .models import SavedUniversity, University
 from .program_display import format_program_display_names
 from .services import calculate_university_fit
@@ -363,7 +364,28 @@ def _build_recommendation_item(
         return None
 
     category = "reach" if fit["category"] == "competitive" else fit["category"]
-    programs, has_program_data = _match_programs(profile, university)
+    program_summary = match_programs_to_profile(profile, university)
+    programs = [
+        {
+            "name": program["display_name"],
+            "fit_reason_key": program["fit_reason_key"],
+            # "keyword" is renamed "related" for this public shape; "exact" and
+            # "cluster" pass through unchanged so match_type stays consistent
+            # with fit_reason_key (program_exact_match/program_cluster_match/
+            # program_related_match) instead of collapsing a real cluster match
+            # into the weaker "related" bucket.
+            "match_type": "related" if program["match_type"] == "keyword" else program["match_type"],
+            "confidence": program["confidence"],
+            "program_fit_score": program["program_fit_score"],
+            "major_cluster": program["major_cluster"],
+            "subject_ranking": program["subject_ranking"],
+        }
+        for program in program_summary["recommended_programs"]
+    ]
+    has_program_data = program_summary["program_data_verified"]
+    best_program = program_summary["recommended_programs"][0] if program_summary["recommended_programs"] else None
+    inferred_clusters = program_summary["major_inference"].get("clusters", [])
+    subject_context = subject_ranking_context(university, inferred_clusters)
 
     essay_ready = profile.essay_status == profile.EssayStatus.YES
     exam_ready = not any(
@@ -393,7 +415,16 @@ def _build_recommendation_item(
         "fit_score": fit["fit_score"],
         "confidence": confidence,
         "recommended_programs": programs,
+        "matched_programs": programs,
         "program_data_verified": has_program_data,
+        "best_program_fit_score": best_program["program_fit_score"] if best_program else None,
+        "major_cluster_match": bool(best_program and best_program["major_cluster"] in inferred_clusters),
+        "program_fit_confidence": program_summary["confidence"],
+        "program_strengths": best_program["preparation_strengths"] if best_program else [],
+        "program_gaps": best_program["preparation_gaps"] if best_program else [],
+        "subject_ranking_context": subject_context,
+        "missing_program_data": program_summary["missing_data"],
+        "major_inference": program_summary["major_inference"],
         "application_round": _application_round_info(
             university, essay_ready=essay_ready, exam_ready=exam_ready, days_remaining=days_remaining
         ),
@@ -450,7 +481,13 @@ def calculate_university_recommendations(profile, preferences=None, *, limit: in
     targets = _normalized_targets(profile)
     queryset = (
         University.objects.filter(is_published=True, is_demo=False)
-        .prefetch_related("programs", "scholarships", "data_sources", "field_verifications")
+        .prefetch_related(
+            "programs",
+            "subject_rankings",
+            "scholarships",
+            "data_sources",
+            "field_verifications",
+        )
         .order_by("name")
     )
     candidates = [

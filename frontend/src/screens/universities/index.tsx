@@ -16,7 +16,7 @@ import {
   removeFromShortlistRequest,
   getUniversityFilterOptionsRequest
 } from "@/features/universities";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
@@ -38,7 +38,27 @@ const emptyFilters: UniversityFilters = {
   sat_average__lte: "",
   gpa_average__lte: "",
   currency_conversion_confidence: "",
-  cost_status: undefined
+  cost_status: undefined,
+  major_cluster: "",
+  program_search: "",
+  subject_area: "",
+  ranking_source: "",
+  subject_rank_min: "",
+  subject_rank_max: "",
+  has_subject_ranking: "",
+  portfolio_required: "",
+  research_heavy: "",
+  stem_heavy: "",
+  interdisciplinary: "",
+  source_confidence: "",
+  global_rank_min: "",
+  global_rank_max: "",
+  qs_ranking_min: "",
+  qs_ranking_max: "",
+  the_rank_min: "",
+  the_rank_max: "",
+  national_rank_min: "",
+  national_rank_max: ""
 };
 
 const MAX_COMPARE = 4;
@@ -420,6 +440,313 @@ export function UniversitiesScreen() {
 
           <section className="space-y-3 border-t pt-4">
             <h2 className="text-sm font-semibold">
+              {t("universities.filters.group.programsMajors")}
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.majorCluster")}
+                </span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      major_cluster: event.target.value
+                    }))
+                  }
+                  value={filters.major_cluster}
+                >
+                  <option value="">{t("universities.filters.all")}</option>
+                  {(filterOptions?.major_clusters ?? []).map((cluster) => (
+                    <option key={cluster} value={cluster}>
+                      {t(`universities.majorCluster.${cluster}` as TranslationKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.programSearch")}
+                </span>
+                <AutocompleteInput
+                  label={t("universities.filters.programSearch")}
+                  onChange={(value) =>
+                    setFilters((current) => ({ ...current, program_search: value }))
+                  }
+                  options={filterOptions?.program_names ?? []}
+                  placeholder={t("universities.filters.programSearchPlaceholder")}
+                  value={filters.program_search}
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.subjectArea")}
+                </span>
+                <AutocompleteInput
+                  label={t("universities.filters.subjectArea")}
+                  onChange={(value) =>
+                    setFilters((current) => ({ ...current, subject_area: value }))
+                  }
+                  options={filterOptions?.subject_areas ?? []}
+                  placeholder={t("universities.filters.subjectAreaPlaceholder")}
+                  value={filters.subject_area}
+                />
+              </label>
+              {(["portfolio_required", "research_heavy", "stem_heavy", "interdisciplinary"] as const).map(
+                (key) => (
+                  <label
+                    className="flex min-h-10 items-center gap-2 rounded-sm border bg-surface px-3 py-2"
+                    key={key}
+                  >
+                    <input
+                      checked={filters[key] === "true"}
+                      className="size-4 shrink-0"
+                      onChange={(event) =>
+                        setFilters((current) => ({
+                          ...current,
+                          [key]: event.target.checked ? "true" : ""
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    <span className="text-sm font-semibold">
+                      {t(`universities.filters.${key}` as TranslationKey)}
+                    </span>
+                  </label>
+                )
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-3 border-t pt-4">
+            <h2 className="text-sm font-semibold">
+              {t("universities.filters.group.rankings")}
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.rankingSource")}
+                </span>
+                <AutocompleteInput
+                  label={t("universities.filters.rankingSource")}
+                  onChange={(value) =>
+                    setFilters((current) => ({ ...current, ranking_source: value }))
+                  }
+                  options={filterOptions?.ranking_sources ?? []}
+                  placeholder={t("universities.filters.rankingSourcePlaceholder")}
+                  value={filters.ranking_source}
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.hasSubjectRanking")}
+                </span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      has_subject_ranking: event.target.value
+                    }))
+                  }
+                  value={filters.has_subject_ranking}
+                >
+                  <option value="">{t("universities.filters.all")}</option>
+                  <option value="true">{t("universities.filters.hasSubjectRankingYes")}</option>
+                  <option value="false">{t("universities.filters.hasSubjectRankingNo")}</option>
+                </select>
+              </label>
+              <div className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.subjectRankRange")}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    aria-label={t("universities.filters.rankFrom")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        subject_rank_min: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankFrom")}
+                    type="number"
+                    value={filters.subject_rank_min}
+                  />
+                  <input
+                    aria-label={t("universities.filters.rankTo")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        subject_rank_max: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankTo")}
+                    type="number"
+                    value={filters.subject_rank_max}
+                  />
+                </div>
+              </div>
+              <div className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.globalRankRange")}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    aria-label={t("universities.filters.rankFrom")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        global_rank_min: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankFrom")}
+                    type="number"
+                    value={filters.global_rank_min}
+                  />
+                  <input
+                    aria-label={t("universities.filters.rankTo")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        global_rank_max: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankTo")}
+                    type="number"
+                    value={filters.global_rank_max}
+                  />
+                </div>
+              </div>
+              <div className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.qsRankRange")}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    aria-label={t("universities.filters.rankFrom")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        qs_ranking_min: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankFrom")}
+                    type="number"
+                    value={filters.qs_ranking_min}
+                  />
+                  <input
+                    aria-label={t("universities.filters.rankTo")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        qs_ranking_max: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankTo")}
+                    type="number"
+                    value={filters.qs_ranking_max}
+                  />
+                </div>
+              </div>
+              <div className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.theRankRange")}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    aria-label={t("universities.filters.rankFrom")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        the_rank_min: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankFrom")}
+                    type="number"
+                    value={filters.the_rank_min}
+                  />
+                  <input
+                    aria-label={t("universities.filters.rankTo")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        the_rank_max: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankTo")}
+                    type="number"
+                    value={filters.the_rank_max}
+                  />
+                </div>
+              </div>
+              <div className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.nationalRankRange")}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    aria-label={t("universities.filters.rankFrom")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        national_rank_min: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankFrom")}
+                    type="number"
+                    value={filters.national_rank_min}
+                  />
+                  <input
+                    aria-label={t("universities.filters.rankTo")}
+                    className={fieldClassName}
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        national_rank_max: event.target.value
+                      }))
+                    }
+                    placeholder={t("universities.filters.rankTo")}
+                    type="number"
+                    value={filters.national_rank_max}
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3 border-t pt-4">
+            <h2 className="text-sm font-semibold">
               {t("universities.filters.group.costScholarships")}
             </h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -527,6 +854,26 @@ export function UniversitiesScreen() {
                   {t("universities.filters.includeDemo")}
                 </span>
               </label>
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  {t("universities.filters.sourceConfidence")}
+                </span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      source_confidence: event.target.value
+                    }))
+                  }
+                  value={filters.source_confidence}
+                >
+                  <option value="">{t("universities.filters.sourceConfidenceAny")}</option>
+                  <option value="verified">{t("universities.verification.status.verified")}</option>
+                  <option value="partial">{t("universities.verification.status.partial")}</option>
+                  <option value="estimated">{t("universities.verification.status.estimated")}</option>
+                </select>
+              </label>
             </div>
           </section>
 
@@ -551,6 +898,12 @@ export function UniversitiesScreen() {
                   <option value="-total_cost_usd_amount">{t("universities.filters.totalUsdHighLow")}</option>
                   <option value="qs_ranking">{t("universities.filters.qsHighLow")}</option>
                   <option value="-qs_ranking">{t("universities.filters.qsLowHigh")}</option>
+                  <option value="global_rank">{t("universities.filters.globalHighLow")}</option>
+                  <option value="-global_rank">{t("universities.filters.globalLowHigh")}</option>
+                  <option value="the_rank">{t("universities.filters.theHighLow")}</option>
+                  <option value="-the_rank">{t("universities.filters.theLowHigh")}</option>
+                  <option value="national_rank">{t("universities.filters.nationalHighLow")}</option>
+                  <option value="-national_rank">{t("universities.filters.nationalLowHigh")}</option>
                   <option value="acceptance_rate">{t("universities.filters.mostSelective")}</option>
                   <option value="-acceptance_rate">{t("universities.filters.leastSelective")}</option>
                 </select>

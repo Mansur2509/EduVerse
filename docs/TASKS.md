@@ -102,3 +102,4 @@ Recommended sequence:
 - [ ] **EXPORT-001** Add privacy-aware user data and roadmap exports.
 - [ ] **ANTIABUSE-001** Add layered abuse controls for auth, event submissions, AI usage, and public forms.
 - [ ] **PAYMENTS-001** Define provider-neutral payment intents and reconciliation after ticketing and abuse controls are ready.
+- [x] **UNIVERSITY-MATCHING-MAJOR-RANKINGS-ENGINE-001** Add major-cluster inference, program-level fit scoring, subject/global ranking fields and filters, and a program-fit breakdown on the university detail page.
