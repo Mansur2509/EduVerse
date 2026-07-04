@@ -123,11 +123,13 @@ export function SuggestionPanel({
   }
 
   function toggleOpen() {
-    setIsOpen((current) => {
-      const next = !current;
-      if (next) onOpen?.();
-      return next;
-    });
+    // Call onOpen (which triggers a parent setState to lazy-load suggestions)
+    // as a plain side effect in the event handler, not inside the setIsOpen
+    // updater -- updaters run during React's render phase, so updating a
+    // different component's state from inside one is not allowed.
+    const next = !isOpen;
+    setIsOpen(next);
+    if (next) onOpen?.();
   }
 
   return (
