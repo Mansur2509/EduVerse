@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
@@ -13,7 +15,6 @@ from services.user_profile_service.models import (
     Volunteer,
 )
 from services.user_profile_service.readiness import (
-    ENRICHMENT_COMPONENTS,
     _score_activities,
     _score_essays,
     _score_honors,
@@ -157,40 +158,52 @@ class ApplicationReadinessAggregationTests(TestCase):
         )
         self.profile, self.preferences = ensure_profile_records(self.user)
 
-    def test_missing_niche_categories_do_not_drag_down_stars(self):
-        # A strong core profile (gpa/exams/timeline) with zero olympiads,
-        # research, sports, portfolio, or volunteering must not be scored as
-        # if those absences were weaknesses dragging the star average down.
+    def test_missing_application_evidence_caps_overall_level(self):
+        # A strong academic/testing profile with empty application-evidence
+        # categories must not be labeled Strong. The score is deterministic,
+        # but capped until the profile has real supporting evidence.
+        self.profile.full_name = "Readiness Student"
+        self.profile.birth_date = date(2008, 1, 1)
+        self.profile.country = "Uzbekistan"
+        self.profile.city = "Tashkent"
+        self.profile.school_or_university = "Demo School"
+        self.profile.grade = "11"
+        self.profile.education_status = "high_school"
         self.profile.gpa = "3.90"
         self.profile.gpa_scale = "4.00"
+        self.profile.intended_degree = "Bachelor"
+        self.profile.target_countries = ["US"]
+        self.profile.university_unsure = True
+        self.profile.intended_majors = ["Economics"]
+        self.profile.scholarship_need = "unsure"
         self.profile.test_scores = {"sat": 1520, "ielts": 8}
         self.profile.expected_graduation_year = 2028
+        self.profile.preparation_needs = ["SAT"]
         self.profile.essay_status = self.profile.EssayStatus.YES
         self.profile.essay_stage = "final polish"
+        self.profile.support_priorities = ["essay review"]
+        self.profile.onboarding_sections = ["identity", "academic", "exams", "activities", "support"]
         self.profile.save()
+        self.preferences.interested_classes = ["admissions"]
+        self.preferences.save(update_fields=["interested_classes"])
 
         readiness = calculate_application_readiness(self.profile, self.preferences)
-        core_only_components = {
-            key: value
-            for key, value in readiness.score_components.items()
-            if key not in ENRICHMENT_COMPONENTS and key != "published_ranges"
-        }
-        # None of the empty enrichment categories should be able to pull the
-        # star rating below what the core components alone would produce.
-        self.assertGreaterEqual(
-            readiness.stars, round(sum(core_only_components.values()) / len(core_only_components))
-        )
-        # But the empty categories are still visible for a next-action nudge.
-        self.assertIn("olympiads", readiness.improvements)
-        self.assertIn("research", readiness.improvements)
+        self.assertLessEqual(readiness.stars, 2)
+        self.assertEqual(readiness.level, "developing")
+        self.assertEqual(readiness.cap_reason, "evidence_incomplete")
+        self.assertIn("evidence_incomplete", readiness.reasons)
+        self.assertIn("research_portfolio", readiness.next_actions)
 
     def test_rich_enrichment_data_can_raise_stars(self):
         Olympiad.objects.create(user=self.user, name="A", level="national")
         Olympiad.objects.create(user=self.user, name="B", level="national")
         Olympiad.objects.create(user=self.user, name="C", level="national")
         readiness = calculate_application_readiness(self.profile, self.preferences)
-        self.assertEqual(readiness.score_components["olympiads"], 5)
-        self.assertIn("olympiads", readiness.strengths)
+        honors_category = next(
+            category for category in readiness.categories if category["key"] == "honors_competitions"
+        )
+        self.assertEqual(honors_category["score"], 3)
+        self.assertIn("honors", honors_category["missing_sources"])
 
     def test_readiness_updates_after_structured_evidence_is_removed(self):
         volunteer = Volunteer.objects.create(
@@ -205,17 +218,27 @@ class ApplicationReadinessAggregationTests(TestCase):
         )
 
         readiness = calculate_application_readiness(self.profile, self.preferences)
-        self.assertIn("volunteering", readiness.strengths)
-        self.assertIn("recommenders", readiness.strengths)
+        activities_category = next(
+            category for category in readiness.categories if category["key"] == "activities_leadership"
+        )
+        execution_category = next(
+            category for category in readiness.categories if category["key"] == "application_execution"
+        )
+        self.assertGreaterEqual(activities_category["score"], 2)
+        self.assertGreaterEqual(execution_category["score"], 2)
 
         volunteer.delete()
         recommender.delete()
 
         updated = calculate_application_readiness(self.profile, self.preferences)
-        self.assertEqual(updated.score_components["volunteering"], 1)
-        self.assertEqual(updated.score_components["recommenders"], 1)
-        self.assertIn("volunteering", updated.improvements)
-        self.assertIn("recommenders", updated.improvements)
+        updated_activities = next(
+            category for category in updated.categories if category["key"] == "activities_leadership"
+        )
+        updated_execution = next(
+            category for category in updated.categories if category["key"] == "application_execution"
+        )
+        self.assertIn("volunteering", updated_activities["missing_sources"])
+        self.assertIn("recommenders", updated_execution["missing_sources"])
 
     def test_no_admissions_outcome_language(self):
         readiness = calculate_application_readiness(self.profile, self.preferences)

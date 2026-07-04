@@ -170,10 +170,20 @@ export type ProfileCompletion = {
 
 export type ApplicationReadiness = {
   stars: 1 | 2 | 3 | 4 | 5;
-  level: "foundation" | "developing" | "competitive" | "strong" | "outstanding";
+  level: "incomplete" | "developing" | "solid" | "strong" | "excellent";
   score_components: Record<string, number>;
+  categories: Array<{
+    key: string;
+    score: number;
+    source_keys: string[];
+    missing_sources: string[];
+    status: string;
+  }>;
   strengths: string[];
   improvements: string[];
+  reasons: string[];
+  next_actions: string[];
+  cap_reason: string;
   comparison_status: "published_ranges" | "official_data_needed";
   compared_universities: string[];
   official_sources: Array<{

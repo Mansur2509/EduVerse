@@ -409,3 +409,16 @@ The provider input is intentionally narrow: the current essay text, essay metada
 Results are cached by `essay_text_hash + context_hash` so unchanged essays/context return the stored score without calling the provider or consuming quota. New uncached scoring is quota-controlled: free users get one new score per day, while paid tiers use monthly limits configured in settings. Provider failures and invalid JSON return safe structured reasons and do not consume quota.
 
 The backend treats provider output as untrusted. It validates an allowlisted JSON shape, score ranges, enum values, max-three/max-20-word suggestions, school/program alignment gating, and source warnings. If verified school/prompt data is missing, the school/program alignment score is stored as `null` and the warning is explicit instead of inventing context. Any output that tries to include generated/replaced essay text, unexpected fields, or admissions-outcome promises is rejected.
+
+## ADR-041: Admissions workspace favors contextual navigation, collapsed filters, and scoped loading
+
+- **Status:** Accepted
+- **Date:** 2026-07-04
+
+EduVerse screens should not feel like every admissions tool is competing for the first viewport. The app shell keeps the core workflow in the top-level sidebar, while Recommendations and Strategy remain available through their existing routes and are exposed as contextual tabs under Universities/Applications. This preserves deep links and avoids a crowded sidebar.
+
+Filter-heavy pages use a shared collapsible filter panel. Pages show active-filter and result counts in the panel header, keep clear/reset actions close to the filters, and default heavy controls closed unless the screen has a strong reason to show them. This keeps desktop density compact and protects narrow mobile widths from long filter walls.
+
+Suggestion-heavy screens should not block initial page load on secondary data. Essays first load essays, Applications first load applications, and Roadmap first loads the roadmap; source-aware suggestions and supporting shortlist data load when the relevant panel/form is opened. Failures are scoped to the panel/form that needs the data instead of blanking the whole page.
+
+Application readiness is deterministic and evidence-capped. The API now returns six readiness categories, missing-source details, reasons, next actions, and a cap reason. High academics/testing can be recognized, but missing activities/honors/research/portfolio/recommenders/essays caps the overall label until the student adds real application evidence. This remains a readiness estimate, not an admissions prediction.

@@ -41,6 +41,7 @@ import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
@@ -103,7 +104,8 @@ export function EssaysScreen() {
   const [essays, setEssays] = useState<EssayWorkspace[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
-  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(true);
+  const [suggestionsRequested, setSuggestionsRequested] = useState(false);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
   const [suggestionsLoadError, setSuggestionsLoadError] = useState(false);
   const [shortlist, setShortlist] = useState<SavedUniversityLite[]>([]);
   const [isShortlistLoading, setIsShortlistLoading] = useState(false);
@@ -158,29 +160,20 @@ export function EssaysScreen() {
     void loadEssays();
   }, [loadEssays]);
 
-  // Suggestions power the always-visible SuggestionPanel below, so they still
-  // load on mount -- but independently, with their own error state, so a
-  // failure only disables that panel instead of the whole page.
-  useEffect(() => {
-    let cancelled = false;
+  const loadSuggestions = useCallback(async () => {
+    if (suggestionsRequested && !suggestionsLoadError) return;
+    setSuggestionsRequested(true);
     setIsSuggestionsLoading(true);
     setSuggestionsLoadError(false);
-    getSuggestionsRequest()
-      .then((response) => {
-        if (cancelled) return;
-        setSuggestions(response.results);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setSuggestionsLoadError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setIsSuggestionsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    try {
+      const response = await getSuggestionsRequest();
+      setSuggestions(response.results);
+    } catch {
+      setSuggestionsLoadError(true);
+    } finally {
+      setIsSuggestionsLoading(false);
+    }
+  }, [suggestionsLoadError, suggestionsRequested]);
 
   // Shortlist only feeds the university dropdown inside the create/edit essay
   // modal, so it is fetched lazily the first time that modal opens (lite
@@ -281,6 +274,7 @@ export function EssaysScreen() {
     currentPage * ESSAYS_PAGE_SIZE
   );
   const groupedVisibleEssays = useMemo(() => groupEssays(visibleEssays, t), [visibleEssays, t]);
+  const activeFilterCount = [filter !== "all", priorityFilter !== "all"].filter(Boolean).length;
 
   useEffect(() => {
     if (currentPage > totalEssayPages) {
@@ -599,6 +593,7 @@ export function EssaysScreen() {
       ) : null}
 
       <SuggestionPanel
+        defaultOpen={false}
         description={t("essays.suggestions.description")}
         isLoading={isSuggestionsLoading}
         isRefreshing={isRefreshingSuggestions}
@@ -607,90 +602,102 @@ export function EssaysScreen() {
         onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
         onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
         onGenerate={() => void handleRefreshSuggestions()}
+        onOpen={() => void loadSuggestions()}
         suggestions={essaySuggestions}
         title={t("essays.suggestions.title")}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={() => {
-            setFilter("all");
-            setCurrentPage(1);
-          }}
-          size="sm"
-          type="button"
-          variant={filter === "all" ? "primary" : "ghost"}
-        >
-          {t("essays.filters.all")}
-        </Button>
-        <Button
-          onClick={() => {
-            setFilter("common_app");
-            setCurrentPage(1);
-          }}
-          size="sm"
-          type="button"
-          variant={filter === "common_app" ? "primary" : "ghost"}
-        >
-          {t("essays.filters.commonApp")}
-        </Button>
-        <Button
-          onClick={() => {
-            setFilter("suggested");
-            setCurrentPage(1);
-          }}
-          size="sm"
-          type="button"
-          variant={filter === "suggested" ? "primary" : "ghost"}
-        >
-          {t("essays.filters.suggested")}
-        </Button>
-        {universityFilters.map(([id, name]) => (
+      <CollapsibleFilterPanel
+        activeCount={activeFilterCount}
+        onClear={() => {
+          setFilter("all");
+          setPriorityFilter("all");
+          setCurrentPage(1);
+        }}
+        resultCount={filteredEssays.length}
+        storageKey="eduverse.filters.essays"
+      >
+        <div className="flex flex-wrap gap-2">
           <Button
-            key={id}
             onClick={() => {
-              setFilter(String(id));
+              setFilter("all");
               setCurrentPage(1);
             }}
             size="sm"
             type="button"
-            variant={filter === String(id) ? "primary" : "ghost"}
+            variant={filter === "all" ? "primary" : "ghost"}
           >
-            {name}
+            {t("essays.filters.all")}
           </Button>
-        ))}
-      </div>
+          <Button
+            onClick={() => {
+              setFilter("common_app");
+              setCurrentPage(1);
+            }}
+            size="sm"
+            type="button"
+            variant={filter === "common_app" ? "primary" : "ghost"}
+          >
+            {t("essays.filters.commonApp")}
+          </Button>
+          <Button
+            onClick={() => {
+              setFilter("suggested");
+              setCurrentPage(1);
+            }}
+            size="sm"
+            type="button"
+            variant={filter === "suggested" ? "primary" : "ghost"}
+          >
+            {t("essays.filters.suggested")}
+          </Button>
+          {universityFilters.map(([id, name]) => (
+            <Button
+              key={id}
+              onClick={() => {
+                setFilter(String(id));
+                setCurrentPage(1);
+              }}
+              size="sm"
+              type="button"
+              variant={filter === String(id) ? "primary" : "ghost"}
+            >
+              {name}
+            </Button>
+          ))}
+        </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-muted-foreground">
-          {t("essays.filters.priority")}
-        </span>
-        <Button
-          onClick={() => {
-            setPriorityFilter("all");
-            setCurrentPage(1);
-          }}
-          size="sm"
-          type="button"
-          variant={priorityFilter === "all" ? "primary" : "ghost"}
-        >
-          {t("essays.filters.all")}
-        </Button>
-        {ESSAY_PRIORITIES.map((priority) => (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("essays.filters.priority")}
+          </span>
           <Button
-            key={priority}
             onClick={() => {
-              setPriorityFilter(priority);
+              setPriorityFilter("all");
               setCurrentPage(1);
             }}
             size="sm"
             type="button"
-            variant={priorityFilter === priority ? "primary" : "ghost"}
+            variant={priorityFilter === "all" ? "primary" : "ghost"}
           >
-            {t(`essays.priority.${priority}` as TranslationKey)}
+            {t("essays.filters.all")}
           </Button>
-        ))}
-      </div>
+          {ESSAY_PRIORITIES.map((priority) => (
+            <Button
+              key={priority}
+              onClick={() => {
+                setPriorityFilter(priority);
+                setCurrentPage(1);
+              }}
+              size="sm"
+              type="button"
+              variant={priorityFilter === priority ? "primary" : "ghost"}
+            >
+              {t(`essays.priority.${priority}` as TranslationKey)}
+            </Button>
+          ))}
+        </div>
+      </CollapsibleFilterPanel>
 
       {essays.length === 0 ? (
         <Card>

@@ -47,10 +47,12 @@ export function SuggestionPanel({
   title,
   description,
   suggestions,
+  defaultOpen = true,
   isLoading = false,
   isRefreshing = false,
   loadError = false,
   loadErrorMessage,
+  onOpen,
   onGenerate,
   onAddToRoadmap,
   onDismiss
@@ -58,16 +60,19 @@ export function SuggestionPanel({
   title: string;
   description: string;
   suggestions: SuggestedItem[];
+  defaultOpen?: boolean;
   isLoading?: boolean;
   isRefreshing?: boolean;
   loadError?: boolean;
   loadErrorMessage?: string;
   limit?: number;
+  onOpen?: () => void;
   onGenerate?: () => void;
   onAddToRoadmap?: (suggestion: SuggestedItem) => void | Promise<void>;
   onDismiss?: (suggestion: SuggestedItem) => void | Promise<void>;
 }) {
   const { locale, t } = useI18n();
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [activeIndex, setActiveIndex] = useState(0);
   const [showAll, setShowAll] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
@@ -117,6 +122,14 @@ export function SuggestionPanel({
     }
   }
 
+  function toggleOpen() {
+    setIsOpen((current) => {
+      const next = !current;
+      if (next) onOpen?.();
+      return next;
+    });
+  }
+
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -127,21 +140,30 @@ export function SuggestionPanel({
           <h2 className="mt-1 text-lg font-semibold">{title}</h2>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
         </div>
-        {onGenerate ? (
-          <Button
-            disabled={isRefreshing}
-            onClick={onGenerate}
-            size="sm"
-            type="button"
-            variant="secondary"
-          >
-            <RefreshCw aria-hidden className="mr-1.5 size-3.5" />
-            {isRefreshing ? t("suggestions.actions.refreshing") : t("suggestions.actions.refresh")}
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={toggleOpen} size="sm" type="button" variant="secondary">
+            <ChevronDown
+              aria-hidden
+              className={`mr-1.5 size-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            />
+            {isOpen ? t("suggestions.actions.hidePanel") : t("suggestions.actions.showPanel")}
           </Button>
-        ) : null}
+          {isOpen && onGenerate ? (
+            <Button
+              disabled={isRefreshing}
+              onClick={onGenerate}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              <RefreshCw aria-hidden className="mr-1.5 size-3.5" />
+              {isRefreshing ? t("suggestions.actions.refreshing") : t("suggestions.actions.refresh")}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      {loadError ? (
+      {!isOpen ? null : loadError ? (
         <p className="mt-4 text-sm text-warning" role="alert">
           {loadErrorMessage || t("suggestions.states.loadError")}
         </p>

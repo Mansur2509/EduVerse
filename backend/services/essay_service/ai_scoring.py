@@ -240,7 +240,7 @@ def _validate_range(value, *, lo: int, hi: int, field: str, allow_null: bool = F
         if allow_null:
             return None
         raise EssayScoringValidationError(f"{field} must not be null.")
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         raise EssayScoringValidationError(f"{field} must be numeric.")
     rounded = int(round(value))
     if rounded < lo or rounded > hi:

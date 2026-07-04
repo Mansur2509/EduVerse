@@ -21,7 +21,9 @@ import {
   type StudentProfileDetails,
   type TestScores
 } from "@/entities/profile";
+import type { OfficialExamDate } from "@/entities/exam";
 import { useAuth } from "@/features/auth";
+import { getOfficialExamDatesRequest } from "@/features/exams";
 import {
   completeOnboardingRequest,
   getApplicationReadinessRequest,
@@ -31,6 +33,7 @@ import {
 } from "@/features/profile";
 import { ApiError, getApiErrorMessage } from "@/shared/api/client";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { formatDate } from "@/shared/lib/date-time";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -82,6 +85,7 @@ type OnboardingForm = {
   ieltsTarget: string;
   apDate: string;
   apTarget: string;
+  apPlans: ApPlan[];
   otherExamName: string;
   otherExamDate: string;
   otherExamTarget: string;
@@ -96,6 +100,13 @@ type OnboardingForm = {
   researchInterest: boolean;
   financeLiteracyInterest: boolean;
   munDebateInterest: boolean;
+};
+
+type ApPlan = {
+  id: string;
+  subject: string;
+  date: string;
+  target: string;
 };
 
 const emptyActivities: OnboardingForm["activities"] = {
@@ -140,6 +151,7 @@ const emptyForm: OnboardingForm = {
   ieltsTarget: "",
   apDate: "",
   apTarget: "",
+  apPlans: [{ id: "ap-1", subject: "", date: "", target: "" }],
   otherExamName: "",
   otherExamDate: "",
   otherExamTarget: "",
@@ -200,6 +212,14 @@ function profileToForm(profile: StudentProfileDetails): OnboardingForm {
   const other = (profile.exam_plans.planned ?? []).find(
     (exam) => !["sat", "ielts", "ap"].includes(exam.name.toLowerCase())
   );
+  const apPlans = (profile.exam_plans.planned ?? [])
+    .filter((exam) => exam.exam_type === "AP" || exam.name.toLowerCase().startsWith("ap "))
+    .map((exam, index) => ({
+      id: `ap-${index + 1}`,
+      subject: exam.name === "AP" ? "" : exam.name,
+      date: exam.date ?? "",
+      target: exam.target_score ?? ""
+    }));
 
   return {
     fullName: profile.full_name,
@@ -231,6 +251,9 @@ function profileToForm(profile: StudentProfileDetails): OnboardingForm {
     ieltsTarget: ielts?.target_score ?? "",
     apDate: ap?.date ?? "",
     apTarget: ap?.target_score ?? "",
+    apPlans: apPlans.length
+      ? apPlans
+      : [{ id: "ap-1", subject: ap?.name === "AP" ? "" : ap?.name ?? "", date: ap?.date ?? "", target: ap?.target_score ?? "" }],
     otherExamName: other?.name ?? "",
     otherExamDate: other?.date ?? "",
     otherExamTarget: other?.target_score ?? "",
@@ -263,22 +286,38 @@ function Field({
   wide?: boolean;
   required?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <label className={wide ? "block md:col-span-2" : "block"}>
-      <span className="text-sm font-semibold">
-        {label}
-        {required ? (
-          <span aria-hidden className="ml-0.5 text-primary-hover">
-            *
-          </span>
-        ) : null}
+      <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+        <span>
+          {label}
+          {required ? (
+            <span aria-hidden className="ml-0.5 text-primary-hover">
+              *
+            </span>
+          ) : null}
+        </span>
+        <span
+          className={
+            required
+              ? "rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-primary-hover"
+              : "rounded-sm border bg-surface px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-muted-foreground"
+          }
+        >
+          {required
+            ? t("onboarding.requiredToContinue")
+            : t("onboarding.optionalImproves")}
+        </span>
       </span>
-      {children}
-      {helper ? (
+      {helper || !required ? (
         <span className="mt-1.5 block text-xs leading-5 text-muted-foreground">
-          {helper}
+          {helper || t("onboarding.optionalHelper")}
         </span>
       ) : null}
+      <div className="mt-2">
+        {children}
+      </div>
     </label>
   );
 }
@@ -327,6 +366,19 @@ function formPayload(
   });
   if (toList(form.apScores).length) testScores.ap = toList(form.apScores);
 
+  const apPlanned: PlannedExam[] = form.apPlans
+    .filter((plan) => plan.subject.trim() && (plan.date || plan.target.trim()))
+    .map((plan) => ({
+      name: plan.subject.trim(),
+      exam_type: "AP" as const,
+      current_score: form.apScores,
+      date: plan.date,
+      target_score: plan.target,
+      planned_retake: Boolean(plan.date || plan.target),
+      planned_retake_month: plan.date ? plan.date.slice(0, 7) : "",
+      test_status: plan.date || plan.target ? "preparing" : "not_started"
+    }));
+
   const planned: PlannedExam[] = [
     {
       name: "SAT",
@@ -348,16 +400,7 @@ function formPayload(
       planned_retake_month: form.ieltsDate ? form.ieltsDate.slice(0, 7) : "",
       test_status: form.ieltsDate || form.ieltsTarget ? "preparing" : "not_started"
     },
-    {
-      name: "AP",
-      exam_type: "AP" as const,
-      current_score: form.apScores,
-      date: form.apDate,
-      target_score: form.apTarget,
-      planned_retake: Boolean(form.apDate || form.apTarget),
-      planned_retake_month: form.apDate ? form.apDate.slice(0, 7) : "",
-      test_status: form.apDate || form.apTarget ? "preparing" : "not_started"
-    },
+    ...apPlanned,
     {
       name: form.otherExamName,
       current_score: "",
@@ -423,9 +466,85 @@ function localizedSaveError(
   return getApiErrorMessage(error, fallback);
 }
 
+function hasAnyExamSignal(form: OnboardingForm) {
+  return Boolean(
+    form.takenExams.trim() ||
+      form.satScore.trim() ||
+      form.ieltsScore.trim() ||
+      form.toeflScore.trim() ||
+      form.actScore.trim() ||
+      form.apScores.trim() ||
+      form.satDate ||
+      form.satTarget.trim() ||
+      form.ieltsDate ||
+      form.ieltsTarget.trim() ||
+      form.apDate ||
+      form.apTarget.trim() ||
+      form.apPlans.some((plan) => plan.subject.trim() || plan.date || plan.target.trim()) ||
+      form.otherExamDate ||
+      form.otherExamTarget.trim()
+  );
+}
+
+function getStepValidationIssues(
+  form: OnboardingForm,
+  step: number,
+  t: (key: TranslationKey) => string
+) {
+  const issues: string[] = [];
+  const requireValue = (value: string | string[], label: string) => {
+    const isMissing = Array.isArray(value) ? value.length === 0 : !value.trim();
+    if (isMissing) issues.push(label);
+  };
+
+  if (step === 0) {
+    requireValue(form.fullName, t("auth.fullName"));
+    requireValue(form.birthDate, t("profile.birthDate"));
+    requireValue(form.country, t("profile.country"));
+    requireValue(form.city, t("profile.city"));
+    requireValue(form.educationStatus, t("profile.educationStatus"));
+    requireValue(form.schoolOrUniversity, t("profile.schoolOrUniversity"));
+    requireValue(form.grade, t("profile.grade"));
+    requireValue(form.expectedGraduationYear, t("onboarding.field.graduationYear"));
+    requireValue(form.gpa, t("onboarding.field.gpa"));
+    requireValue(form.gpaScale, t("onboarding.field.gpaScale"));
+    const graduationYear = Number(form.expectedGraduationYear);
+    if (form.expectedGraduationYear && (!Number.isInteger(graduationYear) || graduationYear < 2025 || graduationYear > 2041)) {
+      issues.push(t("onboarding.validation.graduationYear"));
+    }
+    const gpa = Number(form.gpa);
+    const gpaScale = Number(form.gpaScale);
+    if (form.gpa && form.gpaScale && (gpa < 0 || gpaScale <= 0 || gpa > gpaScale)) {
+      issues.push(t("onboarding.validation.gpaScale"));
+    }
+  }
+
+  if (step === 1) {
+    requireValue(form.intendedDegree, t("profile.intendedDegree"));
+    requireValue(toList(form.targetCountries), t("profile.targetCountries"));
+    if (!form.majorUnsure && form.intendedMajors.length === 0) {
+      issues.push(t("onboarding.field.majors"));
+    }
+  }
+
+  if (step === 2) {
+    if (!hasAnyExamSignal(form)) {
+      issues.push(t("onboarding.validation.examPlan"));
+    }
+    requireValue(form.interestedClasses, t("onboarding.field.interestedClasses"));
+    requireValue(form.preparationNeeds, t("onboarding.field.preparationNeeds"));
+  }
+
+  if (step === 4) {
+    requireValue(form.supportPriorities, t("onboarding.field.supportPriorities"));
+  }
+
+  return issues;
+}
+
 export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const { logout } = useAuth();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [form, setForm] = useState<OnboardingForm>(emptyForm);
   const [savedForm, setSavedForm] = useState<OnboardingForm>(emptyForm);
   const [sections, setSections] = useState<OnboardingSection[]>([]);
@@ -437,6 +556,9 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const [recommendationOpen, setRecommendationOpen] = useState(false);
   const [majorSearch, setMajorSearch] = useState("");
   const [readiness, setReadiness] = useState<ApplicationReadiness | null>(null);
+  const [officialDates, setOfficialDates] = useState<OfficialExamDate[]>([]);
+  const [officialDatesRequested, setOfficialDatesRequested] = useState(false);
+  const [officialDatesError, setOfficialDatesError] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -463,6 +585,23 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
     }
   }, [form, isLoading]);
 
+  useEffect(() => {
+    if (step !== 2 || officialDatesRequested) return;
+    let cancelled = false;
+    setOfficialDatesRequested(true);
+    setOfficialDatesError(false);
+    getOfficialExamDatesRequest({ page_size: 200 })
+      .then((response) => {
+        if (!cancelled) setOfficialDates(response.results);
+      })
+      .catch(() => {
+        if (!cancelled) setOfficialDatesError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [officialDatesRequested, step]);
+
   const update = useCallback(
     <Key extends keyof OnboardingForm>(key: Key, value: OnboardingForm[Key]) => {
       setForm((current) => ({ ...current, [key]: value }));
@@ -485,6 +624,22 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
       }))
       .filter((category) => category.majors.length > 0);
   }, [majorSearch, t]);
+  const satDateOptions = useMemo(
+    () =>
+      officialDates
+        .filter((item) => item.exam_type === "SAT" && item.event_kind === "exam")
+        .slice(0, 5),
+    [officialDates]
+  );
+  const apExamDateOptions = useMemo(
+    () =>
+      officialDates.filter((item) => item.exam_type === "AP" && item.event_kind === "exam"),
+    [officialDates]
+  );
+  const apSubjectOptions = useMemo(
+    () => Array.from(new Set(apExamDateOptions.map((item) => item.name))).sort(),
+    [apExamDateOptions]
+  );
 
   const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(savedForm);
   const unsavedGuard = useUnsavedChangesGuard({
@@ -575,6 +730,36 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
     );
   }
 
+  function updateApPlan(rowId: string, patch: Partial<ApPlan>) {
+    update(
+      "apPlans",
+      form.apPlans.map((row) => {
+        if (row.id !== rowId) return row;
+        const next = { ...row, ...patch };
+        if (patch.subject !== undefined) {
+          const matchingDate = apExamDateOptions.find((item) => item.name === patch.subject);
+          next.date = matchingDate?.test_date ?? "";
+        }
+        return next;
+      })
+    );
+  }
+
+  function addApPlan() {
+    update("apPlans", [
+      ...form.apPlans,
+      { id: `ap-${Date.now()}`, subject: "", date: "", target: "" }
+    ]);
+  }
+
+  function removeApPlan(rowId: string) {
+    if (form.apPlans.length <= 1) return;
+    update(
+      "apPlans",
+      form.apPlans.filter((row) => row.id !== rowId)
+    );
+  }
+
   if (isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-background px-6">
@@ -610,6 +795,8 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const stepDescription = t(
     `onboarding.step.${step + 1}.description` as TranslationKey
   );
+  const currentStepIssues = getStepValidationIssues(form, step, t);
+  const canContinueStep = currentStepIssues.length === 0;
 
   return (
     <main className="min-h-screen bg-background">
@@ -680,6 +867,16 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
           <p className="mt-4 text-xs font-semibold text-muted-foreground">
             {t("onboarding.requiredLegend")}
           </p>
+          {currentStepIssues.length > 0 ? (
+            <div className="mt-3 rounded-sm border border-warning/35 bg-warning/10 p-3 text-xs leading-5 text-warning">
+              <p className="font-semibold">{t("onboarding.validation.blocked")}</p>
+              <ul className="mt-1 list-inside list-disc">
+                {currentStepIssues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <Card className="mt-3 p-5 sm:p-7">
             {step === 0 ? (
@@ -746,6 +943,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                   <Field
                     helper={t("admissions.country.description")}
                     label={t("admissions.country.title")}
+                    required
                     wide
                   >
                     <div className="mt-2 grid max-h-64 gap-2 overflow-y-auto border p-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -770,6 +968,9 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                     <div>
                       <h2 className="text-xl font-semibold">{t("onboarding.field.majors")}</h2>
+                      <span className="mt-1 inline-flex rounded-sm border border-primary/30 bg-primary/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-primary-hover">
+                        {t("onboarding.requiredToContinue")}
+                      </span>
                       <p className="mt-1 text-sm text-muted-foreground">{t("onboarding.field.majorsHelp")}</p>
                     </div>
                     <input className={`${fieldClassName} mt-0 sm:w-72`} onChange={(event) => setMajorSearch(event.target.value)} placeholder={t("onboarding.majorSearch")} value={majorSearch} />
@@ -862,18 +1063,150 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                 </div>
                 <div className="border-t pt-6">
                   <h2 className="text-xl font-semibold">{t("onboarding.field.examDates")}</h2>
-                  <div className="mt-4 grid gap-4 md:grid-cols-3">
-                    {[
-                      ["sat", "SAT"],
-                      ["ielts", "IELTS"],
-                      ["ap", "AP"]
-                    ].map(([prefix, label]) => (
-                      <div className="border bg-surface p-4" key={prefix}>
-                        <h3 className="font-semibold">{label}</h3>
-                        <input aria-label={t("onboarding.field.examDate")} className={fieldClassName} onChange={(event) => update(`${prefix}Date` as keyof OnboardingForm, event.target.value as never)} type="date" value={form[`${prefix}Date` as keyof OnboardingForm] as string} />
-                        <input aria-label={t("onboarding.field.targetScore")} className={fieldClassName} onChange={(event) => update(`${prefix}Target` as keyof OnboardingForm, event.target.value as never)} placeholder={t("onboarding.field.targetScore")} value={form[`${prefix}Target` as keyof OnboardingForm] as string} />
+                  <p className="mt-1 text-xs font-semibold text-primary-hover">
+                    {t("onboarding.validation.examPlan")}
+                  </p>
+                  {officialDatesError ? (
+                    <p className="mt-2 text-xs text-warning">
+                      {t("onboarding.field.officialDatesUnavailable")}
+                    </p>
+                  ) : null}
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="border bg-surface p-4">
+                      <h3 className="font-semibold">SAT</h3>
+                      {satDateOptions.length > 0 ? (
+                        <select
+                          aria-label={t("onboarding.field.examDate")}
+                          className={fieldClassName}
+                          onChange={(event) => update("satDate", event.target.value)}
+                          value={form.satDate}
+                        >
+                          <option value="">{t("onboarding.field.selectSuggestedDate")}</option>
+                          {satDateOptions.map((item) => (
+                            <option key={item.id} value={item.test_date}>
+                              {formatDate(item.test_date, locale)}
+                              {item.test_time ? ` / ${item.test_time}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          aria-label={t("onboarding.field.examDate")}
+                          className={fieldClassName}
+                          onChange={(event) => update("satDate", event.target.value)}
+                          type="date"
+                          value={form.satDate}
+                        />
+                      )}
+                      <input
+                        aria-label={t("onboarding.field.targetScore")}
+                        className={fieldClassName}
+                        onChange={(event) => update("satTarget", event.target.value)}
+                        placeholder={t("onboarding.field.targetScore")}
+                        value={form.satTarget}
+                      />
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {form.satDate
+                          ? t("onboarding.field.selectedSatDate", {
+                              date: formatDate(form.satDate, locale)
+                            })
+                          : t("onboarding.field.dateUnavailable")}
+                      </p>
+                    </div>
+
+                    <div className="border bg-surface p-4">
+                      <h3 className="font-semibold">IELTS</h3>
+                      <input
+                        aria-label={t("onboarding.field.examDate")}
+                        className={fieldClassName}
+                        onChange={(event) => update("ieltsDate", event.target.value)}
+                        type="date"
+                        value={form.ieltsDate}
+                      />
+                      <input
+                        aria-label={t("onboarding.field.targetScore")}
+                        className={fieldClassName}
+                        onChange={(event) => update("ieltsTarget", event.target.value)}
+                        placeholder={t("onboarding.field.targetScore")}
+                        value={form.ieltsTarget}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-3 border bg-surface p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold">{t("onboarding.field.apPlanRows")}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t("onboarding.field.apPlanRowsHelp")}
+                        </p>
                       </div>
-                    ))}
+                      <Button onClick={addApPlan} size="sm" type="button" variant="secondary">
+                        {t("exams.plan.addApSubject")}
+                      </Button>
+                    </div>
+                    {form.apPlans.map((row) => {
+                      const dateOptions = row.subject
+                        ? apExamDateOptions.filter((item) => item.name === row.subject)
+                        : apExamDateOptions;
+                      return (
+                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto]" key={row.id}>
+                          <select
+                            aria-label={t("exams.plan.apSubject")}
+                            className={fieldClassName}
+                            onChange={(event) => updateApPlan(row.id, { subject: event.target.value })}
+                            value={row.subject}
+                          >
+                            <option value="">{t("exams.plan.apSubject")}</option>
+                            {apSubjectOptions.map((subject) => (
+                              <option key={subject} value={subject}>
+                                {subject}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label={t("exams.plan.apDate")}
+                            className={fieldClassName}
+                            onChange={(event) => updateApPlan(row.id, { date: event.target.value })}
+                            value={row.date}
+                          >
+                            <option value="">{t("onboarding.field.selectSuggestedDate")}</option>
+                            {dateOptions.map((item) => (
+                              <option key={item.id} value={item.test_date}>
+                                {formatDate(item.test_date, locale)}
+                                {item.test_time ? ` / ${item.test_time}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            aria-label={t("onboarding.field.targetScore")}
+                            className={fieldClassName}
+                            onChange={(event) => updateApPlan(row.id, { target: event.target.value })}
+                            placeholder={t("onboarding.field.targetScore")}
+                            value={row.target}
+                          />
+                          <Button
+                            disabled={form.apPlans.length <= 1}
+                            onClick={() => removeApPlan(row.id)}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            {t("common.actions.close")}
+                          </Button>
+                          {row.subject ? (
+                            <p className="text-xs font-semibold text-muted-foreground md:col-span-4">
+                              {row.date
+                                ? t("exams.plan.selectedAp", {
+                                    subject: row.subject,
+                                    date: formatDate(row.date, locale)
+                                  })
+                                : t("onboarding.field.dateUnavailable")}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="mt-4 grid gap-4 border bg-surface p-4 md:grid-cols-3">
                     <input aria-label={t("onboarding.field.otherExam")} className={fieldClassName} onChange={(event) => update("otherExamName", event.target.value)} placeholder={t("onboarding.field.otherExam")} value={form.otherExamName} />
@@ -931,7 +1264,17 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                     [t("profile.intendedDegree"), form.intendedDegree],
                     [t("profile.intendedMajors"), form.intendedMajors.join(", ") || t("onboarding.review.notSure")],
                     [t("profile.targetCountries"), form.targetCountries],
-                    [t("onboarding.field.examDates"), [form.satDate, form.ieltsDate, form.apDate, form.otherExamDate].filter(Boolean).join(", ") || t("onboarding.review.none")]
+                    [
+                      t("onboarding.field.examDates"),
+                      [
+                        form.satDate ? `SAT ${form.satDate}` : "",
+                        form.ieltsDate ? `IELTS ${form.ieltsDate}` : "",
+                        ...form.apPlans
+                          .filter((plan) => plan.subject || plan.date)
+                          .map((plan) => `${plan.subject || "AP"} ${plan.date}`.trim()),
+                        form.otherExamDate ? `${form.otherExamName || t("onboarding.field.otherExam")} ${form.otherExamDate}` : ""
+                      ].filter(Boolean).join(", ") || t("onboarding.review.none")
+                    ]
                   ].map(([label, value]) => (
                     <div className="border-l-4 border-navy bg-surface px-4 py-3" key={label}>
                       <dt className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">{label}</dt>
@@ -966,13 +1309,21 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                 {t("onboarding.back")}
               </Button>
               {step < 5 ? (
-                <Button disabled={isSaving} onClick={() => void saveCurrentStep(step + 1)} type="button">
-                  {isSaving ? t("onboarding.saving") : t("onboarding.saveContinue")}
+                <Button disabled={isSaving || !canContinueStep} onClick={() => void saveCurrentStep(step + 1)} type="button">
+                  {isSaving
+                    ? t("onboarding.saving")
+                    : canContinueStep
+                      ? t("onboarding.saveContinue")
+                      : t("onboarding.validation.completeRequired")}
                   <ArrowRight aria-hidden className="ml-2 size-4" />
                 </Button>
               ) : (
-                <Button disabled={isSaving} onClick={() => void finish()} type="button">
-                  {isSaving ? t("onboarding.finishing") : t("onboarding.finish")}
+                <Button disabled={isSaving || !canContinueStep} onClick={() => void finish()} type="button">
+                  {isSaving
+                    ? t("onboarding.finishing")
+                    : canContinueStep
+                      ? t("onboarding.finish")
+                      : t("onboarding.validation.completeRequired")}
                 </Button>
               )}
             </div>

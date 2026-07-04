@@ -17,7 +17,7 @@ import {
 } from "@/entities/application";
 import type { RoadmapTask } from "@/entities/roadmap";
 import type { SuggestedItem } from "@/entities/suggestion";
-import type { SavedUniversity } from "@/entities/university";
+import type { SavedUniversityLite } from "@/entities/university";
 import {
   createApplicationMilestoneRequest,
   createApplicationRequest,
@@ -43,10 +43,12 @@ import { formatDate } from "@/shared/lib/date-time";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { PaginationControls } from "@/shared/ui/pagination";
+import { SectionTabs } from "@/shared/ui/section-tabs";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 const ESSAYS_STATUSES = ["not_started", "drafting", "needs_revision", "ready", "submitted"];
@@ -124,7 +126,13 @@ export function ApplicationsScreen() {
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
-  const [shortlist, setShortlist] = useState<SavedUniversity[]>([]);
+  const [suggestionsRequested, setSuggestionsRequested] = useState(false);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [suggestionsLoadError, setSuggestionsLoadError] = useState(false);
+  const [shortlist, setShortlist] = useState<SavedUniversityLite[]>([]);
+  const [shortlistRequested, setShortlistRequested] = useState(false);
+  const [isShortlistLoading, setIsShortlistLoading] = useState(false);
+  const [shortlistLoadError, setShortlistLoadError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -144,22 +152,15 @@ export function ApplicationsScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [applicationsResponse, shortlistResponse, suggestionsResponse] = await Promise.allSettled([
-        getApplicationsRequest({ page: currentPage, page_size: APPLICATIONS_PAGE_SIZE }),
-        getShortlistRequest(),
-        getSuggestionsRequest()
-      ]);
-      if (applicationsResponse.status === "rejected") {
-        setHasError(true);
-        return;
-      }
-      setApplications(applicationsResponse.value.results);
-      setTotalCount(applicationsResponse.value.count);
+      const applicationsResponse = await getApplicationsRequest({
+        page: currentPage,
+        page_size: APPLICATIONS_PAGE_SIZE
+      });
+      setApplications(applicationsResponse.results);
+      setTotalCount(applicationsResponse.count);
       setSelectedId((current) =>
-        applicationsResponse.value.results.some((item) => item.id === current) ? current : null
+        applicationsResponse.results.some((item) => item.id === current) ? current : null
       );
-      setShortlist(shortlistResponse.status === "fulfilled" ? shortlistResponse.value.results : []);
-      setSuggestions(suggestionsResponse.status === "fulfilled" ? suggestionsResponse.value.results : []);
     } catch {
       setHasError(true);
     } finally {
@@ -170,6 +171,42 @@ export function ApplicationsScreen() {
   useEffect(() => {
     void loadApplications();
   }, [loadApplications]);
+
+  const loadShortlist = useCallback(async () => {
+    if (shortlistRequested && !shortlistLoadError) return;
+    setShortlistRequested(true);
+    setIsShortlistLoading(true);
+    setShortlistLoadError(false);
+    try {
+      const response = await getShortlistRequest({ lite: true });
+      setShortlist(response.results);
+    } catch {
+      setShortlistLoadError(true);
+    } finally {
+      setIsShortlistLoading(false);
+    }
+  }, [shortlistLoadError, shortlistRequested]);
+
+  const loadSuggestions = useCallback(async () => {
+    if (suggestionsRequested && !suggestionsLoadError) return;
+    setSuggestionsRequested(true);
+    setIsSuggestionsLoading(true);
+    setSuggestionsLoadError(false);
+    try {
+      const response = await getSuggestionsRequest();
+      setSuggestions(response.results);
+    } catch {
+      setSuggestionsLoadError(true);
+    } finally {
+      setIsSuggestionsLoading(false);
+    }
+  }, [suggestionsLoadError, suggestionsRequested]);
+
+  useEffect(() => {
+    if (isFormOpen) {
+      void loadShortlist();
+    }
+  }, [isFormOpen, loadShortlist]);
 
   const selected = applications.find((item) => item.id === selectedId) ?? null;
   const hasUnsavedNotes = Boolean(selected && notesDraft !== selected.notes);
@@ -381,6 +418,13 @@ export function ApplicationsScreen() {
   const totalPages = Math.max(1, Math.ceil(totalCount / APPLICATIONS_PAGE_SIZE));
   const pageStart = totalCount ? (currentPage - 1) * APPLICATIONS_PAGE_SIZE + 1 : 0;
   const pageEnd = Math.min(pageStart + Math.max(applications.length, 1) - 1, totalCount);
+  const activeFilterCount = [
+    priorityFilter !== "all",
+    roundFilter !== "all",
+    urgencyFilter !== "all",
+    missingDeadlineOnly,
+    sortBy !== "nearest_deadline"
+  ].filter(Boolean).length;
 
   if (isLoading) {
     return <LoadingNotice message={t("applications.states.loading")} />;
@@ -401,6 +445,14 @@ export function ApplicationsScreen() {
 
   return (
     <div className="space-y-5">
+      <SectionTabs
+        ariaLabel={t("applications.tabs.ariaLabel")}
+        items={[
+          { href: "/applications", label: t("applications.tabs.mine") },
+          { href: "/strategy", label: t("applications.tabs.strategy") }
+        ]}
+      />
+
       <section className="rounded-sm border bg-card p-6 shadow-card sm:p-9">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
@@ -433,16 +485,23 @@ export function ApplicationsScreen() {
         <ApplicationForm
           onCancel={() => setIsFormOpen(false)}
           onSubmit={handleCreate}
+          isShortlistLoading={isShortlistLoading}
           shortlist={shortlist}
+          shortlistLoadError={shortlistLoadError}
         />
       ) : null}
 
       <SuggestionPanel
+        defaultOpen={false}
         description={t("applications.suggestions.description")}
+        isLoading={isSuggestionsLoading}
         isRefreshing={isRefreshingSuggestions}
+        loadError={suggestionsLoadError}
+        loadErrorMessage={t("suggestions.states.loadError")}
         onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
         onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
         onGenerate={() => void handleRefreshSuggestions()}
+        onOpen={() => void loadSuggestions()}
         suggestions={applicationSuggestions}
         title={t("applications.suggestions.title")}
       />
@@ -465,7 +524,18 @@ export function ApplicationsScreen() {
         </Card>
       ) : (
         <div className="space-y-4">
-          <Card className="space-y-3 p-4">
+          <CollapsibleFilterPanel
+            activeCount={activeFilterCount}
+            onClear={() => {
+              setPriorityFilter("all");
+              setRoundFilter("all");
+              setUrgencyFilter("all");
+              setMissingDeadlineOnly(false);
+              setSortBy("nearest_deadline");
+            }}
+            resultCount={visibleApplications.length}
+            storageKey="eduverse.filters.applications"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <h2 className="text-sm font-semibold">{t("applications.filters.title")}</h2>
@@ -473,20 +543,6 @@ export function ApplicationsScreen() {
                   {t("applications.filters.autoApply")}
                 </span>
               </div>
-              <Button
-                onClick={() => {
-                  setPriorityFilter("all");
-                  setRoundFilter("all");
-                  setUrgencyFilter("all");
-                  setMissingDeadlineOnly(false);
-                  setSortBy("nearest_deadline");
-                }}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                {t("applications.filters.clear")}
-              </Button>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <label className="block">
@@ -568,7 +624,7 @@ export function ApplicationsScreen() {
             <p className="text-xs text-muted-foreground">
               {t("applications.filters.resultCount", { count: visibleApplications.length })}
             </p>
-          </Card>
+          </CollapsibleFilterPanel>
           <p className="text-sm font-semibold text-muted-foreground">
             {t("pagination.showingRange", {
               start: pageStart,

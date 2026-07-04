@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import type { ApplicationRound } from "@/entities/application";
-import type { SavedUniversity } from "@/entities/university";
+import type { SavedUniversity, SavedUniversityLite } from "@/entities/university";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
@@ -31,11 +31,15 @@ export function ApplicationForm({
   shortlist,
   onSubmit,
   onCancel,
+  isShortlistLoading = false,
+  shortlistLoadError = false,
   isSubmitting
 }: {
-  shortlist: SavedUniversity[];
+  shortlist: Array<SavedUniversity | SavedUniversityLite>;
   onSubmit: (values: ApplicationFormValues) => Promise<void>;
   onCancel: () => void;
+  isShortlistLoading?: boolean;
+  shortlistLoadError?: boolean;
   isSubmitting?: boolean;
 }) {
   const { t } = useI18n();
@@ -113,6 +117,15 @@ export function ApplicationForm({
               </option>
             ))}
           </select>
+          {shortlistLoadError ? (
+            <p className="mt-1 text-xs text-warning" role="alert">
+              {t("applications.form.shortlistLoadError")}
+            </p>
+          ) : isShortlistLoading ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("applications.form.shortlistLoading")}
+            </p>
+          ) : null}
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">

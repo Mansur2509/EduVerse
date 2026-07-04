@@ -42,6 +42,7 @@ import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid, PaginatedList } from "@/shared/ui/pagination";
@@ -80,6 +81,7 @@ export function RoadmapScreen() {
   const { locale, t } = useI18n();
   const [plan, setPlan] = useState<RoadmapPlan | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
+  const [suggestionsRequested, setSuggestionsRequested] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -93,6 +95,8 @@ export function RoadmapScreen() {
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
   const [actionError, setActionError] = useState(false);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [suggestionsLoadError, setSuggestionsLoadError] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [completedOpen, setCompletedOpen] = useState(false);
 
@@ -100,24 +104,29 @@ export function RoadmapScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [roadmapResponse, suggestionsResponse] = await Promise.allSettled([
-        getRoadmapRequest(),
-        getSuggestionsRequest()
-      ]);
-      if (roadmapResponse.status === "fulfilled") {
-        setPlan(roadmapResponse.value.plan);
-      } else {
-        setHasError(true);
-      }
-      if (suggestionsResponse.status === "fulfilled") {
-        setSuggestions(suggestionsResponse.value.results);
-      }
+      const roadmapResponse = await getRoadmapRequest();
+      setPlan(roadmapResponse.plan);
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const loadSuggestions = useCallback(async () => {
+    if (suggestionsRequested && !suggestionsLoadError) return;
+    setSuggestionsRequested(true);
+    setIsSuggestionsLoading(true);
+    setSuggestionsLoadError(false);
+    try {
+      const suggestionsResponse = await getSuggestionsRequest();
+      setSuggestions(suggestionsResponse.results);
+    } catch {
+      setSuggestionsLoadError(true);
+    } finally {
+      setIsSuggestionsLoading(false);
+    }
+  }, [suggestionsLoadError, suggestionsRequested]);
 
   useEffect(() => {
     void loadRoadmap();
@@ -429,6 +438,11 @@ export function RoadmapScreen() {
     setStatusScope("active");
     setBucket("all");
   }
+  const activeFilterCount = [
+    ...Object.values(filters).map((value) => Boolean(value)),
+    statusScope !== "active",
+    bucket !== "all"
+  ].filter(Boolean).length;
 
   if (isLoading) {
     return (
@@ -641,16 +655,26 @@ export function RoadmapScreen() {
           ) : null}
 
           <SuggestionPanel
+            defaultOpen={false}
             description={t("roadmap.suggestions.description")}
+            isLoading={isSuggestionsLoading}
             isRefreshing={isRefreshingSuggestions}
+            loadError={suggestionsLoadError}
+            loadErrorMessage={t("suggestions.states.loadError")}
             onAddToRoadmap={(suggestion) => void handleAddSuggestion(suggestion)}
             onDismiss={(suggestion) => void handleDismissSuggestion(suggestion)}
             onGenerate={() => void handleRefreshSuggestions()}
+            onOpen={() => void loadSuggestions()}
             suggestions={suggestions}
             title={t("roadmap.suggestions.title")}
           />
 
-          <Card>
+          <CollapsibleFilterPanel
+            activeCount={activeFilterCount}
+            onClear={clearAllFilters}
+            resultCount={bucketedTasks.length}
+            storageKey="eduverse.filters.roadmap"
+          >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold">{t("roadmap.filters.title")}</h2>
@@ -835,13 +859,8 @@ export function RoadmapScreen() {
                 </div>
               </section>
 
-              <div className="flex justify-end border-t pt-4">
-                <Button onClick={clearAllFilters} type="button" variant="ghost">
-                  {t("roadmap.filters.clear")}
-                </Button>
-              </div>
             </form>
-          </Card>
+          </CollapsibleFilterPanel>
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">

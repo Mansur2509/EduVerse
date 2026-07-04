@@ -10,9 +10,16 @@ import { formatDate } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 
 const PAGE_SIZE = 200;
+
+type ApPlanRow = {
+  id: string;
+  subject: string;
+  dateId: string;
+};
 
 function ExamDateRow({ item }: { item: OfficialExamDate }) {
   const { locale, t } = useI18n();
@@ -72,8 +79,10 @@ function ExamDateRow({ item }: { item: OfficialExamDate }) {
 }
 
 export function ExamsScreen() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [dates, setDates] = useState<OfficialExamDate[]>([]);
+  const [selectedSatDateId, setSelectedSatDateId] = useState("");
+  const [apPlans, setApPlans] = useState<ApPlanRow[]>([{ id: "ap-1", subject: "", dateId: "" }]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -106,6 +115,39 @@ export function ExamsScreen() {
     () => dates.filter((item) => item.exam_type === "AP" && item.event_kind !== "exam"),
     [dates]
   );
+  const satPlanOptions = useMemo(() => satDates.slice(0, 5), [satDates]);
+  const selectedSatDate = satPlanOptions.find((item) => String(item.id) === selectedSatDateId);
+  const apSubjects = useMemo(
+    () => Array.from(new Set(apExamDates.map((item) => item.name))).sort(),
+    [apExamDates]
+  );
+
+  function updateApPlan(rowId: string, patch: Partial<ApPlanRow>) {
+    setApPlans((current) =>
+      current.map((row) => {
+        if (row.id !== rowId) return row;
+        const next = { ...row, ...patch };
+        if (patch.subject !== undefined) {
+          const matchingDate = apExamDates.find((item) => item.name === patch.subject);
+          next.dateId = matchingDate ? String(matchingDate.id) : "";
+        }
+        return next;
+      })
+    );
+  }
+
+  function addApPlan() {
+    setApPlans((current) => [
+      ...current,
+      { id: `ap-${Date.now()}`, subject: "", dateId: "" }
+    ]);
+  }
+
+  function removeApPlan(rowId: string) {
+    setApPlans((current) =>
+      current.length > 1 ? current.filter((row) => row.id !== rowId) : current
+    );
+  }
 
   if (isLoading) {
     return <LoadingNotice message={t("exams.states.loading")} />;
@@ -149,6 +191,109 @@ export function ExamsScreen() {
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
           {t("exams.warningDescription")}
         </p>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div>
+            <h2 className="text-lg font-semibold">{t("exams.plan.title")}</h2>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+              {t("exams.plan.description")}
+            </p>
+          </div>
+          <Button onClick={addApPlan} size="sm" type="button" variant="secondary">
+            {t("exams.plan.addApSubject")}
+          </Button>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <section className="rounded-sm border bg-surface p-3">
+            <label className="block">
+              <span className="text-sm font-semibold">{t("exams.plan.satLabel")}</span>
+              <select
+                className={fieldClassName}
+                onChange={(event) => setSelectedSatDateId(event.target.value)}
+                value={selectedSatDateId}
+              >
+                <option value="">{t("exams.plan.selectDate")}</option>
+                {satPlanOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {formatDate(item.test_date, locale)}
+                    {item.test_time ? ` / ${item.test_time}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="mt-2 text-xs font-semibold text-muted-foreground">
+              {selectedSatDate
+                ? t("exams.plan.selectedSat", {
+                    date: formatDate(selectedSatDate.test_date, locale)
+                  })
+                : t("exams.plan.dateUnavailable")}
+            </p>
+          </section>
+
+          <section className="space-y-3 rounded-sm border bg-surface p-3">
+            <h3 className="text-sm font-semibold">{t("exams.plan.apLabel")}</h3>
+            {apPlans.map((row) => {
+              const dateOptions = row.subject
+                ? apExamDates.filter((item) => item.name === row.subject)
+                : apExamDates;
+              const selectedDate = apExamDates.find((item) => String(item.id) === row.dateId);
+              return (
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" key={row.id}>
+                  <select
+                    aria-label={t("exams.plan.apSubject")}
+                    className={fieldClassName}
+                    onChange={(event) => updateApPlan(row.id, { subject: event.target.value })}
+                    value={row.subject}
+                  >
+                    <option value="">{t("exams.plan.apSubject")}</option>
+                    {apSubjects.map((subject) => (
+                      <option key={subject} value={subject}>
+                        {subject}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={t("exams.plan.apDate")}
+                    className={fieldClassName}
+                    disabled={!row.subject && apExamDates.length === 0}
+                    onChange={(event) => updateApPlan(row.id, { dateId: event.target.value })}
+                    value={row.dateId}
+                  >
+                    <option value="">{t("exams.plan.selectDate")}</option>
+                    {dateOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {formatDate(item.test_date, locale)}
+                        {item.test_time ? ` / ${item.test_time}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    disabled={apPlans.length <= 1}
+                    onClick={() => removeApPlan(row.id)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {t("common.actions.close")}
+                  </Button>
+                  {row.subject ? (
+                    <p className="text-xs font-semibold text-muted-foreground md:col-span-3">
+                      {selectedDate
+                        ? t("exams.plan.selectedAp", {
+                            subject: row.subject,
+                            date: formatDate(selectedDate.test_date, locale)
+                          })
+                        : t("exams.plan.dateUnavailable")}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </section>
+        </div>
       </Card>
 
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">

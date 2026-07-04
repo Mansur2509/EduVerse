@@ -263,25 +263,37 @@ Authenticated. Returns a computed evidence summary, never an admissions outcome 
 
 ```json
 {
-  "stars": 4,
-  "level": "strong",
+  "stars": 2,
+  "level": "developing",
   "score_components": {
-    "profile": 5,
-    "academics": 5,
-    "exams": 4,
-    "activities": 3,
-    "essays": 2,
-    "timeline": 4
+    "academic_readiness": 5,
+    "testing_readiness": 4,
+    "activities_leadership": 2,
+    "honors_competitions": 1,
+    "research_portfolio": 1,
+    "application_execution": 2
   },
-  "strengths": ["profile", "academics", "exams", "timeline"],
-  "improvements": ["essays"],
+  "categories": [
+    {
+      "key": "academic_readiness",
+      "score": 5,
+      "source_keys": ["profile", "academics", "timeline"],
+      "missing_sources": [],
+      "status": "excellent"
+    }
+  ],
+  "strengths": ["academic_readiness", "testing_readiness"],
+  "improvements": ["honors_competitions", "research_portfolio", "application_execution"],
+  "reasons": ["evidence_incomplete", "academically_promising_evidence_incomplete"],
+  "next_actions": ["honors_competitions", "research_portfolio", "application_execution"],
+  "cap_reason": "evidence_incomplete",
   "comparison_status": "official_data_needed",
   "compared_universities": [],
   "official_sources": []
 }
 ```
 
-`comparison_status=published_ranges` is returned only when matching published university requirements can be compared with available profile evidence. Clients must retain the no-guarantee disclaimer and link any returned official sources.
+Readiness is deterministic across six category groups: academic readiness, testing readiness, activities/leadership, honors/competitions, research/portfolio, and application execution. `stars` is capped when the foundation profile is incomplete or when too many evidence categories are missing, so a high GPA/test profile is not labeled strong without supporting application evidence. `comparison_status=published_ranges` is returned only when matching published university requirements can be compared with available profile evidence. Clients must retain the no-guarantee disclaimer and link any returned official sources.
 
 ### GET `/api/profile/assessment/latest/`
 

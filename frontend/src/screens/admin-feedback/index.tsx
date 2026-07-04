@@ -14,6 +14,7 @@ import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 
@@ -135,6 +136,7 @@ export function AdminFeedbackScreen() {
     appliedFilters.feedback_type !== "" ||
     appliedFilters.priority !== "" ||
     appliedFilters.page_module !== "";
+  const activeFilterCount = Object.values(appliedFilters).filter(Boolean).length;
 
   return (
     <div className="space-y-6">
@@ -148,7 +150,12 @@ export function AdminFeedbackScreen() {
         </p>
       </section>
 
-      <Card>
+      <CollapsibleFilterPanel
+        activeCount={activeFilterCount}
+        onClear={resetFilters}
+        resultCount={totalCount}
+        storageKey="eduverse.filters.adminFeedback"
+      >
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">{t("adminFeedback.filters.title")}</h2>
           {hasActiveFilters ? (
@@ -214,14 +221,11 @@ export function AdminFeedbackScreen() {
           </label>
         </div>
         <div className="mt-3 flex justify-end gap-2 border-t pt-3">
-          <Button onClick={resetFilters} size="sm" type="button" variant="ghost">
-            {t("adminFeedback.filters.reset")}
-          </Button>
           <Button onClick={applyFilters} size="sm" type="button">
             {t("adminFeedback.filters.apply")}
           </Button>
         </div>
-      </Card>
+      </CollapsibleFilterPanel>
 
       {isLoading ? (
         <Card>

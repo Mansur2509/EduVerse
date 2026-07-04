@@ -680,8 +680,12 @@ class ApplicationReadinessSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         read_only=True,
     )
+    categories = serializers.ListField(child=serializers.DictField(), read_only=True)
     strengths = serializers.ListField(child=serializers.CharField(), read_only=True)
     improvements = serializers.ListField(child=serializers.CharField(), read_only=True)
+    reasons = serializers.ListField(child=serializers.CharField(), read_only=True)
+    next_actions = serializers.ListField(child=serializers.CharField(), read_only=True)
+    cap_reason = serializers.CharField(read_only=True)
     comparison_status = serializers.CharField(read_only=True)
     compared_universities = serializers.ListField(
         child=serializers.CharField(),

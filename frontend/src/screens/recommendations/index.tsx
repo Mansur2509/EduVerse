@@ -17,9 +17,11 @@ import { useI18n, type LocaleCode, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { SectionTabs } from "@/shared/ui/section-tabs";
 
 const SORT_OPTIONS = ["best_fit", "deadline_soon", "lowest_cost", "highest_confidence"] as const;
 type SortOption = (typeof SORT_OPTIONS)[number];
@@ -136,6 +138,15 @@ export function RecommendationsScreen() {
     confidenceFilter !== "all" ||
     internationalOnly ||
     sortBy !== "best_fit";
+  const activeFilterCount = [
+    categoryFilter !== "all",
+    countryFilter !== "all",
+    costRiskFilter !== "all",
+    urgencyFilter !== "all",
+    confidenceFilter !== "all",
+    internationalOnly,
+    sortBy !== "best_fit"
+  ].filter(Boolean).length;
 
   function clearFilters() {
     setCategoryFilter("all");
@@ -266,6 +277,15 @@ export function RecommendationsScreen() {
 
   return (
     <div className="space-y-5">
+      <SectionTabs
+        ariaLabel={t("universities.tabs.ariaLabel")}
+        items={[
+          { href: "/universities", label: t("universities.tabs.browse") },
+          { href: "/recommendations", label: t("universities.tabs.recommendations") },
+          { href: "/strategy", label: t("universities.tabs.strategy") }
+        ]}
+      />
+
       <section className="rounded-sm border bg-card p-6 shadow-card sm:p-9">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-hover">
           {t("recommendations.eyebrow")}
@@ -346,7 +366,12 @@ export function RecommendationsScreen() {
         </Card>
       ) : null}
 
-      <Card className="space-y-3 p-4">
+      <CollapsibleFilterPanel
+        activeCount={activeFilterCount}
+        onClear={clearFilters}
+        resultCount={filtered.length}
+        storageKey="eduverse.filters.recommendations"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <h2 className="text-sm font-semibold">{t("applications.filters.title")}</h2>
@@ -354,15 +379,6 @@ export function RecommendationsScreen() {
               {t("applications.filters.autoApply")}
             </span>
           </div>
-          <Button
-            disabled={!hasActiveFilters}
-            onClick={clearFilters}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            {t("applications.filters.clear")}
-          </Button>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <label className="block">
@@ -468,7 +484,7 @@ export function RecommendationsScreen() {
         <p className="text-xs text-muted-foreground">
           {t("recommendations.filters.resultCount", { count: filtered.length })}
         </p>
-      </Card>
+      </CollapsibleFilterPanel>
 
       {filtered.length === 0 ? (
         <Card>

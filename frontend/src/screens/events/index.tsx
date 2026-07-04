@@ -15,6 +15,7 @@ import { getEventsRequest } from "@/features/events";
 import { useI18n } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
@@ -74,6 +75,9 @@ export function EventsScreen() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
   const hasActiveFilters = Object.values(appliedFilters).some(Boolean);
+  const activeFilterCount = Object.values(appliedFilters).filter((value) =>
+    typeof value === "string" ? value.trim() : Boolean(value)
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -124,7 +128,12 @@ export function EventsScreen() {
         </div>
       </section>
 
-      <Card>
+      <CollapsibleFilterPanel
+        activeCount={activeFilterCount}
+        onClear={clearFilters}
+        resultCount={totalCount}
+        storageKey="eduverse.filters.events"
+      >
         <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleSubmit}>
           <label className="block">
             <span className="text-sm font-semibold">{t("events.filters.search")}</span>
@@ -218,7 +227,7 @@ export function EventsScreen() {
             </Button>
           </div>
         </form>
-      </Card>
+      </CollapsibleFilterPanel>
 
       {!isLoading && !hasError && events.length ? (
         <EventMapPreview events={events} />

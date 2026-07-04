@@ -15,20 +15,33 @@ class ApplicationReadiness:
     stars: int
     level: str
     score_components: dict[str, int]
+    categories: list[dict[str, object]]
     strengths: list[str]
     improvements: list[str]
+    reasons: list[str]
+    next_actions: list[str]
+    cap_reason: str
     comparison_status: str
     compared_universities: list[str]
     official_sources: list[dict[str, str]]
 
 
 LEVELS = {
-    1: "foundation",
+    1: "incomplete",
     2: "developing",
-    3: "competitive",
+    3: "solid",
     4: "strong",
-    5: "outstanding",
+    5: "excellent",
 }
+
+READINESS_CATEGORY_KEYS = (
+    "academic_readiness",
+    "testing_readiness",
+    "activities_leadership",
+    "honors_competitions",
+    "research_portfolio",
+    "application_execution",
+)
 
 
 def _number(value):
@@ -324,21 +337,83 @@ def _published_comparison(profile):
     return comparisons, names, sources
 
 
-#  Niche achievement categories that many students genuinely do not have
-# (not every strong applicant has olympiad results or a research project).
-# Their absence must never be averaged in as a weakness -- it only appears
-# under `improvements` as an optional next step, and only ever raises the
-# overall star average when the student actually has entries.
-ENRICHMENT_COMPONENTS = (
-    "leadership",
+CAP_EVIDENCE_KEYS = (
+    "activities",
     "honors",
-    "olympiads",
-    "sports",
     "research",
     "portfolio",
-    "volunteering",
     "recommenders",
+    "essays",
 )
+
+
+def _rounded_mean(values: list[int]) -> int:
+    return max(1, min(5, round(mean(values))))
+
+
+def _build_readiness_categories(components: dict[str, int]) -> list[dict[str, object]]:
+    category_inputs = {
+        "academic_readiness": ("profile", "academics", "timeline"),
+        "testing_readiness": ("exams",),
+        "activities_leadership": ("activities", "leadership", "volunteering"),
+        "honors_competitions": ("honors", "olympiads"),
+        "research_portfolio": ("research", "portfolio"),
+        "application_execution": ("essays", "recommenders", "timeline"),
+    }
+    categories = []
+    for key in READINESS_CATEGORY_KEYS:
+        source_keys = category_inputs[key]
+        scores = [components[source_key] for source_key in source_keys]
+        score = _rounded_mean(scores)
+        missing_sources = [
+            source_key for source_key in source_keys if components[source_key] <= 1
+        ]
+        categories.append(
+            {
+                "key": key,
+                "score": score,
+                "source_keys": list(source_keys),
+                "missing_sources": missing_sources,
+                "status": LEVELS[score],
+            }
+        )
+    return categories
+
+
+def _readiness_cap(components: dict[str, int], completion_percentage: int) -> tuple[int, str]:
+    missing_evidence = [key for key in CAP_EVIDENCE_KEYS if components[key] <= 1]
+    if completion_percentage < 50:
+        return 2, "foundation_incomplete"
+    if len(missing_evidence) >= 4:
+        return 2, "evidence_incomplete"
+    if len(missing_evidence) >= 3:
+        return 3, "evidence_limited"
+    return 5, ""
+
+
+def _readiness_reasons(
+    categories: list[dict[str, object]],
+    components: dict[str, int],
+    cap_reason: str,
+) -> list[str]:
+    reasons: list[str] = []
+    if cap_reason:
+        reasons.append(cap_reason)
+    if components["academics"] >= 4 and cap_reason in {"evidence_incomplete", "evidence_limited"}:
+        reasons.append("academically_promising_evidence_incomplete")
+    if components["exams"] <= 2:
+        reasons.append("testing_data_limited")
+    if components["essays"] <= 2 or components["recommenders"] <= 2:
+        reasons.append("application_execution_limited")
+    if not reasons:
+        strongest = max(categories, key=lambda item: int(item["score"]))
+        reasons.append(f"{strongest['key']}_strongest")
+    return reasons[:4]
+
+
+def _readiness_next_actions(categories: list[dict[str, object]]) -> list[str]:
+    sorted_categories = sorted(categories, key=lambda item: int(item["score"]))
+    return [str(item["key"]) for item in sorted_categories[:3]]
 
 
 def calculate_application_readiness(
@@ -366,20 +441,28 @@ def calculate_application_readiness(
     if published_scores:
         components["published_ranges"] = round(mean(published_scores))
 
-    stars_inputs = [
-        value
-        for key, value in components.items()
-        if key not in ENRICHMENT_COMPONENTS or value > 1
+    categories = _build_readiness_categories(components)
+    uncapped_stars = _rounded_mean([int(category["score"]) for category in categories])
+    max_score, cap_reason = _readiness_cap(components, completion.percentage)
+    stars = min(uncapped_stars, max_score)
+    strengths = [
+        str(category["key"]) for category in categories if int(category["score"]) >= 4
     ]
-    stars = max(1, min(5, round(mean(stars_inputs))))
-    strengths = [key for key, value in components.items() if value >= 4]
-    improvements = [key for key, value in components.items() if value <= 2]
+    improvements = [
+        str(category["key"]) for category in categories if int(category["score"]) <= 2
+    ]
+    reasons = _readiness_reasons(categories, components, cap_reason)
+    next_actions = _readiness_next_actions(categories)
     return ApplicationReadiness(
         stars=stars,
         level=LEVELS[stars],
-        score_components=components,
+        score_components={str(category["key"]): int(category["score"]) for category in categories},
+        categories=categories,
         strengths=strengths,
         improvements=improvements,
+        reasons=reasons,
+        next_actions=next_actions,
+        cap_reason=cap_reason,
         comparison_status="published_ranges" if published_scores else "official_data_needed",
         compared_universities=compared_universities,
         official_sources=sources[:8],

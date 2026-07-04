@@ -7,9 +7,11 @@ import type { ApplicationStrategyResponse, StrategySchool } from "@/entities/str
 import { getApplicationStrategyRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { SectionTabs } from "@/shared/ui/section-tabs";
 
 const CATEGORY_BADGE_STYLES: Record<RecommendationCategory, string> = {
   dream: "border-danger/45 bg-danger/15 text-danger",
@@ -119,9 +121,23 @@ export function StrategyScreen() {
   })();
 
   const visibleGroups = groups.filter((group) => group.schools.length > 0);
+  const activeFilterCount = [
+    groupMode !== "category",
+    countryFilter !== "all",
+    majorClusterFilter !== "all"
+  ].filter(Boolean).length;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      <SectionTabs
+        ariaLabel={t("universities.tabs.ariaLabel")}
+        items={[
+          { href: "/universities", label: t("universities.tabs.browse") },
+          { href: "/recommendations", label: t("universities.tabs.recommendations") },
+          { href: "/strategy", label: t("universities.tabs.strategy") }
+        ]}
+      />
+
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           {t("strategy.eyebrow")}
@@ -141,7 +157,16 @@ export function StrategyScreen() {
         </Card>
       ) : null}
 
-      <Card>
+      <CollapsibleFilterPanel
+        activeCount={activeFilterCount}
+        onClear={() => {
+          setGroupMode("category");
+          setCountryFilter("all");
+          setMajorClusterFilter("all");
+        }}
+        resultCount={visibleGroups.reduce((count, group) => count + group.schools.length, 0)}
+        storageKey="eduverse.filters.strategy"
+      >
         <div className="flex flex-wrap items-end gap-4">
           <label className="block">
             <span className="flex items-center gap-1 text-sm font-semibold">
@@ -192,7 +217,7 @@ export function StrategyScreen() {
             </select>
           </label>
         </div>
-      </Card>
+      </CollapsibleFilterPanel>
 
       {visibleGroups.length === 0 ? (
         <Card>

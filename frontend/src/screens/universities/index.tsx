@@ -19,10 +19,12 @@ import {
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
+import { SectionTabs } from "@/shared/ui/section-tabs";
 
 const emptyFilters: UniversityFilters = {
   search: "",
@@ -229,9 +231,21 @@ export function UniversitiesScreen() {
     : universities;
   const totalPages = Math.max(1, Math.ceil(totalCount / DEFAULT_PAGE_SIZE));
   const universityNameOptions = filterOptions?.universities.map((item) => item.name) ?? [];
+  const activeFilterCount = Object.values(appliedFilters).filter((value) =>
+    typeof value === "string" ? value.trim() : Boolean(value)
+  ).length;
 
   return (
     <div className="space-y-6">
+      <SectionTabs
+        ariaLabel={t("universities.tabs.ariaLabel")}
+        items={[
+          { href: "/universities", label: t("universities.tabs.browse") },
+          { href: "/recommendations", label: t("universities.tabs.recommendations") },
+          { href: "/strategy", label: t("universities.tabs.strategy") }
+        ]}
+      />
+
       <section className="rounded-sm border bg-card p-6 shadow-card sm:p-9">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-hover">
           {t("universities.list.eyebrow")}
@@ -266,7 +280,12 @@ export function UniversitiesScreen() {
         </div>
       </section>
 
-      <Card>
+      <CollapsibleFilterPanel
+        activeCount={activeFilterCount}
+        onClear={clearFilters}
+        resultCount={shortlistOnly ? visibleUniversities.length : totalCount}
+        storageKey="eduverse.filters.universities"
+      >
         <form className="space-y-5" onSubmit={handleSubmit}>
           <section className="space-y-3">
             <h2 className="text-sm font-semibold">
@@ -917,7 +936,7 @@ export function UniversitiesScreen() {
             </div>
           </section>
         </form>
-      </Card>
+      </CollapsibleFilterPanel>
 
       {isLoading ? (
         <LoadingNotice message={t("universities.states.loading")} />
