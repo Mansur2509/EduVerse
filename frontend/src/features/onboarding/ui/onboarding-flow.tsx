@@ -625,17 +625,24 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
       }))
       .filter((category) => category.majors.length > 0);
   }, [majorSearch, t]);
+  const todayIso = new Date().toISOString().slice(0, 10);
   const satDateOptions = useMemo(
     () =>
       officialDates
-        .filter((item) => item.exam_type === "SAT" && item.event_kind === "exam")
+        .filter(
+          (item) =>
+            item.exam_type === "SAT" && item.event_kind === "exam" && item.test_date >= todayIso
+        )
         .slice(0, 5),
-    [officialDates]
+    [officialDates, todayIso]
   );
   const apExamDateOptions = useMemo(
     () =>
-      officialDates.filter((item) => item.exam_type === "AP" && item.event_kind === "exam"),
-    [officialDates]
+      officialDates.filter(
+        (item) =>
+          item.exam_type === "AP" && item.event_kind === "exam" && item.test_date >= todayIso
+      ),
+    [officialDates, todayIso]
   );
   const apSubjectOptions = useMemo(
     () => Array.from(new Set(apExamDateOptions.map((item) => item.name))).sort(),
