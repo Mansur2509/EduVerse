@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 
@@ -557,7 +558,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const [majorSearch, setMajorSearch] = useState("");
   const [readiness, setReadiness] = useState<ApplicationReadiness | null>(null);
   const [officialDates, setOfficialDates] = useState<OfficialExamDate[]>([]);
-  const [officialDatesRequested, setOfficialDatesRequested] = useState(false);
+  const officialDatesRequestedRef = useRef(false);
   const [officialDatesError, setOfficialDatesError] = useState(false);
 
   useEffect(() => {
@@ -586,9 +587,9 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   }, [form, isLoading]);
 
   useEffect(() => {
-    if (step !== 2 || officialDatesRequested) return;
+    if (step !== 2 || officialDatesRequestedRef.current) return;
     let cancelled = false;
-    setOfficialDatesRequested(true);
+    officialDatesRequestedRef.current = true;
     setOfficialDatesError(false);
     getOfficialExamDatesRequest({ page_size: 200 })
       .then((response) => {
@@ -600,7 +601,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [officialDatesRequested, step]);
+  }, [step]);
 
   const update = useCallback(
     <Key extends keyof OnboardingForm>(key: Key, value: OnboardingForm[Key]) => {
