@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, ExternalLink, Plus, RefreshCw, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ESSAY_PRIORITIES,
@@ -47,26 +47,6 @@ import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { PaginationControls } from "@/shared/ui/pagination";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
-
-const SCORE_FIELDS: Array<{
-  key: "structure_score" | "clarity_score" | "authenticity_score" | "specificity_score" | "grammar_score" | "prompt_fit_score";
-  labelKey: TranslationKey;
-}> = [
-  { key: "structure_score", labelKey: "essays.feedback.structure" },
-  { key: "clarity_score", labelKey: "essays.feedback.clarity" },
-  { key: "authenticity_score", labelKey: "essays.feedback.authenticity" },
-  { key: "specificity_score", labelKey: "essays.feedback.specificity" },
-  { key: "grammar_score", labelKey: "essays.feedback.grammar" },
-  { key: "prompt_fit_score", labelKey: "essays.feedback.promptFit" }
-];
-
-const LABEL_STYLES: Record<string, string> = {
-  weak: "border-danger/35 bg-danger/10 text-danger",
-  developing: "border-warning/35 bg-warning/10 text-warning",
-  solid: "border-accent/35 bg-accent/10 text-accent",
-  strong: "border-success/35 bg-success/10 text-success",
-  excellent: "border-success/35 bg-success/10 text-success"
-};
 
 const ESSAYS_PAGE_SIZE = 5;
 
@@ -123,11 +103,13 @@ export function EssaysScreen() {
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [latestScore, setLatestScore] = useState<AIEssayScoreReport | null>(null);
   const [isScoringEssay, setIsScoringEssay] = useState(false);
+  const isScoringRef = useRef(false);
   const [scoreNotice, setScoreNotice] = useState<{
     reason: AIEssayScoreReason;
     quotaRemaining: number | null;
     nextAvailableAt: string | null;
   } | null>(null);
+  const [scoreRequestFailed, setScoreRequestFailed] = useState(false);
   const [actionError, setActionError] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -347,13 +329,27 @@ export function EssaysScreen() {
   }
 
   async function handleScoreEssay() {
-    if (!selectedEssay) return;
+    // Reentrancy guard on top of the disabled button: the ref flips
+    // synchronously (unlike state), so a second invocation fired before the
+    // next render (e.g. a fast double-click or Enter-key repeat) is rejected
+    // immediately rather than racing a second request for the same essay.
+    if (!selectedEssay || isScoringRef.current) return;
+    isScoringRef.current = true;
     setIsScoringEssay(true);
     setActionError(false);
+    setScoreRequestFailed(false);
     setScoreNotice(null);
     try {
       if (draftText !== selectedEssay.draft_text) {
-        await updateEssayRequest(selectedEssay.id, { draft_text: draftText });
+        try {
+          await updateEssayRequest(selectedEssay.id, { draft_text: draftText });
+        } catch {
+          // The draft itself failed to save -- keep the existing draft-save
+          // error path so the user knows their edits, not just the score,
+          // are unsaved. Do not attempt to score unsaved text.
+          setActionError(true);
+          return;
+        }
       }
       const response = await scoreEssayRequest(selectedEssay.id);
       setScoreNotice({
@@ -365,8 +361,13 @@ export function EssaysScreen() {
         setLatestScore(response.score);
       }
     } catch {
-      setActionError(true);
+      // A raw request failure (network error, unexpected non-JSON 5xx from
+      // infra) rather than one of the backend's structured reasons. The
+      // draft text itself is untouched and already saved above, so tell the
+      // user specifically that only scoring failed.
+      setScoreRequestFailed(true);
     } finally {
+      isScoringRef.current = false;
       setIsScoringEssay(false);
     }
   }
@@ -916,22 +917,10 @@ export function EssaysScreen() {
                       {t("essays.actions.discardDraft")}
                     </Button>
                     <Button
-                      disabled={isGeneratingFeedback}
-                      onClick={() => void handleGenerateFeedback()}
-                      size="sm"
-                      type="button"
-                    >
-                      <Sparkles aria-hidden className="mr-1.5 size-3.5" />
-                      {isGeneratingFeedback
-                        ? t("essays.actions.analyzing")
-                        : t("essays.actions.ruleBasedCheck")}
-                    </Button>
-                    <Button
                       disabled={isScoringEssay}
                       onClick={() => void handleScoreEssay()}
                       size="sm"
                       type="button"
-                      variant="secondary"
                     >
                       <Sparkles aria-hidden className="mr-1.5 size-3.5" />
                       {isScoringEssay ? t("essays.actions.scoring") : t("essays.actions.getScore")}
@@ -953,38 +942,37 @@ export function EssaysScreen() {
                       {t("essays.actions.markSubmitted")}
                     </Button>
                   </div>
+
+                  {/* Demoted, secondary utility -- deliberately not styled or
+                      positioned like the primary actions above so it never
+                      reads as a competing evaluation next to the AI score. */}
+                  <div className="mt-3 border-t pt-3">
+                    <Button
+                      disabled={isGeneratingFeedback}
+                      onClick={() => void handleGenerateFeedback()}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {isGeneratingFeedback
+                        ? t("essays.actions.analyzing")
+                        : t("essays.actions.basicStructureCheck")}
+                    </Button>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("essays.feedback.ruleBasedNotice")}
+                    </p>
+                  </div>
                 </Card>
 
                 {selectedEssay.latest_feedback ? (
                   <Card className="bg-elevated/45 p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-semibold">{t("essays.feedback.title")}</h3>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("essays.feedback.ruleBasedNotice")}
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-sm border px-3 py-1 text-sm font-semibold ${LABEL_STYLES[selectedEssay.latest_feedback.overall_label]}`}
-                      >
-                        {t(`essays.feedback.label.${selectedEssay.latest_feedback.overall_label}` as TranslationKey)}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {selectedEssay.latest_feedback.summary}
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                      {t("essays.feedback.title")}
+                    </h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("essays.feedback.ruleBasedNotice")}
                     </p>
-                    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {SCORE_FIELDS.map((field) => {
-                        const value = selectedEssay.latest_feedback?.[field.key];
-                        if (value === null || value === undefined) return null;
-                        return (
-                          <div key={field.key}>
-                            <dt className="text-xs text-muted-foreground">{t(field.labelKey)}</dt>
-                            <dd className="text-lg font-semibold">{value}</dd>
-                          </div>
-                        );
-                      })}
-                    </dl>
+                    <p className="mt-2 text-sm">{selectedEssay.latest_feedback.summary}</p>
                     {selectedEssay.latest_feedback.strengths.length > 0 ? (
                       <div className="mt-4">
                         <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -1000,6 +988,20 @@ export function EssaysScreen() {
                         </ul>
                       </div>
                     ) : null}
+                    {selectedEssay.latest_feedback.issues.length === 0 &&
+                    selectedEssay.latest_feedback.strengths.length === 0 ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {t("essays.feedback.seeRevisionChecklist")}
+                      </p>
+                    ) : null}
+                  </Card>
+                ) : null}
+
+                {scoreRequestFailed ? (
+                  <Card className="border-warning/35 bg-warning/10">
+                    <p className="text-sm text-warning" role="alert">
+                      {t("essays.score.requestFailed")}
+                    </p>
                   </Card>
                 ) : null}
 
@@ -1027,9 +1029,14 @@ export function EssaysScreen() {
                       <div>
                         <h3 className="text-lg font-semibold">{t("essays.score.title")}</h3>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {scoreNotice?.reason === "cached"
-                            ? t("essays.score.cachedNotice")
-                            : t("essays.score.notice")}
+                          {scoreRequestFailed ||
+                          (scoreNotice &&
+                            (scoreNotice.reason === "ai_unavailable" ||
+                              scoreNotice.reason === "validation_failed"))
+                            ? t("essays.score.staleAfterFailedRefresh")
+                            : scoreNotice?.reason === "cached"
+                              ? t("essays.score.cachedNotice")
+                              : t("essays.score.notice")}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -1105,7 +1112,54 @@ export function EssaysScreen() {
                           )}
                         </dd>
                       </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          {t("essays.score.genericLanguageSignal")}
+                        </dt>
+                        <dd className="text-lg font-semibold">
+                          {t(`essays.score.signal.${latestScore.generic_language_signal}` as TranslationKey)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          {t("essays.score.unsupportedClaimsSignal")}
+                        </dt>
+                        <dd className="text-lg font-semibold">
+                          {t(
+                            `essays.score.signal.${latestScore.unsupported_claims_signal}` as TranslationKey
+                          )}
+                        </dd>
+                      </div>
                     </dl>
+
+                    {latestScore.strength_flags.length > 0 ? (
+                      <div className="mt-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                          {t("essays.score.strengthFlags")}
+                        </h4>
+                        <ul className="mt-2 space-y-1.5 text-sm">
+                          {latestScore.strength_flags.map((flag) => (
+                            <li className="flex items-start gap-2" key={flag}>
+                              <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+                              {flag}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {latestScore.risk_flags.length > 0 ? (
+                      <div className="mt-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                          {t("essays.score.riskFlags")}
+                        </h4>
+                        <ul className="mt-2 space-y-1 text-sm text-warning">
+                          {latestScore.risk_flags.map((flag) => (
+                            <li key={flag}>{flag}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
 
                     {latestScore.source_warnings.length > 0 ? (
                       <div className="mt-4">

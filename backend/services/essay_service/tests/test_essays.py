@@ -12,6 +12,7 @@ from services.application_service.models import ApplicationTrackerItem
 from services.essay_service.ai_scoring import (
     EssayScoringValidationError,
     build_scoring_payload,
+    compute_context_hash,
     compute_essay_text_hash,
     validate_and_normalize_output,
 )
@@ -94,6 +95,51 @@ class FakeFailingEssayScoringClient:
 
     def score_essay(self, *, system_prompt, user_prompt):
         raise self.error
+
+
+class FakeFlakyEssayScoringClient:
+    """Fails with the given error `fail_times` times, then returns `output`."""
+
+    def __init__(self, error: AIProviderError, *, fail_times: int, output=None):
+        self.error = error
+        self.fail_times = fail_times
+        self.output = output or valid_ai_score_output()
+        self.calls = 0
+
+    def score_essay(self, *, system_prompt, user_prompt):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise self.error
+        return self.output
+
+
+class FakeRacingEssayScoringClient:
+    """Simulates a concurrent request winning the race: writes a competing
+    AIEssayScoreReport for the same essay/hash pair as a side effect of the
+    provider call succeeding, before this call's own result is used."""
+
+    def __init__(self, *, essay, essay_text_hash, context_hash, user, output=None):
+        self.essay = essay
+        self.essay_text_hash = essay_text_hash
+        self.context_hash = context_hash
+        self.user = user
+        self.output = output or valid_ai_score_output()
+        self.calls = 0
+
+    def score_essay(self, *, system_prompt, user_prompt):
+        self.calls += 1
+        AIEssayScoreReport.objects.create(
+            user=self.user,
+            essay=self.essay,
+            essay_text_hash=self.essay_text_hash,
+            context_hash=self.context_hash,
+            rubric_version="essay_numeric_v1",
+            model_provider="gemini",
+            model_name="gemini-flash-latest",
+            raw_output_json=self.output,
+            **validate_and_normalize_output(self.output, payload=build_scoring_payload(self.essay)),
+        )
+        return self.output
 
 
 class EssayFeedbackEngineTests(APITestCase):
@@ -732,7 +778,7 @@ class AIEssayScoringTests(APITestCase):
 
         response = self._score_with_client(essay, client)
 
-        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY, response.data)
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE, response.data)
         self.assertEqual(response.data["reason"], "validation_failed")
         self.assertEqual(AIEssayScoreReport.objects.count(), 0)
 
@@ -742,7 +788,7 @@ class AIEssayScoringTests(APITestCase):
 
         response = self._score_with_client(essay, client)
 
-        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY, response.data)
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE, response.data)
         self.assertEqual(response.data["reason"], "validation_failed")
 
     def test_suggestions_limits_are_enforced(self):
@@ -806,11 +852,116 @@ class AIEssayScoringTests(APITestCase):
         with self.assertLogs("services.essay_service.ai_scoring", level="WARNING") as captured:
             response = self._score_with_client(essay, client)
 
-        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         log_line = "\n".join(captured.output)
         self.assertIn("feature=essay_scoring", log_line)
         self.assertIn("essay_id=", log_line)
         self.assertNotIn("grandmother's garden", log_line)
+
+    def test_transient_provider_error_is_retried_once_and_succeeds(self):
+        essay = self._essay()
+        error = AIProviderError(
+            "Gemini essay scoring request timed out.",
+            error_body="timeout while calling Gemini",
+            cause_class="TimeoutError",
+        )
+        client = FakeFlakyEssayScoringClient(error, fail_times=1)
+
+        response = self._score_with_client(essay, client)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["reason"], "scored")
+        self.assertEqual(client.calls, 2)
+        self.assertEqual(AIEssayScoreReport.objects.count(), 1)
+
+    def test_transient_provider_error_retried_once_then_fails_cleanly(self):
+        essay = self._essay()
+        error = AIProviderError(
+            "Gemini essay scoring request failed.",
+            status_code=503,
+            error_body="upstream overloaded",
+            cause_class="HTTPError",
+        )
+        client = FakeFlakyEssayScoringClient(error, fail_times=99)
+
+        with self.assertLogs("services.essay_service.ai_scoring", level="WARNING") as captured:
+            response = self._score_with_client(essay, client)
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data["reason"], "ai_unavailable")
+        # Capped at exactly one retry (two total attempts), never more.
+        self.assertEqual(client.calls, 2)
+        self.assertEqual(AIEssayScoreReport.objects.count(), 0)
+        log_line = "\n".join(captured.output)
+        self.assertIn("attempt=1_retrying", log_line)
+        self.assertIn("attempt=2_final", log_line)
+
+    def test_non_retryable_provider_error_is_not_retried(self):
+        essay = self._essay()
+        error = AIProviderError(
+            "Gemini essay scoring request failed.",
+            status_code=400,
+            error_body='{"error": {"code": 400, "status": "INVALID_ARGUMENT"}}',
+            cause_class="HTTPError",
+            provider_code=400,
+            provider_status="INVALID_ARGUMENT",
+        )
+        client = FakeFlakyEssayScoringClient(error, fail_times=99)
+
+        response = self._score_with_client(essay, client)
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data["reason"], "ai_unavailable")
+        self.assertEqual(client.calls, 1)
+
+    def test_concurrent_scoring_reuses_winning_report_instead_of_duplicating(self):
+        essay = self._essay()
+        essay_text_hash = compute_essay_text_hash(essay.draft_text)
+        payload = build_scoring_payload(essay)
+        context_hash = compute_context_hash(payload, model_name="gemini-flash-latest")
+        client = FakeRacingEssayScoringClient(
+            essay=essay,
+            essay_text_hash=essay_text_hash,
+            context_hash=context_hash,
+            user=essay.user,
+        )
+
+        response = self._score_with_client(essay, client)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["reason"], "cached")
+        self.assertTrue(response.data["cached"])
+        # Only the racing request's own write exists -- score_essay() did not
+        # create a second row for the same essay/hash pair.
+        self.assertEqual(AIEssayScoreReport.objects.count(), 1)
+
+    @override_settings(AI_ESSAY_DAILY_FREE_LIMIT=2)
+    def test_failed_rescore_does_not_delete_previous_score(self):
+        essay = self._essay()
+        good_client = FakeEssayScoringClient()
+        first = self._score_with_client(essay, good_client)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        report_id = first.data["score"]["id"]
+
+        essay.draft_text = essay.draft_text + " A meaningfully different revised ending."
+        essay.save(update_fields=["draft_text", "updated_at"])
+        failing_error = AIProviderError(
+            "Gemini essay scoring request failed.",
+            status_code=500,
+            error_body="upstream error",
+            cause_class="HTTPError",
+        )
+        failing_client = FakeFailingEssayScoringClient(failing_error)
+        second = self._score_with_client(essay, failing_client)
+        self.assertEqual(second.status_code, status.HTTP_503_SERVICE_UNAVAILABLE, second.data)
+
+        # The original report from the first (successful) call must still
+        # exist untouched, and the latest-score endpoint must still serve it.
+        self.assertTrue(AIEssayScoreReport.objects.filter(id=report_id).exists())
+        self.client.force_authenticate(essay.user)
+        latest = self.client.get(f"/api/essays/{essay.id}/score/latest/")
+        self.assertEqual(latest.status_code, status.HTTP_200_OK)
+        self.assertEqual(latest.data["score"]["id"], report_id)
 
     def test_missing_draft_returns_safe_missing_text_reason(self):
         essay = self._essay(draft_text="")

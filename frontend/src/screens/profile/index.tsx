@@ -30,7 +30,9 @@ import {
   type TestScores,
   type Volunteer
 } from "@/entities/profile";
+import type { OfficialExamDate } from "@/entities/exam";
 import { useAuth } from "@/features/auth/model/auth-context";
+import { type ApPlanRow, getOfficialExamDatesRequest, PlannedExamFields } from "@/features/exams";
 import {
   getProfileAssessmentLatestRequest,
   getProfileCompletionRequest,
@@ -110,8 +112,7 @@ type ProfileFormState = {
   satTarget: string;
   ieltsDate: string;
   ieltsTarget: string;
-  apDate: string;
-  apTarget: string;
+  apPlans: ApPlanRow[];
   telegramUsername: string;
   phone: string;
 };
@@ -153,8 +154,7 @@ const emptyForm: ProfileFormState = {
   satTarget: "",
   ieltsDate: "",
   ieltsTarget: "",
-  apDate: "",
-  apTarget: "",
+  apPlans: [{ id: "ap-1", subject: "", date: "", target: "" }],
   telegramUsername: "",
   phone: ""
 };
@@ -179,9 +179,21 @@ function scoreToText(value: TestScores[string]) {
 
 function profileToForm(profile: StudentProfileDetails): ProfileFormState {
   const plannedExams = profile.exam_plans.planned ?? [];
-  const satPlan = plannedExams.find((exam) => exam.name === "SAT");
-  const ieltsPlan = plannedExams.find((exam) => exam.name === "IELTS");
-  const apPlan = plannedExams.find((exam) => exam.name === "AP");
+  const satPlan = plannedExams.find((exam) => exam.exam_type === "SAT" || exam.name === "SAT");
+  const ieltsPlan = plannedExams.find(
+    (exam) => exam.exam_type === "IELTS" || exam.name === "IELTS"
+  );
+  // Every AP row (from onboarding's per-subject planning, e.g. "AP Biology")
+  // is kept here, not just a single exam literally named "AP" -- otherwise
+  // saving from this screen would silently drop the other rows.
+  const apPlans: ApPlanRow[] = plannedExams
+    .filter((exam) => exam.exam_type === "AP" || exam.name.toLowerCase().startsWith("ap "))
+    .map((exam, index) => ({
+      id: `ap-${index + 1}`,
+      subject: exam.name === "AP" ? "" : exam.name,
+      date: exam.date ?? "",
+      target: exam.target_score ?? ""
+    }));
   return {
     fullName: profile.full_name,
     birthDate: profile.birth_date ?? "",
@@ -222,8 +234,7 @@ function profileToForm(profile: StudentProfileDetails): ProfileFormState {
     satTarget: satPlan?.target_score ?? "",
     ieltsDate: ieltsPlan?.date ?? "",
     ieltsTarget: ieltsPlan?.target_score ?? "",
-    apDate: apPlan?.date ?? "",
-    apTarget: apPlan?.target_score ?? "",
+    apPlans: apPlans.length ? apPlans : [{ id: "ap-1", subject: "", date: "", target: "" }],
     telegramUsername: profile.telegram_username,
     phone: profile.phone
   };
@@ -488,6 +499,8 @@ export function ProfileScreen() {
   const [volunteering, setVolunteering] = useState<Volunteer[]>([]);
   const [recommenders, setRecommenders] = useState<Recommender[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [officialDates, setOfficialDates] = useState<OfficialExamDate[]>([]);
+  const [officialDatesError, setOfficialDatesError] = useState(false);
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
@@ -565,11 +578,50 @@ export function ProfileScreen() {
     void loadItems();
   }, [loadProfile, loadItems]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setOfficialDatesError(false);
+    getOfficialExamDatesRequest({ page_size: 200 })
+      .then((response) => {
+        if (!cancelled) setOfficialDates(response.results);
+      })
+      .catch(() => {
+        if (!cancelled) setOfficialDatesError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function updateField<Key extends keyof ProfileFormState>(
     field: Key,
     value: ProfileFormState[Key]
   ) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateApPlan(rowId: string, patch: Partial<ApPlanRow>) {
+    setForm((current) => ({
+      ...current,
+      apPlans: current.apPlans.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
+    }));
+  }
+
+  function addApPlan() {
+    setForm((current) => ({
+      ...current,
+      apPlans: [
+        ...current.apPlans,
+        { id: `ap-${Date.now()}`, subject: "", date: "", target: "" }
+      ]
+    }));
+  }
+
+  function removeApPlan(rowId: string) {
+    setForm((current) => {
+      if (current.apPlans.length <= 1) return current;
+      return { ...current, apPlans: current.apPlans.filter((row) => row.id !== rowId) };
+    });
   }
 
   const hasUnsavedProfileChanges = JSON.stringify(form) !== JSON.stringify(savedForm);
@@ -645,11 +697,33 @@ export function ProfileScreen() {
         test_scores: testScores,
         exam_plans: {
           taken: profile?.exam_plans.taken ?? [],
-          planned: ([
-            { name: "SAT", exam_type: "SAT", date: form.satDate, target_score: form.satTarget },
-            { name: "IELTS", exam_type: "IELTS", date: form.ieltsDate, target_score: form.ieltsTarget },
-            { name: "AP", exam_type: "AP", date: form.apDate, target_score: form.apTarget }
-          ] satisfies PlannedExam[]).filter((exam) => exam.date || exam.target_score)
+          planned: [
+            ...(
+              [
+                { name: "SAT", exam_type: "SAT", date: form.satDate, target_score: form.satTarget },
+                {
+                  name: "IELTS",
+                  exam_type: "IELTS",
+                  date: form.ieltsDate,
+                  target_score: form.ieltsTarget
+                },
+                ...form.apPlans
+                  .filter((plan) => plan.subject.trim() && (plan.date || plan.target.trim()))
+                  .map((plan) => ({
+                    name: plan.subject.trim(),
+                    exam_type: "AP" as const,
+                    date: plan.date,
+                    target_score: plan.target
+                  }))
+              ] satisfies PlannedExam[]
+            ).filter((exam) => exam.date || exam.target_score),
+            // Preserve any planned exam this screen doesn't manage (e.g. ACT
+            // or a custom "Other" entry from onboarding) instead of silently
+            // dropping it on every Profile save.
+            ...(profile?.exam_plans.planned ?? []).filter(
+              (exam) => !["SAT", "IELTS", "AP"].includes(exam.exam_type ?? "")
+            )
+          ]
         },
         telegram_username: form.telegramUsername,
         phone: form.phone
@@ -1280,31 +1354,22 @@ export function ProfileScreen() {
           />
         </Field>
         <Field label={t("dashboard.examCountdown.title")} wide>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {([
-              ["SAT", "satDate", "satTarget"],
-              ["IELTS", "ieltsDate", "ieltsTarget"],
-              ["AP", "apDate", "apTarget"]
-            ] as const).map(([exam, dateField, targetField]) => (
-              <div className="border bg-surface p-3" key={exam}>
-                <p className="font-semibold">{exam}</p>
-                <input
-                  aria-label={t("onboarding.field.examDate")}
-                  className={fieldClassName}
-                  onChange={(event) => updateField(dateField, event.target.value)}
-                  type="date"
-                  value={form[dateField]}
-                />
-                <input
-                  aria-label={t("onboarding.field.targetScore")}
-                  className={fieldClassName}
-                  onChange={(event) => updateField(targetField, event.target.value)}
-                  placeholder={t("onboarding.field.targetScore")}
-                  value={form[targetField]}
-                />
-              </div>
-            ))}
-          </div>
+          <PlannedExamFields
+            apPlans={form.apPlans}
+            ieltsDate={form.ieltsDate}
+            ieltsTarget={form.ieltsTarget}
+            officialDates={officialDates}
+            officialDatesError={officialDatesError}
+            onAddApPlan={addApPlan}
+            onIeltsDateChange={(value) => updateField("ieltsDate", value)}
+            onIeltsTargetChange={(value) => updateField("ieltsTarget", value)}
+            onRemoveApPlan={removeApPlan}
+            onSatDateChange={(value) => updateField("satDate", value)}
+            onSatTargetChange={(value) => updateField("satTarget", value)}
+            onUpdateApPlan={updateApPlan}
+            satDate={form.satDate}
+            satTarget={form.satTarget}
+          />
         </Field>
       </ProfileSection>
 

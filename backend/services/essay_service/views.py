@@ -21,8 +21,16 @@ AI_SCORE_REASON_STATUS = {
     "cached": status.HTTP_200_OK,
     "scored": status.HTTP_201_CREATED,
     "quota_exceeded": status.HTTP_429_TOO_MANY_REQUESTS,
+    # Both of these mean "the AI path did not produce a usable score this
+    # time" from the client's point of view -- a provider-level failure
+    # (timeout/network/malformed response) and a response that failed our own
+    # strict schema/content validation are both retryable, temporary, and
+    # never a raw backend crash. Using the same 503 (not 502, which implies a
+    # broken gateway/infra) keeps the frontend's error handling uniform and
+    # avoids surfacing an alarming "Bad Gateway" for what is actually a
+    # controlled, sanitized response with a JSON body.
     "ai_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
-    "validation_failed": status.HTTP_502_BAD_GATEWAY,
+    "validation_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
     "missing_essay_text": status.HTTP_400_BAD_REQUEST,
 }
 

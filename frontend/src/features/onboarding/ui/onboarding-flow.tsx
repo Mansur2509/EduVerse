@@ -24,7 +24,7 @@ import {
 } from "@/entities/profile";
 import type { OfficialExamDate } from "@/entities/exam";
 import { useAuth } from "@/features/auth";
-import { getOfficialExamDatesRequest } from "@/features/exams";
+import { getOfficialExamDatesRequest, PlannedExamFields } from "@/features/exams";
 import {
   completeOnboardingRequest,
   getApplicationReadinessRequest,
@@ -34,7 +34,6 @@ import {
 } from "@/features/profile";
 import { ApiError, getApiErrorMessage } from "@/shared/api/client";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
-import { formatDate } from "@/shared/lib/date-time";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -545,7 +544,7 @@ function getStepValidationIssues(
 
 export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const { logout } = useAuth();
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const [form, setForm] = useState<OnboardingForm>(emptyForm);
   const [savedForm, setSavedForm] = useState<OnboardingForm>(emptyForm);
   const [sections, setSections] = useState<OnboardingSection[]>([]);
@@ -626,16 +625,9 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
       .filter((category) => category.majors.length > 0);
   }, [majorSearch, t]);
   const todayIso = new Date().toISOString().slice(0, 10);
-  const satDateOptions = useMemo(
-    () =>
-      officialDates
-        .filter(
-          (item) =>
-            item.exam_type === "SAT" && item.event_kind === "exam" && item.test_date >= todayIso
-        )
-        .slice(0, 5),
-    [officialDates, todayIso]
-  );
+  // Only kept for the subject -> matching-date auto-fill in updateApPlan
+  // below; the suggested-date lists themselves now live inside the shared
+  // PlannedExamFields component (also used by Profile) so both stay in sync.
   const apExamDateOptions = useMemo(
     () =>
       officialDates.filter(
@@ -643,10 +635,6 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
           item.exam_type === "AP" && item.event_kind === "exam" && item.test_date >= todayIso
       ),
     [officialDates, todayIso]
-  );
-  const apSubjectOptions = useMemo(
-    () => Array.from(new Set(apExamDateOptions.map((item) => item.name))).sort(),
-    [apExamDateOptions]
   );
 
   const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(savedForm);
@@ -1074,147 +1062,23 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
                   <p className="mt-1 text-xs font-semibold text-primary-hover">
                     {t("onboarding.validation.examPlan")}
                   </p>
-                  {officialDatesError ? (
-                    <p className="mt-2 text-xs text-warning">
-                      {t("onboarding.field.officialDatesUnavailable")}
-                    </p>
-                  ) : null}
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div className="border bg-surface p-4">
-                      <h3 className="font-semibold">SAT</h3>
-                      {satDateOptions.length > 0 ? (
-                        <select
-                          aria-label={t("onboarding.field.examDate")}
-                          className={fieldClassName}
-                          onChange={(event) => update("satDate", event.target.value)}
-                          value={form.satDate}
-                        >
-                          <option value="">{t("onboarding.field.selectSuggestedDate")}</option>
-                          {satDateOptions.map((item) => (
-                            <option key={item.id} value={item.test_date}>
-                              {formatDate(item.test_date, locale)}
-                              {item.test_time ? ` / ${item.test_time}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          aria-label={t("onboarding.field.examDate")}
-                          className={fieldClassName}
-                          onChange={(event) => update("satDate", event.target.value)}
-                          type="date"
-                          value={form.satDate}
-                        />
-                      )}
-                      <input
-                        aria-label={t("onboarding.field.targetScore")}
-                        className={fieldClassName}
-                        onChange={(event) => update("satTarget", event.target.value)}
-                        placeholder={t("onboarding.field.targetScore")}
-                        value={form.satTarget}
-                      />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {form.satDate
-                          ? t("onboarding.field.selectedSatDate", {
-                              date: formatDate(form.satDate, locale)
-                            })
-                          : t("onboarding.field.dateUnavailable")}
-                      </p>
-                    </div>
-
-                    <div className="border bg-surface p-4">
-                      <h3 className="font-semibold">IELTS</h3>
-                      <input
-                        aria-label={t("onboarding.field.examDate")}
-                        className={fieldClassName}
-                        onChange={(event) => update("ieltsDate", event.target.value)}
-                        type="date"
-                        value={form.ieltsDate}
-                      />
-                      <input
-                        aria-label={t("onboarding.field.targetScore")}
-                        className={fieldClassName}
-                        onChange={(event) => update("ieltsTarget", event.target.value)}
-                        placeholder={t("onboarding.field.targetScore")}
-                        value={form.ieltsTarget}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-3 border bg-surface p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 className="font-semibold">{t("onboarding.field.apPlanRows")}</h3>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("onboarding.field.apPlanRowsHelp")}
-                        </p>
-                      </div>
-                      <Button onClick={addApPlan} size="sm" type="button" variant="secondary">
-                        {t("exams.plan.addApSubject")}
-                      </Button>
-                    </div>
-                    {form.apPlans.map((row) => {
-                      const dateOptions = row.subject
-                        ? apExamDateOptions.filter((item) => item.name === row.subject)
-                        : apExamDateOptions;
-                      return (
-                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto]" key={row.id}>
-                          <select
-                            aria-label={t("exams.plan.apSubject")}
-                            className={fieldClassName}
-                            onChange={(event) => updateApPlan(row.id, { subject: event.target.value })}
-                            value={row.subject}
-                          >
-                            <option value="">{t("exams.plan.apSubject")}</option>
-                            {apSubjectOptions.map((subject) => (
-                              <option key={subject} value={subject}>
-                                {subject}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            aria-label={t("exams.plan.apDate")}
-                            className={fieldClassName}
-                            onChange={(event) => updateApPlan(row.id, { date: event.target.value })}
-                            value={row.date}
-                          >
-                            <option value="">{t("onboarding.field.selectSuggestedDate")}</option>
-                            {dateOptions.map((item) => (
-                              <option key={item.id} value={item.test_date}>
-                                {formatDate(item.test_date, locale)}
-                                {item.test_time ? ` / ${item.test_time}` : ""}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            aria-label={t("onboarding.field.targetScore")}
-                            className={fieldClassName}
-                            onChange={(event) => updateApPlan(row.id, { target: event.target.value })}
-                            placeholder={t("onboarding.field.targetScore")}
-                            value={row.target}
-                          />
-                          <Button
-                            disabled={form.apPlans.length <= 1}
-                            onClick={() => removeApPlan(row.id)}
-                            size="sm"
-                            type="button"
-                            variant="ghost"
-                          >
-                            {t("common.actions.close")}
-                          </Button>
-                          {row.subject ? (
-                            <p className="text-xs font-semibold text-muted-foreground md:col-span-4">
-                              {row.date
-                                ? t("exams.plan.selectedAp", {
-                                    subject: row.subject,
-                                    date: formatDate(row.date, locale)
-                                  })
-                                : t("onboarding.field.dateUnavailable")}
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                  <div className="mt-4">
+                    <PlannedExamFields
+                      apPlans={form.apPlans}
+                      ieltsDate={form.ieltsDate}
+                      ieltsTarget={form.ieltsTarget}
+                      officialDates={officialDates}
+                      officialDatesError={officialDatesError}
+                      onAddApPlan={addApPlan}
+                      onIeltsDateChange={(value) => update("ieltsDate", value)}
+                      onIeltsTargetChange={(value) => update("ieltsTarget", value)}
+                      onRemoveApPlan={removeApPlan}
+                      onSatDateChange={(value) => update("satDate", value)}
+                      onSatTargetChange={(value) => update("satTarget", value)}
+                      onUpdateApPlan={updateApPlan}
+                      satDate={form.satDate}
+                      satTarget={form.satTarget}
+                    />
                   </div>
                   <div className="mt-4 grid gap-4 border bg-surface p-4 md:grid-cols-3">
                     <input aria-label={t("onboarding.field.otherExam")} className={fieldClassName} onChange={(event) => update("otherExamName", event.target.value)} placeholder={t("onboarding.field.otherExam")} value={form.otherExamName} />

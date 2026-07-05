@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from services.ai_gateway_service.essay_scoring_client import GeminiEssayScoringClient
-from services.ai_gateway_service.exceptions import AIProviderError
+from services.ai_gateway_service.exceptions import AIProviderError, AIProviderUnavailable
 from services.subscription_service.models import Plan, Subscription, UsageLog
 
 from .models import AIEssayScoreReport, EssayWorkspace
@@ -398,6 +398,44 @@ def validate_and_normalize_output(raw: dict, *, payload: dict) -> dict:
     }
 
 
+RETRYABLE_STATUS_THRESHOLD = 500
+
+
+def _is_retryable_provider_error(error: AIProviderError) -> bool:
+    """Retry only transient provider-side failures: timeouts, network errors,
+    and malformed/non-JSON provider output all raise with no HTTP status at
+    all, and a 5xx response means the provider itself is having trouble --
+    retrying with the identical prompt is safe and may simply succeed on a
+    flaky call. Never retry a provider-returned 4xx (bad request, auth
+    failure, model not found, quota exhausted) or a missing/misconfigured API
+    key: those are deterministic and retrying wastes a second provider call
+    without any chance of a different outcome."""
+    if isinstance(error, AIProviderUnavailable):
+        return False
+    return error.status_code is None or error.status_code >= RETRYABLE_STATUS_THRESHOLD
+
+
+def _log_provider_error(error: AIProviderError, *, model_name: str, essay_id: int, attempt: str) -> None:
+    # Never log the essay text, the prompt, or the API key -- only enough
+    # structured, sanitized detail (status code, wrapped-exception class,
+    # Gemini's own error code/status, message, and truncated provider error
+    # body) to diagnose a production failure from Render logs.
+    logger.warning(
+        "Gemini provider error feature=essay_scoring model=%s essay_id=%s attempt=%s status=%s "
+        "exception=%s cause=%s provider_code=%s provider_status=%s message=\"%s\" error=\"%s\"",
+        model_name,
+        essay_id,
+        attempt,
+        getattr(error, "status_code", None),
+        type(error).__name__,
+        getattr(error, "cause_class", None),
+        getattr(error, "provider_code", None),
+        getattr(error, "provider_status", None),
+        str(error)[:1000],
+        getattr(error, "error_body", "")[:1000],
+    )
+
+
 @dataclass
 class QuotaStatus:
     window: str  # "day" | "month"
@@ -514,30 +552,31 @@ def score_essay(essay: EssayWorkspace, *, user) -> dict:
     user_prompt = build_user_prompt(payload)
     try:
         raw_output = client.score_essay(system_prompt=ESSAY_SCORING_SYSTEM_PROMPT, user_prompt=user_prompt)
-    except AIProviderError as error:
-        # Never log the essay text, the prompt, or the API key -- only enough
-        # structured, sanitized detail (status code, wrapped-exception class,
-        # Gemini's own error code/status, message, and truncated provider
-        # error body) to diagnose a production failure from Render logs.
-        logger.warning(
-            "Gemini provider error feature=essay_scoring model=%s status=%s exception=%s cause=%s "
-            "provider_code=%s provider_status=%s message=\"%s\" error=\"%s\"",
-            model_name,
-            getattr(error, "status_code", None),
-            type(error).__name__,
-            getattr(error, "cause_class", None),
-            getattr(error, "provider_code", None),
-            getattr(error, "provider_status", None),
-            str(error)[:1000],
-            getattr(error, "error_body", "")[:1000],
-        )
-        return {
-            "reason": "ai_unavailable",
-            "cached": False,
-            "report": None,
-            "quota_remaining": quota.remaining,
-            "next_available_at": None,
-        }
+    except AIProviderError as first_error:
+        if not _is_retryable_provider_error(first_error):
+            _log_provider_error(first_error, model_name=model_name, essay_id=essay.id, attempt="1_final")
+            return {
+                "reason": "ai_unavailable",
+                "cached": False,
+                "report": None,
+                "quota_remaining": quota.remaining,
+                "next_available_at": None,
+            }
+        _log_provider_error(first_error, model_name=model_name, essay_id=essay.id, attempt="1_retrying")
+        try:
+            # Exactly one retry, same sanitized system/user prompt -- covers a
+            # single flaky timeout/network blip/malformed response without
+            # multiplying provider load or quota usage.
+            raw_output = client.score_essay(system_prompt=ESSAY_SCORING_SYSTEM_PROMPT, user_prompt=user_prompt)
+        except AIProviderError as retry_error:
+            _log_provider_error(retry_error, model_name=model_name, essay_id=essay.id, attempt="2_final")
+            return {
+                "reason": "ai_unavailable",
+                "cached": False,
+                "report": None,
+                "quota_remaining": quota.remaining,
+                "next_available_at": None,
+            }
 
     try:
         normalized = validate_and_normalize_output(raw_output, payload=payload)
@@ -557,6 +596,28 @@ def score_essay(essay: EssayWorkspace, *, user) -> dict:
             "cached": False,
             "report": None,
             "quota_remaining": quota.remaining,
+            "next_available_at": None,
+        }
+
+    # Guard against two near-simultaneous score requests for the same essay
+    # (e.g. a double-click) both reaching this point: if another request
+    # already wrote a report for this exact essay_text_hash/context_hash
+    # while this one was waiting on the provider call, reuse it instead of
+    # creating a second row and double-charging quota/UsageLog.
+    concurrent_report = (
+        AIEssayScoreReport.objects.filter(
+            essay=essay, essay_text_hash=essay_text_hash, context_hash=context_hash
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if concurrent_report is not None:
+        quota_after = get_quota_status(user)
+        return {
+            "reason": "cached",
+            "cached": True,
+            "report": concurrent_report,
+            "quota_remaining": quota_after.remaining,
             "next_available_at": None,
         }
 
