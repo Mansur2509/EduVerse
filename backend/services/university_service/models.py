@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from common.validators import validate_http_url
@@ -111,6 +112,35 @@ class University(models.Model):
     application_portal_url = models.URLField(blank=True, validators=[validate_http_url])
     international_office_url = models.URLField(blank=True, validators=[validate_http_url])
     virtual_info_session_url = models.URLField(blank=True, validators=[validate_http_url])
+    # A second, distinct admissions link some sources publish alongside
+    # `admissions_url` (e.g. a general admissions info page vs. a "how to
+    # apply" page). Kept separate rather than overwriting `admissions_url`
+    # since either may be the more useful link depending on the source.
+    admissions_website = models.URLField(blank=True, validators=[validate_http_url])
+
+    # Bulk-import public fields (added for the ~450-university dataset import).
+    # All optional/raw-text-preserving: null/blank means "not provided", never
+    # invented. Free-text fields are stored verbatim rather than force-parsed
+    # into structured data when the source prose is too varied to normalize
+    # safely.
+    majors_list = models.JSONField(default=list, blank=True)
+    admissions_cycle_target = models.CharField(max_length=240, blank=True)
+    standardized_testing_policy_text = models.TextField(blank=True)
+    # Distinct from `sat_average` (which existing fit-scoring code already
+    # reads with its own semantics) -- this is specifically the dataset's
+    # "SAT 50th percentile" column and must never be conflated with it.
+    sat_p50 = models.PositiveSmallIntegerField(null=True, blank=True)
+    qs_overall_score = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    need_based_aid_notes = models.TextField(blank=True)
+    merit_scholarship_notes = models.TextField(blank=True)
+    other_scholarships_notes = models.TextField(blank=True)
+    scholarship_links_text = models.TextField(blank=True)
+    profile_evidence_notes = models.TextField(blank=True)
+    activities_notes = models.TextField(blank=True)
+    honors_olympiads_notes = models.TextField(blank=True)
+    research_experience_notes = models.TextField(blank=True)
+    portfolio_notes = models.TextField(blank=True)
+    essay_drafts_notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -418,3 +448,106 @@ class UniversityImportJob(models.Model):
 
     def __str__(self) -> str:
         return f"{self.original_filename} ({self.mode}, {self.status})"
+
+
+class UniversityGuidanceContext(models.Model):
+    """Internal guidance/context layer for a university.
+
+    Never serialized to the public API -- no public serializer references
+    this model, so it is excluded from student-facing responses by omission
+    rather than by an exclude-list. Backend services only (essay review,
+    fit/strategy analysis, recommendation prep, profile improvement) should
+    read this through `get_university_ai_context()`, which returns only the
+    fields relevant to the requested purpose instead of the whole row.
+    """
+
+    university = models.OneToOneField(
+        University, on_delete=models.CASCADE, related_name="guidance_context"
+    )
+    recommendation_letters = models.TextField(blank=True)
+    what_they_look_for = models.TextField(blank=True)
+    preferred_student_profile = models.TextField(blank=True)
+    who_they_seek = models.TextField(blank=True)
+    student_traits_mentioned = models.TextField(blank=True)
+    alumni_profile_evidence = models.TextField(blank=True)
+    published_admitted_student_essays = models.TextField(blank=True)
+    official_admissions_messaging = models.TextField(blank=True)
+    student_life_page_signals = models.TextField(blank=True)
+    graduate_alumni_outcomes = models.TextField(blank=True)
+    sample_admitted_essays = models.TextField(blank=True)
+    essay_themes = models.TextField(blank=True)
+    research_leadership_themes = models.TextField(blank=True)
+    personality_traits_mentioned = models.TextField(blank=True)
+    academic_interests_mentioned = models.TextField(blank=True)
+    institutional_values = models.TextField(blank=True)
+    source_urls = models.TextField(blank=True)
+    last_verified_date = models.DateField(null=True, blank=True)
+    verification_status = models.CharField(max_length=120, blank=True)
+    data_source = models.TextField(blank=True)
+    # Admin/source note (dataset column 59) -- internal only, never public.
+    notes = models.TextField(blank=True)
+    # Future-proofing safety net: the full raw column->value dict for this
+    # guidance section, so a gap in the explicit field mapping above never
+    # silently loses source data.
+    raw_context_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Guidance context: {self.university.name}"
+
+
+class UniversitySignalWeights(models.Model):
+    """System-only profile-scoring vector for a university (dataset columns
+    60-72). Never serialized to the public API and never shown to students as
+    raw values -- intended for the fit/readiness engine
+    (`compare_student_vector_to_university_weights`) only.
+    """
+
+    _score_validators = (MinValueValidator(0), MaxValueValidator(10))
+
+    university = models.OneToOneField(
+        University, on_delete=models.CASCADE, related_name="signal_weights"
+    )
+    profile_evidence_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    activities_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    honors_olympiads_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    research_experience_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    portfolio_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    subject_passion_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    curiosity_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    originality_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    leadership_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    community_impact_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    research_fit_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    olympiads_score = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=_score_validators
+    )
+    profile_scoring_source = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Signal weights: {self.university.name}"

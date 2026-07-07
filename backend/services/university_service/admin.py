@@ -6,10 +6,12 @@ from .models import (
     University,
     UniversityDataSource,
     UniversityFieldVerification,
+    UniversityGuidanceContext,
     UniversityImportJob,
     UniversityProgram,
     UniversityRequirement,
     UniversityScholarship,
+    UniversitySignalWeights,
     UniversitySubjectRanking,
 )
 
@@ -52,6 +54,22 @@ class UniversitySubjectRankingInline(admin.TabularInline):
     )
 
 
+class UniversityGuidanceContextInline(admin.StackedInline):
+    # Staff-only view of the internal guidance/context layer -- never exposed
+    # through any public serializer.
+    model = UniversityGuidanceContext
+    extra = 0
+    can_delete = False
+
+
+class UniversitySignalWeightsInline(admin.StackedInline):
+    # Staff-only view of the system-only profile-scoring vector -- never
+    # exposed through any public serializer or shown to students as raw data.
+    model = UniversitySignalWeights
+    extra = 0
+    can_delete = False
+
+
 @admin.register(University)
 class UniversityAdmin(admin.ModelAdmin):
     list_display = (
@@ -71,6 +89,8 @@ class UniversityAdmin(admin.ModelAdmin):
         UniversitySubjectRankingInline,
         UniversityFieldVerificationInline,
         UniversityDataSourceInline,
+        UniversityGuidanceContextInline,
+        UniversitySignalWeightsInline,
     ]
 
 
