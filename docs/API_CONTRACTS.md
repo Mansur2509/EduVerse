@@ -688,6 +688,8 @@ All moderation endpoints require an admin role. A moderator cannot approve or re
 | POST | `/api/admin/university-import/dry-run/` | Admin/staff | Upload `.xlsx`, create an import job, parse through the existing importer, and roll back writes |
 | POST | `/api/admin/university-import/execute/` | Admin/staff | Upload `.xlsx`, create an import job, and run the idempotent real import |
 | GET | `/api/admin/university-import/jobs/{id}/` | Admin/staff | Read import job status, counters, report JSON, or error message |
+
+The separate 72-column data-cleaning importer is CLI-only and must not be exposed through public APIs. Use `python manage.py import_universities_data <path>` for a default dry-run, or add `--commit` to write safe creates/missing-field updates. It performs deterministic cell cleaning before saving, skips placeholder/commentary/country-average cells, writes optional audit/manual-review CSVs, stores committed row fingerprints in `UniversityDataImportBatch`/`UniversityDataImportRowLog`, and never serializes skipped raw cells, audit rows, or system-only signal weights through student-facing endpoints.
 | GET | `/health/` | Public | Service health |
 | GET | `/api/v1/universities/` | Authenticated | University catalog, search/filter; excludes `is_demo=true` records unless `?include_demo=true` |
 | GET | `/api/v1/universities/filter-options/` | Authenticated | Data-backed catalog filter/autocomplete options for countries, cities, institution types, verification states, cost confidence, and university names |

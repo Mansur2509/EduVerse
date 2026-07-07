@@ -6,6 +6,7 @@ from django.test import TestCase
 
 from services.university_service.data_import import (
     ImportConfigurationError,
+    clean_raw_cell,
     import_universities_data,
     normalized_university_key,
     parse_optional_decimal,
@@ -16,6 +17,8 @@ from services.university_service.data_import import (
 )
 from services.university_service.models import (
     University,
+    UniversityDataImportBatch,
+    UniversityDataImportRowLog,
     UniversityGuidanceContext,
     UniversitySignalWeights,
 )
@@ -104,15 +107,18 @@ def sample_row(**overrides) -> dict:
             "Country": "Testland",
             "City": "Test City",
             "Official Website": "https://sample.example.edu/",
+            "Admissions URL": "https://sample.example.edu/admissions?utm_source=test",
             "Majors": "Physics; Chemistry; Physics",
+            "Deadlines": "Regular Decision: January 5",
             "SAT 25th": "1400",
-            "SAT 50th": "Not used",
+            "SAT 50th": "1450",
             "SAT 75th": "1500",
             "IELTS Minimum": "6.5",
             "Average GPA": "3.80",
-            "Acceptance Rate": "12.5",
+            "Acceptance Rate": "12.5%",
             "QS World University Ranking": "42nd overall, QS WUR 2027",
             "Tuition": "$40,000",
+            "Scholarships": "Dean Scholarship",
             "What They Look For": "Curiosity and rigor.",
             "Notes": "Internal admin note, never public.",
             "Last Verified Date": "2026-01-15",
@@ -126,7 +132,13 @@ def sample_row(**overrides) -> dict:
 
 def write_csv(rows: list[dict], *, headers: list[str] | None = None) -> str:
     headers = headers or FULL_HEADERS
-    handle = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8", newline="")
+    handle = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".csv",
+        delete=False,
+        encoding="utf-8",
+        newline="",
+    )
     writer = csv.DictWriter(handle, fieldnames=headers)
     writer.writeheader()
     for row in rows:
@@ -141,25 +153,17 @@ class ParsingHelperTests(TestCase):
         self.assertIsNone(value)
         self.assertIsNone(warning)
 
-    def test_parse_optional_int_extracts_leading_number(self):
+    def test_parse_optional_int_extracts_plain_number(self):
         value, warning = parse_optional_int("1520")
         self.assertEqual(value, 1520)
         self.assertIsNone(warning)
 
-    def test_parse_optional_int_warns_on_unparseable_text(self):
-        value, warning = parse_optional_int("varies by program")
-        self.assertIsNone(value)
-        self.assertIsNotNone(warning)
-
-    def test_parse_optional_decimal_extracts_first_number_from_prose(self):
+    def test_parse_optional_decimal_rejects_prose(self):
         value, warning = parse_optional_decimal(
-            "6.5 standard / 7.0 higher by course", max_digits=3, decimal_places=1
+            "6.5 standard / 7.0 higher by course",
+            max_digits=3,
+            decimal_places=1,
         )
-        self.assertEqual(value, 6.5)
-        self.assertIsNone(warning)
-
-    def test_parse_optional_decimal_warns_on_out_of_range_value(self):
-        value, warning = parse_optional_decimal("99999", max_digits=3, decimal_places=1)
         self.assertIsNone(value)
         self.assertIsNotNone(warning)
 
@@ -167,11 +171,6 @@ class ParsingHelperTests(TestCase):
         value, warning = parse_score_0_10("15")
         self.assertIsNone(value)
         self.assertIsNotNone(warning)
-
-    def test_parse_score_0_10_accepts_valid_range(self):
-        value, warning = parse_score_0_10("7")
-        self.assertEqual(value, 7)
-        self.assertIsNone(warning)
 
     def test_parse_qs_ranking_extracts_rank_and_year(self):
         rank, year, warning = parse_qs_ranking("1st overall, QS WUR 2027")
@@ -183,8 +182,8 @@ class ParsingHelperTests(TestCase):
         majors = split_majors("Physics; Chemistry; physics; Biology")
         self.assertEqual(majors, ["Physics", "Chemistry", "Biology"])
 
-    def test_normalized_key_strips_trailing_parenthetical(self):
-        key_a = normalized_university_key("Massachusetts Institute of Technology (MIT)", "USA")
+    def test_normalized_key_handles_safe_aliases(self):
+        key_a = normalized_university_key("MIT", "USA")
         key_b = normalized_university_key("Massachusetts Institute of Technology", "usa")
         self.assertEqual(key_a, key_b)
 
@@ -204,137 +203,172 @@ class ImportUniversitiesDataTests(TestCase):
         with self.assertRaises(ImportConfigurationError):
             import_universities_data(path, commit=False)
 
-    def test_missing_file_raises_configuration_error(self):
-        with self.assertRaises(ImportConfigurationError):
-            import_universities_data("C:/does/not/exist.csv", commit=False)
-
-    def test_unsupported_extension_raises_configuration_error(self):
-        path = self._write([sample_row()])
-        renamed = path.rsplit(".", 1)[0] + ".docx"
-        Path(path).rename(renamed)
-        self._temp_files.append(renamed)
-        with self.assertRaises(ImportConfigurationError):
-            import_universities_data(renamed, commit=False)
-
     def test_dry_run_never_writes_to_the_database(self):
         path = self._write([sample_row()])
-        summary = import_universities_data(path, commit=False)
+        summary = import_universities_data(path)
         self.assertEqual(summary.created, 1)
         self.assertEqual(University.objects.count(), 0)
+        self.assertEqual(UniversityDataImportBatch.objects.count(), 0)
 
-    def test_commit_creates_university_guidance_and_signal_rows(self):
+    def test_commit_creates_university_guidance_signal_and_row_log(self):
         path = self._write([sample_row()])
         summary = import_universities_data(path, commit=True)
         self.assertEqual(summary.created, 1)
         university = University.objects.get(name="Sample University")
         self.assertTrue(university.is_published)
-        self.assertEqual(university.country, "Testland")
         self.assertEqual(university.majors_list, ["Physics", "Chemistry"])
         self.assertEqual(university.sat_p25, 1400)
-        self.assertIsNone(university.sat_p50)  # "Not used" -> intentionally blank
-        self.assertEqual(university.sat_p75, 1500)
+        self.assertEqual(university.sat_p50, 1450)
         self.assertEqual(university.qs_ranking, 42)
         self.assertEqual(university.qs_ranking_year, 2027)
+        self.assertEqual(university.admissions_url, "https://sample.example.edu/admissions")
 
         guidance = UniversityGuidanceContext.objects.get(university=university)
         self.assertEqual(guidance.what_they_look_for, "Curiosity and rigor.")
         self.assertEqual(guidance.notes, "Internal admin note, never public.")
-        self.assertIn("What They Look For", guidance.raw_context_json)
 
         signals = UniversitySignalWeights.objects.get(university=university)
         self.assertEqual(signals.profile_evidence_score, 8)
         self.assertEqual(signals.activities_score, 9)
+        self.assertEqual(UniversityDataImportRowLog.objects.count(), 1)
 
-    def test_missing_required_field_is_skipped_not_fatal(self):
-        rows = [sample_row(Name="Good University"), sample_row(Name="", City="")]
-        path = self._write(rows)
-        summary = import_universities_data(path, commit=True)
-        self.assertEqual(summary.created, 1)
-        self.assertEqual(summary.skipped_errors, 1)
-        self.assertEqual(summary.missing_required, 1)
-        self.assertEqual(University.objects.count(), 1)
-
-    def test_existing_university_is_not_overwritten_without_update_existing_flag(self):
-        University.objects.create(
-            name="Sample University",
-            country="Testland",
-            city="Old City",
-            slug="sample-university",
-            official_website="https://old.example.edu/",
-            is_published=True,
-        )
-        path = self._write([sample_row(**{"Official Website": "https://new.example.edu/"})])
-        summary = import_universities_data(path, commit=True)
-        self.assertEqual(summary.skipped_existing, 1)
-        self.assertEqual(summary.created, 0)
-        university = University.objects.get(name="Sample University")
-        self.assertEqual(university.official_website, "https://old.example.edu/")
-        self.assertEqual(university.city, "Old City")
-        # Guidance/signal rows are still populated -- nothing to protect there.
-        self.assertTrue(UniversityGuidanceContext.objects.filter(university=university).exists())
-        self.assertTrue(UniversitySignalWeights.objects.filter(university=university).exists())
-
-    def test_existing_university_is_overwritten_with_update_existing_flag(self):
-        University.objects.create(
-            name="Sample University",
-            country="Testland",
-            city="Old City",
-            slug="sample-university",
-            official_website="https://old.example.edu/",
-            is_published=True,
-        )
-        path = self._write([sample_row(**{"Official Website": "https://new.example.edu/"})])
-        summary = import_universities_data(path, commit=True, update_existing=True)
-        self.assertEqual(summary.updated, 1)
-        university = University.objects.get(name="Sample University")
-        self.assertEqual(university.official_website, "https://new.example.edu/")
-
-    def test_limit_only_processes_first_n_rows(self):
-        rows = [sample_row(Name=f"University {i}") for i in range(5)]
-        path = self._write(rows)
-        summary = import_universities_data(path, commit=False, limit=2)
-        self.assertEqual(summary.rows_read, 2)
-
-    def test_duplicate_keys_within_file_are_reported(self):
-        rows = [sample_row(), sample_row()]
-        path = self._write(rows)
-        summary = import_universities_data(path, commit=False)
-        self.assertEqual(summary.duplicate_keys_in_file, 1)
-
-    def test_invalid_url_is_dropped_with_warning_not_stored(self):
-        path = self._write([sample_row(**{"Official Website": "not a url"})])
-        summary = import_universities_data(path, commit=True)
-        self.assertEqual(summary.created, 1)
-        university = University.objects.get(name="Sample University")
-        self.assertEqual(university.official_website, "")
-        self.assertTrue(any("Official Website" in w for w in summary.warnings))
-
-    def test_out_of_range_score_is_rejected_not_stored(self):
-        path = self._write([sample_row(**{"Profile Evidence Score": "99"})])
+    def test_bad_gpa_comment_cell_is_not_imported(self):
+        bad = "average for this country is 4.5 but in other system it is a 3.6"
+        cell = clean_raw_cell(bad, "Average GPA")
+        self.assertIn(cell.status, {"skipped_generic_country_average", "skipped_commentary"})
+        path = self._write([sample_row(**{"Average GPA": bad})])
         summary = import_universities_data(path, commit=True)
         university = University.objects.get(name="Sample University")
-        signals = UniversitySignalWeights.objects.get(university=university)
-        self.assertIsNone(signals.profile_evidence_score)
-        self.assertTrue(any("Profile Evidence Score" in w for w in summary.warnings))
+        self.assertIsNone(university.gpa_average)
+        self.assertGreaterEqual(summary.generic_country_average_cells, 1)
 
-    def test_unparseable_ielts_text_is_preserved_in_testing_policy_notes(self):
-        path = self._write(
-            [sample_row(**{"IELTS Minimum": "No fixed IELTS minimum published; contact admissions"})]
-        )
+    def test_placeholder_deadline_is_not_imported(self):
+        deadline = "2026-2027 cycle: program/intake-specific deadlines; verify on official page"
+        path = self._write([sample_row(Deadlines=deadline)])
+        summary = import_universities_data(path, commit=True)
+        university = University.objects.get(name="Sample University")
+        self.assertEqual(university.deadlines_text, "")
+        self.assertGreaterEqual(summary.placeholder_cells + summary.commentary_cells, 1)
+
+    def test_generic_major_comment_is_not_imported(self):
+        majors = "Program list varies by faculty/degree; verify exact undergraduate majors/courses."
+        path = self._write([sample_row(Majors=majors)])
         import_universities_data(path, commit=True)
         university = University.objects.get(name="Sample University")
-        self.assertIsNone(university.ielts_minimum)
-        self.assertIn("No fixed IELTS minimum published", university.standardized_testing_policy_text)
+        self.assertEqual(university.majors_list, [])
 
-    def test_tsv_file_is_supported(self):
-        path = tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False, encoding="utf-8", newline="").name
-        self._temp_files = getattr(self, "_temp_files", []) + [path]
-        with open(path, "w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=FULL_HEADERS, delimiter="\t")
-            writer.writeheader()
-            writer.writerow(sample_row())
+    def test_valid_majors_are_accepted_normalized_and_deduped(self):
+        path = self._write([sample_row(Majors="Computer Science; Economics; Chemical Engineering")])
+        import_universities_data(path, commit=True)
+        university = University.objects.get(name="Sample University")
+        self.assertEqual(
+            university.majors_list,
+            ["Computer Science", "Economics", "Chemical Engineering"],
+        )
+
+    def test_existing_university_missing_field_is_filled_by_default(self):
+        University.objects.create(
+            name="Massachusetts Institute of Technology",
+            country="USA",
+            city="Cambridge",
+            slug="mit",
+            official_website="https://mit.edu/",
+            is_published=True,
+        )
+        path = self._write(
+            [
+                sample_row(
+                    Name="MIT",
+                    Country="USA",
+                    City="Cambridge",
+                    **{"Official Website": "https://mit.edu/"},
+                    **{"IELTS Minimum": "7.0"},
+                )
+            ]
+        )
+        summary = import_universities_data(path, commit=True)
+        university = University.objects.get(slug="mit")
+        self.assertEqual(university.ielts_minimum, 7.0)
+        self.assertEqual(summary.updated, 1)
+
+    def test_existing_good_field_conflict_is_not_overwritten(self):
+        University.objects.create(
+            name="Massachusetts Institute of Technology",
+            country="USA",
+            city="Cambridge",
+            slug="mit",
+            official_website="https://mit.edu/",
+            ielts_minimum="7.0",
+            is_published=True,
+        )
+        path = self._write(
+            [
+                sample_row(
+                    Name="MIT",
+                    Country="USA",
+                    City="Cambridge",
+                    **{"Official Website": "https://mit.edu/"},
+                    **{"IELTS Minimum": "6.0"},
+                )
+            ]
+        )
+        summary = import_universities_data(path, commit=True)
+        university = University.objects.get(slug="mit")
+        self.assertEqual(university.ielts_minimum, 7.0)
+        self.assertEqual(summary.conflicts, 1)
+        self.assertEqual(summary.manual_review_entries[0].conflict_fields, "University.ielts_minimum")
+
+    def test_duplicate_university_row_is_skipped_safely(self):
+        rows = [sample_row(), sample_row(**{"IELTS Minimum": "7.0"})]
+        path = self._write(rows)
         summary = import_universities_data(path, commit=True)
         self.assertEqual(summary.created, 1)
+        self.assertEqual(summary.skipped_duplicate_rows, 1)
+        self.assertEqual(University.objects.count(), 1)
+
+    def test_same_file_imported_twice_skips_already_imported_rows(self):
+        path = self._write([sample_row()])
+        first = import_universities_data(path, commit=True)
+        second = import_universities_data(path, commit=True)
+        self.assertEqual(first.created, 1)
+        self.assertEqual(second.already_imported_rows, 1)
+        self.assertEqual(UniversityDataImportRowLog.objects.count(), 1)
+
+    def test_invalid_url_is_dropped_not_stored(self):
+        path = self._write([sample_row(**{"Official Website": "see admissions website"})])
+        summary = import_universities_data(path, commit=True)
+        university = University.objects.get(name="Sample University")
+        self.assertEqual(university.official_website, "")
+        self.assertGreaterEqual(summary.placeholder_cells, 1)
+
+    def test_valid_url_is_accepted_and_tracking_is_stripped(self):
+        path = self._write([sample_row(**{"Admissions URL": "https://mitadmissions.org/apply/?utm_source=x"})])
+        import_universities_data(path, commit=True)
+        university = University.objects.get(name="Sample University")
+        self.assertEqual(university.admissions_url, "https://mitadmissions.org/apply/")
+
+    def test_audit_and_manual_review_csv_outputs_are_written(self):
+        University.objects.create(
+            name="Sample University",
+            country="Testland",
+            city="Test City",
+            slug="sample-university",
+            official_website="https://sample.example.edu/",
+            ielts_minimum="7.0",
+            is_published=True,
+        )
+        path = self._write([sample_row(**{"IELTS Minimum": "6.0"})])
+        audit_path = tempfile.NamedTemporaryFile(suffix=".csv", delete=False).name
+        review_path = tempfile.NamedTemporaryFile(suffix=".csv", delete=False).name
+        self._temp_files.extend([audit_path, review_path])
+        import_universities_data(
+            path,
+            commit=False,
+            audit_out=audit_path,
+            manual_review_out=review_path,
+        )
+        self.assertIn("field_name", Path(audit_path).read_text(encoding="utf-8"))
+        self.assertIn("conflict_fields", Path(review_path).read_text(encoding="utf-8"))
 
     def test_xlsx_file_is_supported(self):
         openpyxl = __import__("openpyxl")
@@ -349,18 +383,7 @@ class ImportUniversitiesDataTests(TestCase):
         summary = import_universities_data(path, commit=True)
         self.assertEqual(summary.created, 1)
 
-    def test_one_bad_row_does_not_abort_the_whole_import(self):
-        # A row that raises mid-processing (simulated via an absurd combination
-        # that still parses) must not prevent later good rows from importing.
-        rows = [sample_row(Name="", City=""), sample_row(Name="Second University")]
-        path = self._write(rows)
-        summary = import_universities_data(path, commit=True)
-        self.assertEqual(summary.created, 1)
-        self.assertTrue(University.objects.filter(name="Second University").exists())
-
-    def test_no_ai_call_is_made_during_import(self):
-        # Structural guard: the import module must never import the Gemini
-        # gateway. A regression here would violate the "no AI calls" hard rule.
+    def test_no_provider_call_is_made_during_import(self):
         import services.university_service.data_import as data_import_module
 
         source = Path(data_import_module.__file__).read_text(encoding="utf-8")

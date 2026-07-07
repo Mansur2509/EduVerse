@@ -7,19 +7,16 @@ from services.university_service.data_import import (
 
 
 def _safe_line(text: str) -> str:
-    """Never let a console-encoding issue on the operator's terminal crash
-    report printing -- replace anything the terminal can't display."""
     try:
         return text.encode("ascii", errors="backslashreplace").decode("ascii")
-    except Exception:  # noqa: BLE001 - report printing must never raise
+    except Exception:  # noqa: BLE001 - report printing must never crash
         return "(unprintable line)"
 
 
 class Command(BaseCommand):
     help = (
-        "Import the ~450-university / 72-column dataset (public data, "
-        "guidance/context layer, and system-only scoring vector). "
-        "Always run --dry-run first."
+        "Clean, dedupe, dry-run, and safely upsert the 72-column university "
+        "dataset. Defaults to dry-run unless --commit is passed."
     )
 
     def add_arguments(self, parser):
@@ -27,39 +24,69 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Parse and validate only -- rolls back every database change.",
+            help="Parse and validate only. This is the default when --commit is absent.",
         )
         parser.add_argument(
             "--commit",
             action="store_true",
-            help="Actually write changes to the database.",
+            help="Actually write safe create/update changes to the database.",
+        )
+        parser.add_argument(
+            "--missing-only",
+            action="store_true",
+            help="For existing universities, fill only empty/unknown fields.",
         )
         parser.add_argument(
             "--update-existing",
             action="store_true",
-            help="With --commit: overwrite already-known universities' data instead of skipping them.",
+            help=(
+                "Allow safe improvement of existing fields. Good existing scalar "
+                "values still go to manual review instead of silent overwrite."
+            ),
         )
         parser.add_argument(
             "--limit",
             type=int,
             default=None,
-            help="Only process the first N data rows (useful for a quick sanity check).",
+            help="Only process the first N data rows.",
+        )
+        parser.add_argument(
+            "--audit-out",
+            default=None,
+            help="Optional CSV path for cell-level audit output.",
+        )
+        parser.add_argument(
+            "--manual-review-out",
+            default=None,
+            help="Optional CSV path for ambiguous matches/conflicts.",
+        )
+        parser.add_argument(
+            "--force-reprocess",
+            action="store_true",
+            help="Reprocess rows even when their row hash was committed before.",
         )
 
     def handle(self, *args, **options):
-        dry_run = options["dry_run"]
-        commit = options["commit"]
-        if dry_run == commit:
-            raise CommandError("Pass exactly one of --dry-run or --commit.")
+        commit = bool(options["commit"])
+        if options["dry_run"] and commit:
+            raise CommandError("Pass either --dry-run or --commit, not both.")
         if options["update_existing"] and not commit:
             raise CommandError("--update-existing only applies together with --commit.")
+        if options["force_reprocess"] and not commit:
+            raise CommandError("--force-reprocess only applies together with --commit.")
+
+        missing_only = bool(options["missing_only"] or not options["update_existing"])
 
         try:
             summary = import_universities_data(
                 options["path"],
                 commit=commit,
                 update_existing=options["update_existing"],
+                missing_only=missing_only,
                 limit=options["limit"],
+                audit_out=options["audit_out"],
+                manual_review_out=options["manual_review_out"],
+                force_reprocess=options["force_reprocess"],
             )
         except ImportConfigurationError as error:
             raise CommandError(str(error)) from error
@@ -70,23 +97,30 @@ class Command(BaseCommand):
             f"rows read: {summary.rows_read}",
             f"universities created: {summary.created}",
             f"universities updated: {summary.updated}",
-            f"universities skipped (already exist, not updated): {summary.skipped_existing}",
+            f"universities skipped duplicate/already imported: {summary.skipped_duplicate_rows}",
+            f"universities skipped existing/no new data: {summary.skipped_existing}",
             f"rows skipped due to errors: {summary.skipped_errors}",
             f"rows missing required Name/Country/City: {summary.missing_required}",
             f"duplicate keys within this file: {summary.duplicate_keys_in_file}",
-            f"public fields imported (non-empty values set): {summary.public_fields_imported}",
-            f"guidance contexts imported: {summary.guidance_contexts_imported}",
-            f"signal vectors imported: {summary.signal_vectors_imported}",
-            f"warnings: {len(summary.warnings)}",
-            f"errors: {len(summary.errors)}",
+            f"skipped invalid cells: {summary.invalid_cells}",
+            f"skipped placeholder cells: {summary.placeholder_cells}",
+            f"skipped commentary cells: {summary.commentary_cells}",
+            f"skipped generic country-average cells: {summary.generic_country_average_cells}",
+            f"conflicts requiring manual review: {summary.conflicts}",
+            f"ambiguous university matches: {summary.ambiguous_matches}",
+            f"public fields imported: {summary.public_fields_imported}",
+            f"guidance contexts changed: {summary.guidance_contexts_imported}",
+            f"signal vectors changed: {summary.signal_vectors_imported}",
+            f"audit rows: {len(summary.audit_entries)}",
+            f"manual review rows: {len(summary.manual_review_entries)}",
         ]
         for line in lines:
             self.stdout.write(_safe_line(line))
 
-        if summary.warnings:
-            self.stdout.write(self.style.WARNING(f"-- first {min(20, len(summary.warnings))} warnings --"))
-            for warning in summary.warnings[:20]:
-                self.stdout.write(_safe_line(f"  {warning}"))
+        if options["audit_out"]:
+            self.stdout.write(_safe_line(f"audit csv: {options['audit_out']}"))
+        if options["manual_review_out"]:
+            self.stdout.write(_safe_line(f"manual review csv: {options['manual_review_out']}"))
 
         if summary.errors:
             self.stdout.write(self.style.ERROR(f"-- first {min(20, len(summary.errors))} errors --"))

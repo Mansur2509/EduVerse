@@ -450,6 +450,60 @@ class UniversityImportJob(models.Model):
         return f"{self.original_filename} ({self.mode}, {self.status})"
 
 
+class UniversityDataImportBatch(models.Model):
+    """Committed runs of the 72-column university data importer.
+
+    Separate from `UniversityImportJob`, which belongs to the admin upload UI.
+    This model is only for source-row fingerprinting and auditability.
+    """
+
+    source_file_name = models.CharField(max_length=255)
+    committed = models.BooleanField(default=False, db_index=True)
+    row_count = models.PositiveIntegerField(default=0)
+    summary_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("source_file_name", "created_at")),
+            models.Index(fields=("committed", "created_at")),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_file_name} ({'committed' if self.committed else 'dry-run'})"
+
+
+class UniversityDataImportRowLog(models.Model):
+    batch = models.ForeignKey(
+        UniversityDataImportBatch,
+        on_delete=models.CASCADE,
+        related_name="row_logs",
+    )
+    source_file_name = models.CharField(max_length=255)
+    row_number = models.PositiveIntegerField()
+    row_hash = models.CharField(max_length=64, db_index=True)
+    matched_university = models.ForeignKey(
+        University,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="data_import_row_logs",
+    )
+    action = models.CharField(max_length=40)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("batch", "row_number")
+        indexes = [
+            models.Index(fields=("row_hash", "action")),
+            models.Index(fields=("source_file_name", "row_number")),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_file_name} row {self.row_number}: {self.action}"
+
+
 class UniversityGuidanceContext(models.Model):
     """Internal guidance/context layer for a university.
 

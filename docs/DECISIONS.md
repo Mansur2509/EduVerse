@@ -422,3 +422,14 @@ Filter-heavy pages use a shared collapsible filter panel. Pages show active-filt
 Suggestion-heavy screens should not block initial page load on secondary data. Essays first load essays, Applications first load applications, and Roadmap first loads the roadmap; source-aware suggestions and supporting shortlist data load when the relevant panel/form is opened. Failures are scoped to the panel/form that needs the data instead of blanking the whole page.
 
 Application readiness is deterministic and evidence-capped. The API now returns six readiness categories, missing-source details, reasons, next actions, and a cap reason. High academics/testing can be recognized, but missing activities/honors/research/portfolio/recommenders/essays caps the overall label until the student adds real application evidence. This remains a readiness estimate, not an admissions prediction.
+
+## ADR-042: Bulk university data import is dry-run-first, cell-cleaned, and conflict-audited
+
+- **Status:** Accepted
+- **Date:** 2026-07-07
+
+The 72-column university admissions dataset importer is a CLI-only operations tool, separate from the admin upload UI's `xlsx_import.py` pipeline. It defaults to dry-run unless `--commit` is passed and never deletes/truncates data. Every source cell is classified before it can be saved; placeholders, verification instructions, commentary, generic country averages, vague scholarship text, invalid URLs, prose in numeric fields, and uncertain values are skipped rather than folded into public fields.
+
+Existing universities are matched conservatively by normalized name/country, website domain, safe aliases, and a high fuzzy threshold. Ambiguous matches go to manual review. Existing good values are not overwritten silently: missing/unknown fields may be filled, duplicate equal values are skipped, appendable text fields only receive genuinely new chunks, and scalar conflicts are written to the manual-review report.
+
+Committed rows are fingerprinted in `UniversityDataImportBatch` and `UniversityDataImportRowLog`, so rerunning the same committed file skips already imported rows unless `--force-reprocess` is explicit. Audit and manual-review CSVs are operator artifacts only; skipped raw cells, import logs, internal guidance context, and system-only signal weights remain excluded from public university serializers.
