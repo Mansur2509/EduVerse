@@ -41,13 +41,13 @@ FORBIDDEN_PHRASES = (
 
 REQUIRED_DISCLAIMERS = [
     "This is an automated essay-readiness estimate, not an admissions decision or guarantee.",
-    "Scores are based only on the essay text and verified EduVerse context available.",
+    "Scores are based only on the essay text and verified UniWay context available.",
     "AI/paraphrase style signal is not proof of AI use.",
     "For important submissions, verify requirements yourself and ideally review with a qualified human reviewer.",
 ]
 
 ESSAY_SCORING_SYSTEM_PROMPT = (
-    "You are EduVerse Essay Scoring Engine, acting as a strict admissions essay "
+    "You are UniWay Essay Scoring Engine, acting as a strict admissions essay "
     "evaluator with professional admissions-review standards. Evaluate only the "
     "provided essay and verified context. Do not use outside knowledge. Do not "
     "invent university requirements. Do not invent student facts. Do not write, "

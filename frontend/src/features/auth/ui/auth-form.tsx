@@ -19,10 +19,10 @@ type AuthFormProps = {
   showModeLink?: boolean;
 };
 
-const DEMO_PASSWORD = "EduVerse-Demo-842!";
+const DEMO_PASSWORD = "UniWay-Demo-842!";
 const DEMO_ACCOUNTS = [
   {
-    email: "student.demo@eduverse.local",
+    email: "student.demo@uniway.local",
     labelKey: "auth.demo.student",
     role: "student"
   }
@@ -284,7 +284,7 @@ export function AuthForm({
 
       {showModeLink ? (
         <p className="mt-5 text-center text-sm text-muted-foreground">
-          {isRegister ? t("auth.alreadyRegistered") : t("auth.newToEduVerse")}{" "}
+          {isRegister ? t("auth.alreadyRegistered") : t("auth.newToUniWay")}{" "}
           {onModeChange ? (
             <button
               className="font-semibold text-primary-hover hover:underline"

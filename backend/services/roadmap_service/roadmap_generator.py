@@ -75,7 +75,8 @@ DEADLINE_REMINDER_WINDOWS = (60, 30, 14, 7)
 
 
 def _is_demo_user(user) -> bool:
-    return bool(getattr(user, "email", "").endswith("@eduverse.local"))
+    email = getattr(user, "email", "")
+    return bool(email.endswith("@uniway.local") or email.endswith("@eduverse.local"))
 
 
 def _priority_for_due_date(due_date: date | None, today: date, *, blocking: bool = False) -> str:
@@ -455,7 +456,7 @@ class RoadmapBuilder:
             f"official_exam_link:{exam_type}",
             title=f"Check official {exam_type} dates",
             description=(
-                f"EduVerse has no verified date dataset for {exam_type}. "
+                f"UniWay has no verified date dataset for {exam_type}. "
                 "Check current test dates, registration deadlines, and score-delivery "
                 "timing on the official site before planning around them."
             ),

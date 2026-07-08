@@ -5,7 +5,7 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "Promote existing EduVerse users to admin access by email."
+    help = "Promote existing UniWay users to admin access by email."
 
     def add_arguments(self, parser):
         parser.add_argument(

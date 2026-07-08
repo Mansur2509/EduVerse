@@ -1,4 +1,4 @@
-# Generated manually for EDUVERSE-DEPTH-POLISH-001.
+# Generated manually for UNIWAY-DEPTH-POLISH-001.
 
 import django.db.models.deletion
 from django.conf import settings

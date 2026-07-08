@@ -5,15 +5,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN addgroup --system eduverse && adduser --system --ingroup eduverse eduverse
+RUN addgroup --system uniway && adduser --system --ingroup uniway uniway
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN chown -R eduverse:eduverse /app
+RUN chown -R uniway:uniway /app
 
-USER eduverse
+USER uniway
 EXPOSE 8000
 
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

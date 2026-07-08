@@ -246,7 +246,7 @@ class EventRegistrationTests(APITestCase):
 
     def test_seeded_demo_student_event_lists_accept_page_size_query(self):
         call_command("seed_demo", "--with-demo-data", stdout=StringIO())
-        demo_user = User.objects.get(email="student.demo@eduverse.local")
+        demo_user = User.objects.get(email="student.demo@uniway.local")
         self.client.force_authenticate(demo_user)
 
         catalog_response = self.client.get(f"{reverse('events:list')}?page=1&page_size=21")

@@ -1,6 +1,6 @@
 # Local Beta Preview
 
-This guide is the supported founder-friendly Windows path for opening the current EduVerse beta. It uses the existing project environments and a local SQLite database. Docker and PostgreSQL are not required for this preview.
+This guide is the supported founder-friendly Windows path for opening the current UniWay beta. It uses the existing project environments and a local SQLite database. Docker and PostgreSQL are not required for this preview.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ The repository already contains the backend virtual environment and local Python
 Run once:
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm install
 npm run prepare:preview
 ```
@@ -28,7 +28,7 @@ npm run prepare:preview
 Git Bash equivalent:
 
 ```bash
-cd /d/Eduverce/frontend
+cd /d/UniWay/frontend
 npm install
 npm run prepare:preview
 ```
@@ -38,13 +38,13 @@ npm run prepare:preview
 Open PowerShell terminal 1:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\Eduverce\backend\scripts\run-local-preview.ps1
+powershell -ExecutionPolicy Bypass -File D:\UniWay\backend\scripts\run-local-preview.ps1
 ```
 
 The script:
 
 1. uses the existing `backend/.venv` and `backend/.deps`;
-2. selects `backend/eduverse_local.sqlite3`;
+2. selects `backend/uniway_local.sqlite3`;
 3. applies committed migrations;
 4. loads safe fictional demo data;
 5. starts Django at `http://127.0.0.1:8000`.
@@ -56,14 +56,14 @@ Keep this terminal open.
 Open terminal 2:
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm run preview:beta
 ```
 
 Git Bash:
 
 ```bash
-cd /d/Eduverce/frontend
+cd /d/UniWay/frontend
 npm run preview:beta
 ```
 
@@ -83,9 +83,9 @@ After sign-in, accounts without completed onboarding stay in the required six-st
 
 | Role | Email | Password |
 | --- | --- | --- |
-| Student | `student.demo@eduverse.local` | `EduVerse-Demo-842!` |
-| Organizer | `organizer.demo@eduverse.local` | `EduVerse-Demo-842!` |
-| Admin | `admin.demo@eduverse.local` | `EduVerse-Demo-842!` |
+| Student | `student.demo@uniway.local` | `UniWay-Demo-842!` |
+| Organizer | `organizer.demo@uniway.local` | `UniWay-Demo-842!` |
+| Admin | `admin.demo@uniway.local` | `UniWay-Demo-842!` |
 
 These are development credentials for the local SQLite preview only. They are not production accounts, not a backdoor, and must not be reused outside local founder/demo environments.
 
@@ -96,9 +96,9 @@ Before a live founder review, walk through this path:
 1. Open `http://127.0.0.1:3000` while logged out and confirm the full-screen sign-in/register gate appears without the product sidebar.
 2. Try one invalid login and confirm a clean error message appears.
 3. Register a new account and confirm it lands in the required onboarding flow before showing the app shell.
-4. Complete onboarding or sign in as `student.demo@eduverse.local`, then review `/dashboard`, `/profile`, `/events`, `/events/my`, and at least one event detail page.
-5. Sign in as `organizer.demo@eduverse.local` and review `/organizer/events`, draft/edit/submit flows, custom registration form editing, event status clarity, participants, CSV export, ticket verification, and check-in.
-6. Sign in as `admin.demo@eduverse.local` and review `/admin/events/moderation`, including the pending fictional event.
+4. Complete onboarding or sign in as `student.demo@uniway.local`, then review `/dashboard`, `/profile`, `/events`, `/events/my`, and at least one event detail page.
+5. Sign in as `organizer.demo@uniway.local` and review `/organizer/events`, draft/edit/submit flows, custom registration form editing, event status clarity, participants, CSV export, ticket verification, and check-in.
+6. Sign in as `admin.demo@uniway.local` and review `/admin/events/moderation`, including the pending fictional event.
 7. Review `/pricing`, `/universities`, `/roadmap`, `/essays`, `/exams`, `/finance`, `/activities`, and `/research` as honest preview pages.
 8. Check a narrow/mobile viewport for horizontal overflow, readable cards, and reachable navigation.
 9. Confirm Event Map/catalog remains visible on the Free plan and does not imply paid gating.
@@ -129,15 +129,15 @@ Install a current Node.js LTS release, reopen the terminal, then confirm `node -
 The terminal is in the wrong directory:
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 ```
 
-In Git Bash use `/d/Eduverce/frontend`, not `D:\Eduverce\frontend`.
+In Git Bash use `/d/UniWay/frontend`, not `D:\UniWay\frontend`.
 
 ### Frontend dependencies are missing
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm install
 ```
 
@@ -146,7 +146,7 @@ Do not run `npm audit fix --force` during preview setup; forced upgrades may int
 ### `.env.local` is missing
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm run prepare:preview
 ```
 
@@ -155,12 +155,12 @@ npm run prepare:preview
 Start terminal 1 with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\Eduverce\backend\scripts\run-local-preview.ps1
+powershell -ExecutionPolicy Bypass -File D:\UniWay\backend\scripts\run-local-preview.ps1
 ```
 
 ### Port 3000 or 8000 is already in use
 
-Close the older EduVerse development terminal before starting another instance. Do not terminate unrelated processes.
+Close the older UniWay development terminal before starting another instance. Do not terminate unrelated processes.
 
 ### PostgreSQL connection error
 

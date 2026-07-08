@@ -119,7 +119,7 @@ function logApiDiagnostic(url: string, status: number, data: unknown) {
   if (process.env.NODE_ENV === "production") {
     return;
   }
-  console.info("[eduverse-api]", {
+  console.info("[uniway-api]", {
     url,
     status,
     payload: summarizePayload(data)
@@ -139,7 +139,7 @@ async function parseResponse(response: Response): Promise<unknown> {
 
   if (!contentType.includes("application/json")) {
     throw new ApiError(
-      `EduVerse API returned ${contentType || "an unknown content type"} instead of JSON.`,
+      `UniWay API returned ${contentType || "an unknown content type"} instead of JSON.`,
       response.status,
       {
         contentType,
@@ -155,7 +155,7 @@ async function parseResponse(response: Response): Promise<unknown> {
       return JSON.parse(text) as unknown;
     } catch {
       throw new ApiError(
-        "EduVerse API returned invalid JSON.",
+        "UniWay API returned invalid JSON.",
         response.status,
         {
           contentType,
@@ -346,7 +346,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
       throw new ApiError(
         getErrorMessage(
           errorData,
-          `EduVerse API request failed with status ${response.status}.`
+          `UniWay API request failed with status ${response.status}.`
         ),
         response.status,
         errorData
@@ -363,7 +363,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
       notifyAuthInvalid();
     }
     throw new ApiError(
-      getErrorMessage(data, `EduVerse API request failed with status ${response.status}.`),
+      getErrorMessage(data, `UniWay API request failed with status ${response.status}.`),
       response.status,
       data
     );
@@ -415,7 +415,7 @@ export function normalizeListResponse<Item>(
     return data.results;
   }
   throw new ApiError(
-    `EduVerse API payload mismatch for ${endpointName}: expected an array or a paginated results object.`,
+    `UniWay API payload mismatch for ${endpointName}: expected an array or a paginated results object.`,
     0,
     data
   );

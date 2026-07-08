@@ -165,7 +165,7 @@ export function StrategyScreen() {
           setMajorClusterFilter("all");
         }}
         resultCount={visibleGroups.reduce((count, group) => count + group.schools.length, 0)}
-        storageKey="eduverse.filters.strategy"
+        storageKey="uniway.filters.strategy"
       >
         <div className="flex flex-wrap items-end gap-4">
           <label className="block">

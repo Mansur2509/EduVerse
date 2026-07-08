@@ -133,10 +133,10 @@ export function RoadmapScreen() {
   }, [loadRoadmap]);
 
   useEffect(() => {
-    if (window.localStorage.getItem("eduverse.roadmap.instructions.viewed") === "true") {
+    if (window.localStorage.getItem("uniway.roadmap.instructions.viewed") === "true") {
       setInstructionsOpen(false);
     }
-    const storedView = window.localStorage.getItem("eduverse.roadmap.viewMode");
+    const storedView = window.localStorage.getItem("uniway.roadmap.viewMode");
     if (storedView === "list" || storedView === "timeline") {
       setViewMode(storedView);
     }
@@ -144,7 +144,7 @@ export function RoadmapScreen() {
 
   function handleViewModeChange(nextMode: RoadmapViewMode) {
     setViewMode(nextMode);
-    window.localStorage.setItem("eduverse.roadmap.viewMode", nextMode);
+    window.localStorage.setItem("uniway.roadmap.viewMode", nextMode);
   }
 
   async function handleGenerate() {
@@ -201,7 +201,7 @@ export function RoadmapScreen() {
     setInstructionsOpen((current) => {
       const next = !current;
       if (!next) {
-        window.localStorage.setItem("eduverse.roadmap.instructions.viewed", "true");
+        window.localStorage.setItem("uniway.roadmap.instructions.viewed", "true");
       }
       return next;
     });
@@ -673,7 +673,7 @@ export function RoadmapScreen() {
             activeCount={activeFilterCount}
             onClear={clearAllFilters}
             resultCount={bucketedTasks.length}
-            storageKey="eduverse.filters.roadmap"
+            storageKey="uniway.filters.roadmap"
           >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">

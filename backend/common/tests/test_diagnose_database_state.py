@@ -30,7 +30,7 @@ class DiagnoseDatabaseStateHelperTests(TestCase):
         self.assertEqual(ref, "zhipvgmchntayiyuafdk")
 
     def test_detect_supabase_ref_absent_for_other_hosts(self):
-        self.assertIsNone(detect_supabase_ref("db.example.com", "eduverse"))
+        self.assertIsNone(detect_supabase_ref("db.example.com", "uniway"))
 
     def test_mask_email_hides_most_of_local_part(self):
         self.assertEqual(mask_email("timarus52111@gmail.com"), "ti***@gmail.com")

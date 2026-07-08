@@ -1,6 +1,6 @@
-# EduVerse
+# UniWay
 
-EduVerse is an academic student-success platform for admissions planning, original exam practice, event discovery, profile building, research guidance, career exploration, and foundational financial literacy.
+UniWay is an academic student-success platform for admissions planning, original exam practice, event discovery, profile building, research guidance, career exploration, and foundational financial literacy.
 
 This repository currently contains the Phase 0 foundation:
 
@@ -55,7 +55,7 @@ BETA-PREVIEW-001 connects the completed authentication, profile, event, organize
 One-time frontend setup:
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm install
 npm run prepare:preview
 ```
@@ -63,17 +63,17 @@ npm run prepare:preview
 Start the backend in PowerShell terminal 1:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\Eduverce\backend\scripts\run-local-preview.ps1
+powershell -ExecutionPolicy Bypass -File D:\UniWay\backend\scripts\run-local-preview.ps1
 ```
 
 Start the frontend in terminal 2:
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm run preview:beta
 ```
 
-Open `http://127.0.0.1:3000`. The root route opens a full-screen EduVerse sign-in/register gateway. Every product route requires an active backend-confirmed session; after authentication the dashboard, profile, events, organizer, moderation, and preview modules become available according to role.
+Open `http://127.0.0.1:3000`. The root route opens a full-screen UniWay sign-in/register gateway. Every product route requires an active backend-confirmed session; after authentication the dashboard, profile, events, organizer, moderation, and preview modules become available according to role.
 
 New and incomplete accounts must finish the six-step academic onboarding before the application shell opens. Draft answers are saved to the self-only profile API, and exam dates later appear as dashboard countdowns.
 
@@ -100,4 +100,4 @@ ORGANIZER-001 adds draft-first organizer management under `/api/organizer/`, adm
 ## Events
 
 EVENTS-001 provides the authenticated student catalog and detail API under `/api/events/`, profile-snapshot registration, cancellation, and “My events”. Demo seed data creates fictional published events suitable for local testing. Payments, QR tickets, Telegram, custom forms, and exports are intentionally deferred.
-# EduVerse
+# UniWay

@@ -9,8 +9,8 @@ import { AppGate } from "./app-gate";
 
 export const metadata: Metadata = {
   title: {
-    default: "EduVerse",
-    template: "%s · EduVerse"
+    default: "UniWay",
+    template: "%s · UniWay"
   },
   description:
     "A calm academic workspace for admissions, events, exams, research, and student growth."

@@ -19,7 +19,8 @@ import {
 import { dictionaries } from "./dictionaries";
 import type { TranslationKey, TranslationValues } from "./types";
 
-const LOCALE_STORAGE_KEY = "eduverse.locale";
+const LOCALE_STORAGE_KEY = "uniway.locale";
+const LEGACY_LOCALE_STORAGE_KEY = "eduverse.locale";
 
 type I18nContextValue = {
   locale: LocaleCode;
@@ -64,9 +65,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleCode>(defaultLocale);
 
   useEffect(() => {
-    const storedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    const storedLocale =
+      window.localStorage.getItem(LOCALE_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_LOCALE_STORAGE_KEY);
     if (storedLocale && isLocaleCode(storedLocale)) {
       setLocaleState(storedLocale);
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, storedLocale);
+      window.localStorage.removeItem(LEGACY_LOCALE_STORAGE_KEY);
     }
   }, []);
 
@@ -79,6 +84,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const setLocale = useCallback((nextLocale: LocaleCode) => {
     setLocaleState(nextLocale);
     window.localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
+    window.localStorage.removeItem(LEGACY_LOCALE_STORAGE_KEY);
   }, []);
 
   const t = useCallback(
@@ -104,4 +110,3 @@ export function useI18n() {
   }
   return context;
 }
-

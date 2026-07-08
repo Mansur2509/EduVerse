@@ -32,7 +32,7 @@ from services.user_profile_service.services import ensure_profile_records
 
 User = get_user_model()
 
-DEMO_PASSWORD = "EduVerse-Demo-842!"
+DEMO_PASSWORD = "UniWay-Demo-842!"
 
 # `KNOWN_ADMIN_EMAILS` is re-exported from common.admin_bootstrap for callers that
 # still import it from here.
@@ -74,7 +74,7 @@ class Command(BaseCommand):
             self.seed_real_universities()
             self.seed_event(demo_users)
             self.seed_question()
-            self.stdout.write(self.style.SUCCESS("EduVerse demo data is ready."))
+            self.stdout.write(self.style.SUCCESS("UniWay demo data is ready."))
         else:
             self.stdout.write(
                 self.style.SUCCESS(
@@ -95,9 +95,9 @@ class Command(BaseCommand):
 
     def seed_demo_accounts(self):
         accounts = {
-            "student": ("student.demo@eduverse.local", User.Role.STUDENT),
-            "organizer": ("organizer.demo@eduverse.local", User.Role.ORGANIZER),
-            "admin": ("admin.demo@eduverse.local", User.Role.ADMIN),
+            "student": ("student.demo@uniway.local", User.Role.STUDENT),
+            "organizer": ("organizer.demo@uniway.local", User.Role.ORGANIZER),
+            "admin": ("admin.demo@uniway.local", User.Role.ADMIN),
         }
         users = {}
         for key, (email, role) in accounts.items():
@@ -113,11 +113,11 @@ class Command(BaseCommand):
             user.save()
 
             profile, preferences = ensure_profile_records(user)
-            profile.full_name = f"EduVerse Demo {role.title()}"
+            profile.full_name = f"UniWay Demo {role.title()}"
             profile.birth_date = date(2004, 4, 12)
             profile.country = "Uzbekistan"
             profile.city = "Tashkent"
-            profile.school_or_university = "EduVerse Demo Academy"
+            profile.school_or_university = "UniWay Demo Academy"
             profile.grade = "12"
             profile.expected_graduation_year = timezone.now().year + 1
             profile.education_status = "school_student"
@@ -165,7 +165,7 @@ class Command(BaseCommand):
                 "support",
             ]
             profile.onboarding_completed_at = timezone.now()
-            profile.telegram_username = f"@eduverse_demo_{key}"
+            profile.telegram_username = f"@uniway_demo_{key}"
             profile.save()
 
             preferences.interested_classes = [
@@ -207,8 +207,8 @@ class Command(BaseCommand):
         next_year = today.year + 1
         demo_universities = (
             {
-                "slug": "eduverse-demo-university",
-                "name": "EduVerse Demo University",
+                "slug": "uniway-demo-university",
+                "name": "UniWay Demo University",
                 "country": "Demoland",
                 "city": "Sample City",
                 "institution_type": "",
@@ -448,12 +448,12 @@ class Command(BaseCommand):
         now = timezone.now()
         demo_events = (
             {
-                "slug": "eduverse-demo-planning-workshop",
+                "slug": "uniway-demo-planning-workshop",
                 "category": ("workshop", "Workshop"),
-                "title": "EduVerse Demo Planning Workshop",
+                "title": "UniWay Demo Planning Workshop",
                 "short_description": "A fictional workshop for testing event discovery and registration.",
                 "description": (
-                    "Fictional local development event for testing the EduVerse event module. "
+                    "Fictional local development event for testing the UniWay event module. "
                     "It is not a real opportunity."
                 ),
                 "format": Event.Format.HYBRID,
@@ -465,9 +465,9 @@ class Command(BaseCommand):
                 "status": Event.Status.PUBLISHED,
             },
             {
-                "slug": "eduverse-demo-research-webinar",
+                "slug": "uniway-demo-research-webinar",
                 "category": ("research", "Research opportunity"),
-                "title": "EduVerse Demo Research Webinar",
+                "title": "UniWay Demo Research Webinar",
                 "short_description": "A fictional online research-planning session for local development.",
                 "description": (
                     "Fictional webinar record used to demonstrate online event details, filtering, "
@@ -478,13 +478,13 @@ class Command(BaseCommand):
                 "starts_at": now + timedelta(days=60),
                 "deadline": now + timedelta(days=50),
                 "capacity": 100,
-                "location": ("Online", "", "EduVerse Demo Stream"),
+                "location": ("Online", "", "UniWay Demo Stream"),
                 "status": Event.Status.PUBLISHED,
             },
             {
-                "slug": "eduverse-demo-policy-forum",
+                "slug": "uniway-demo-policy-forum",
                 "category": ("conference", "Conference"),
-                "title": "EduVerse Demo Student Policy Forum",
+                "title": "UniWay Demo Student Policy Forum",
                 "short_description": "A fictional organizer submission ready for moderation review.",
                 "description": (
                     "Fictional pending event used to demonstrate the organizer and admin "
@@ -513,7 +513,7 @@ class Command(BaseCommand):
                     "title": demo["title"],
                     "short_description": demo["short_description"],
                     "description": demo["description"],
-                    "organizer_name": "EduVerse Demo Organizer",
+                    "organizer_name": "UniWay Demo Organizer",
                     "format": demo["format"],
                     "is_online": demo["is_online"],
                     "online_url": (
@@ -545,7 +545,7 @@ class Command(BaseCommand):
                 },
             )
 
-        workshop = Event.objects.get(slug="eduverse-demo-planning-workshop")
+        workshop = Event.objects.get(slug="uniway-demo-planning-workshop")
         EventRegistration.objects.update_or_create(
             user=demo_users["student"],
             event=workshop,
@@ -554,9 +554,9 @@ class Command(BaseCommand):
                 "payment_status": EventRegistration.PaymentStatus.NOT_REQUIRED,
                 "registration_data": {"source": "seed_demo"},
                 "contact_snapshot": {
-                    "full_name": "EduVerse Demo Student",
-                    "email": "student.demo@eduverse.local",
-                    "telegram_username": "@eduverse_demo_student",
+                    "full_name": "UniWay Demo Student",
+                    "email": "student.demo@uniway.local",
+                    "telegram_username": "@uniway_demo_student",
                 },
             },
         )
@@ -580,7 +580,7 @@ class Command(BaseCommand):
             prompt="A study group reads 18 pages each day for 5 days. How many pages do they read in total?",
             defaults={
                 "origin": Question.Origin.ORIGINAL,
-                "provenance_note": "Original EduVerse arithmetic demonstration question.",
+                "provenance_note": "Original UniWay arithmetic demonstration question.",
                 "is_published": True,
             },
         )

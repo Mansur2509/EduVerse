@@ -49,7 +49,7 @@ export default function GlobalError({
             Something went wrong
           </h1>
           <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", lineHeight: 1.6, color: "#555" }}>
-            EduVerse hit an unexpected error while loading this page. This is usually temporary.
+            UniWay hit an unexpected error while loading this page. This is usually temporary.
             Please reload and try again.
           </p>
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem", justifyContent: "center" }}>

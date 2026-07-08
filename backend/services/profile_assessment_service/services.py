@@ -59,7 +59,7 @@ FORBIDDEN_OUTCOME_LANGUAGE_RE = re.compile(
 )
 KEYWORD_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,48}$")
 DISCLAIMER = (
-    "This is a profile-readiness estimate based on saved EduVerse profile data. "
+    "This is a profile-readiness estimate based on saved UniWay profile data. "
     "It is not an admissions decision and does not promise an outcome."
 )
 

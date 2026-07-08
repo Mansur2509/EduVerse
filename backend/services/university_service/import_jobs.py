@@ -184,7 +184,7 @@ def save_uploaded_workbook(uploaded_file: UploadedFile) -> Path:
     suffix = Path(uploaded_file.name).suffix.lower()
     with tempfile.NamedTemporaryFile(
         delete=False,
-        prefix="eduverse_university_import_",
+        prefix="uniway_university_import_",
         suffix=suffix or ".xlsx",
     ) as temporary:
         for chunk in uploaded_file.chunks():

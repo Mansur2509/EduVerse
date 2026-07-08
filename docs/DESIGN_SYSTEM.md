@@ -2,7 +2,7 @@
 
 ## Direction
 
-EduVerse should feel like a composed academic institution: premium, calm, trustworthy, and information-rich without being crowded. The V1 language combines Harvard-like crimson and editorial authority with Penn-like navy structure and clarity, without copying either institution's marks or layouts.
+UniWay should feel like a composed academic institution: premium, calm, trustworthy, and information-rich without being crowded. The V1 language combines Harvard-like crimson and editorial authority with Penn-like navy structure and clarity, without copying either institution's marks or layouts.
 
 The current baseline is a warm ivory/light academic canvas with deep navy navigation, crimson actions, restrained gold accents, serif headings, and crisp geometry. Dark mode remains structurally supported through the same tokens. The interface avoids gradients, glass effects, neon, glowing AI treatments, robot imagery, chatbot-first layouts, oversized pill controls, and generic soft SaaS cards.
 

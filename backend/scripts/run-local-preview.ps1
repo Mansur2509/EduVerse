@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $backendRoot = Split-Path -Parent $PSScriptRoot
 $pythonPath = Join-Path $backendRoot ".venv\Scripts\python.exe"
 $dependencyPath = Join-Path $backendRoot ".deps"
-$databasePath = Join-Path $backendRoot "eduverse_local.sqlite3"
+$databasePath = Join-Path $backendRoot "uniway_local.sqlite3"
 
 if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw "Missing backend virtual environment: $pythonPath"
@@ -33,7 +33,7 @@ try {
     }
 
     Write-Host ""
-    Write-Host "EduVerse backend is ready at http://127.0.0.1:8000" -ForegroundColor Green
+    Write-Host "UniWay backend is ready at http://127.0.0.1:8000" -ForegroundColor Green
     Write-Host "Keep this window open while previewing the beta."
     & $pythonPath manage.py runserver 127.0.0.1:8000
 }

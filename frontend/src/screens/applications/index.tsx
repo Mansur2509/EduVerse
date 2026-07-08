@@ -534,7 +534,7 @@ export function ApplicationsScreen() {
               setSortBy("nearest_deadline");
             }}
             resultCount={visibleApplications.length}
-            storageKey="eduverse.filters.applications"
+            storageKey="uniway.filters.applications"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">

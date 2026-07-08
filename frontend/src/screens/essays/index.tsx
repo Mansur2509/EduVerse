@@ -52,7 +52,7 @@ import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 const ESSAYS_PAGE_SIZE = 5;
 
 function scoreCardStorageKey(essayId: number) {
-  return `eduverse.essay.${essayId}.scoreCardOpen`;
+  return `uniway.essay.${essayId}.scoreCardOpen`;
 }
 
 type Translate = ReturnType<typeof useI18n>["t"];
@@ -662,7 +662,7 @@ export function EssaysScreen() {
           setCurrentPage(1);
         }}
         resultCount={filteredEssays.length}
-        storageKey="eduverse.filters.essays"
+        storageKey="uniway.filters.essays"
       >
         <div className="flex flex-wrap gap-2">
           <Button

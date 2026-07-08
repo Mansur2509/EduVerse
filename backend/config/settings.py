@@ -81,7 +81,7 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
     "default": dj_database_url.config(
-        default="postgresql://eduverse:change-me-for-local-development@localhost:5432/eduverse",
+        default="postgresql://uniway:change-me-for-local-development@localhost:5432/uniway",
         conn_max_age=60,
         conn_health_checks=True,
     )

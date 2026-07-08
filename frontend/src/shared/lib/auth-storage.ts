@@ -3,8 +3,9 @@ export type AuthTokens = {
   refresh: string;
 };
 
-const AUTH_STORAGE_KEY = "eduverse.auth.tokens";
-export const AUTH_INVALID_EVENT = "eduverse:auth-invalid";
+const AUTH_STORAGE_KEY = "uniway.auth.tokens";
+const LEGACY_AUTH_STORAGE_KEYS = ["eduverse.auth.tokens"];
+export const AUTH_INVALID_EVENT = "uniway:auth-invalid";
 
 let memoryTokens: AuthTokens | null = null;
 
@@ -23,21 +24,40 @@ function getBrowserStorage(): Storage | null {
 function removeStoredTokens(storage: Storage | null) {
   try {
     storage?.removeItem(AUTH_STORAGE_KEY);
+    for (const legacyKey of LEGACY_AUTH_STORAGE_KEYS) {
+      storage?.removeItem(legacyKey);
+    }
   } catch {
     // Storage can be unavailable in hardened/incognito browser contexts.
   }
+}
+
+function readStoredTokens(storage: Storage | null): string | null {
+  try {
+    const currentValue = storage?.getItem(AUTH_STORAGE_KEY) ?? null;
+    if (currentValue) {
+      return currentValue;
+    }
+
+    for (const legacyKey of LEGACY_AUTH_STORAGE_KEYS) {
+      const legacyValue = storage?.getItem(legacyKey) ?? null;
+      if (legacyValue) {
+        storage?.setItem(AUTH_STORAGE_KEY, legacyValue);
+        storage?.removeItem(legacyKey);
+        return legacyValue;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export const authStorage = {
   get(): AuthTokens | null {
     const storage = getBrowserStorage();
 
-    let rawValue: string | null = null;
-    try {
-      rawValue = storage?.getItem(AUTH_STORAGE_KEY) ?? null;
-    } catch {
-      return memoryTokens;
-    }
+    const rawValue = readStoredTokens(storage);
     if (!rawValue) {
       return memoryTokens;
     }

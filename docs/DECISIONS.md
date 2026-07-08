@@ -26,7 +26,7 @@ OpenRouter credentials and calls remain in `ai_gateway_service`. The gateway wil
 - **Status:** Accepted
 - **Date:** 2026-06-22
 
-EduVerse compares user metrics to published ranges and reports categorical alignment. It does not invent admission probabilities or guarantees.
+UniWay compares user metrics to published ranges and reports categorical alignment. It does not invent admission probabilities or guarantees.
 
 ## ADR-005: Original exam content only
 
@@ -70,7 +70,7 @@ The initial web client keeps tokens in one localStorage helper so the vertical s
 - **Status:** Superseded by ADR-017
 - **Date:** 2026-06-22
 
-Dark mode is the current EduVerse visual baseline. Components consume semantic CSS variables through Tailwind rather than fixed color values. A light token set remains available under `data-theme="light"` so future theme switching does not require component rewrites.
+Dark mode is the current UniWay visual baseline. Components consume semantic CSS variables through Tailwind rather than fixed color values. A light token set remains available under `data-theme="light"` so future theme switching does not require component rewrites.
 
 ## ADR-011: Dependency-free client localization foundation
 
@@ -120,7 +120,7 @@ Preview pages must not fabricate admissions outcome odds, university statistics,
 - **Status:** Accepted
 - **Date:** 2026-06-23
 
-Every product route is private to an authenticated EduVerse account. The frontend mounts `AppGate` above the application shell and exposes no protected navigation or page content until `/api/auth/me/` confirms the session. Session checking, authenticated, unauthenticated, and backend-offline states are distinct so a connectivity failure does not impersonate logout or leak cached product UI.
+Every product route is private to an authenticated UniWay account. The frontend mounts `AppGate` above the application shell and exposes no protected navigation or page content until `/api/auth/me/` confirms the session. Session checking, authenticated, unauthenticated, and backend-offline states are distinct so a connectivity failure does not impersonate logout or leak cached product UI.
 
 Published event, university, exam, and question catalogs also require backend authentication. Health, registration, login, and JWT refresh remain the minimal anonymous entry points. UI gating is defense in depth; DRF permissions remain authoritative.
 
@@ -129,7 +129,7 @@ Published event, university, exam, and question catalogs also require backend au
 - **Status:** Accepted
 - **Date:** 2026-06-23
 
-EduVerse V1 uses a warm ivory canvas, deep institutional navy navigation, Harvard-like crimson emphasis, restrained academic gold, serif headings, and crisp geometry. This direction borrows the seriousness and hierarchy of established universities without copying protected marks, seals, or page layouts.
+UniWay V1 uses a warm ivory canvas, deep institutional navy navigation, Harvard-like crimson emphasis, restrained academic gold, serif headings, and crisp geometry. This direction borrows the seriousness and hierarchy of established universities without copying protected marks, seals, or page layouts.
 
 Corners are capped at 4px for ordinary controls and surfaces. Gradients, glass effects, neon, large pills, generic soft SaaS cards, and AI-first visual language are excluded. A dark semantic token set remains supported, but the reviewed V1 baseline is light academic. Event Map stays a core feature on every plan, while subscription cards remain an honest non-purchasable preview until payment work is authorized.
 
@@ -138,7 +138,7 @@ Corners are capped at 4px for ordinary controls and surfaces. Gradients, glass e
 - **Status:** Accepted
 - **Date:** 2026-06-23
 
-An authenticated session is necessary but not sufficient to mount the EduVerse product shell. The frontend must also confirm `is_complete` through `/api/profile/completion/`. Incomplete accounts receive only the full-screen onboarding flow, and final completion is recorded by a dedicated backend endpoint after required fields and reviewed sections pass validation.
+An authenticated session is necessary but not sufficient to mount the UniWay product shell. The frontend must also confirm `is_complete` through `/api/profile/completion/`. Incomplete accounts receive only the full-screen onboarding flow, and final completion is recorded by a dedicated backend endpoint after required fields and reviewed sections pass validation.
 
 Onboarding saves partial drafts to the self-only profile API after each step. sessionStorage is a non-authoritative resilience layer. The major/profession helper is a transparent rule-based mapping over a structured catalog; it does not invoke an LLM or claim aptitude certainty.
 
@@ -156,7 +156,7 @@ ESLint runs as the explicit `npm run lint` check. Next's duplicated build-time l
 - **Status:** Accepted
 - **Date:** 2026-06-23
 
-EduVerse V1 uses a deterministic, dependency-free admissions exploration engine: a structured major catalog, forty non-diagnostic questions, and explicit mappings to majors, preparation classes, exams, and event types. Results organize interests; they do not diagnose aptitude or predict admission.
+UniWay V1 uses a deterministic, dependency-free admissions exploration engine: a structured major catalog, forty non-diagnostic questions, and explicit mappings to majors, preparation classes, exams, and event types. Results organize interests; they do not diagnose aptitude or predict admission.
 
 Readiness is returned as one to five stars plus Foundation, Developing, Competitive, Strong, or Outstanding. University-specific comparisons are permitted only when published requirements and official sources exist; otherwise the interface says that official data is needed. Admission probabilities and guarantees are prohibited.
 
@@ -220,7 +220,7 @@ PRODUCTION-RESCUE-004 clarified two roadmap production rules. First, a tracked a
 
 Revision tasks use an update-in-place dedup strategy distinct from roadmap's `dedup_key`: on each feedback run, an existing `todo` task in the same category is updated (title/description refreshed) rather than duplicated, while `completed`/`skipped` tasks are left alone. This avoids checklist spam from repeated "Get feedback" clicks while still preserving completed-task history, the same "skip/complete, don't delete" principle used throughout the roadmap and structured-profile items.
 
-`application_service` (`ApplicationTrackerItem`/`ApplicationMilestone`) deliberately does not auto-advance any status field. Creating a tracker item for a university only ever defaults to `status=researching` and every sub-status (essays/recommendations/tests/documents/financial aid) to its "not started" equivalent — the student is the only actor that moves an application through the pipeline. This mirrors the roadmap/fit-analysis stance of describing reality rather than inferring it: EduVerse has no reliable signal that an application was actually submitted, so it never claims one.
+`application_service` (`ApplicationTrackerItem`/`ApplicationMilestone`) deliberately does not auto-advance any status field. Creating a tracker item for a university only ever defaults to `status=researching` and every sub-status (essays/recommendations/tests/documents/financial aid) to its "not started" equivalent — the student is the only actor that moves an application through the pipeline. This mirrors the roadmap/fit-analysis stance of describing reality rather than inferring it: UniWay has no reliable signal that an application was actually submitted, so it never claims one.
 
 `ApplicationMilestone.linked_roadmap_task` is the one new cross-service foreign key added in this phase (`application_service` → `roadmap_service`), validated so a milestone can only link to a roadmap task the same user owns. This is additive only — no field or migration was added to `roadmap_service` itself. The university detail page's Deadlines/Roadmap tabs and the applications screen instead reuse the existing `linked_university` filter on `/api/roadmap/tasks/` (already present from `ROADMAP-GENERATOR-001`) plus a newly added `university` filter on `/api/applications/`, so "show me everything tied to this university" needed zero new aggregate endpoints.
 
@@ -231,7 +231,7 @@ Two new `University` fields, `international_office_url` and `virtual_info_sessio
 - **Status:** Accepted
 - **Date:** 2026-06-29
 
-EduVerse will deepen the existing admissions workflow through a persistent, rule-based suggestions layer instead of adding a broad new module. `suggestions_service` owns `SuggestedItem` records that can be dismissed or added to the roadmap, while reading existing profile, university, roadmap, essay, and application data as context. This preserves user intent (dismissed items do not immediately reappear) and makes "add to roadmap" an explicit action rather than an automatic mutation.
+UniWay will deepen the existing admissions workflow through a persistent, rule-based suggestions layer instead of adding a broad new module. `suggestions_service` owns `SuggestedItem` records that can be dismissed or added to the roadmap, while reading existing profile, university, roadmap, essay, and application data as context. This preserves user intent (dismissed items do not immediately reappear) and makes "add to roadmap" an explicit action rather than an automatic mutation.
 
 Suggestions follow the same evidence policy as university data and roadmap tasks. Official deadlines are only shown when backed by stored source data. Student-entered tracker dates are labeled `profile_based`; computed exam windows, essay checkpoints, and document preparation dates are labeled `planning_window`; missing official data becomes a verification suggestion. No suggestion estimates admission probability, award probability, or guaranteed outcomes. No AI is used.
 
@@ -260,9 +260,9 @@ The dataset workbook is committed under `backend/data/universities/` for local/o
 - **Status:** Accepted
 - **Date:** 2026-06-30
 
-Manual production imports through local `DATABASE_URL`, Render Shell, or a startup command are too error-prone for EduVerse's current beta operations. A long import inside migrations or web-service startup can also block Render's port scan and fail deploys before gunicorn is ready.
+Manual production imports through local `DATABASE_URL`, Render Shell, or a startup command are too error-prone for UniWay's current beta operations. A long import inside migrations or web-service startup can also block Render's port scan and fail deploys before gunicorn is ready.
 
-EduVerse therefore exposes a protected admin/staff-only upload workflow under `/api/admin/university-import/` and `/admin/university-import`. It creates a `UniversityImportJob` record, accepts only `.xlsx` files up to 10 MB, stores the upload in a temporary file, and deletes that file after processing when possible. Students, organizers, and anonymous users cannot access the endpoints; UI hiding is not the security boundary.
+UniWay therefore exposes a protected admin/staff-only upload workflow under `/api/admin/university-import/` and `/admin/university-import`. It creates a `UniversityImportJob` record, accepts only `.xlsx` files up to 10 MB, stores the upload in a temporary file, and deletes that file after processing when possible. Students, organizers, and anonymous users cannot access the endpoints; UI hiding is not the security boundary.
 
 The workflow reuses `services/university_service/xlsx_import.py` for file reading, parsing, normalization, and upsert behavior. Dry-run is a true read-only planner: it parses the workbook and performs a bulk slug lookup to estimate created/updated/skipped rows without calling `save()`, `get_or_create()`, or `update_or_create()`. Execute writes one university per short transaction and preserves the existing safety policy: idempotent upsert by slug/name, no deletes, no invented data, placeholder SAT quarantining, raw text preservation, and curated verification rows preserved unless the importer policy changes deliberately.
 
@@ -277,16 +277,16 @@ Repeated item surfaces use explicit page controls instead of infinite scroll, en
 
 The shared frontend primitives are `PaginationControls`, `PaginatedGrid`, and `PaginatedList` under `frontend/src/shared/ui/pagination.tsx`. Grids are used for catalog/card surfaces such as universities and events; list or board pages such as roadmap, applications, moderation, and participant tables keep their domain layout but still expose previous/next, page number, total pages, and range summaries. Local pagination is used only after the full relevant client-side filtered set is already loaded, such as essay tab filters and roadmap task buckets.
 
-EDUVERSE-GLOBAL-PAGINATION-AND-SLIDERS-001 tightened this pattern: `PaginationControls` now supports `pageSize`, `totalCount`, and first/last page controls while preserving the older `onPrevious`/`onNext`/`onPageSelect` callback style. The university catalog remains backend-paginated at 21 cards per page and now exposes city, verification-status, QS ranking, tuition, and total-cost filters/sorts through the same paginated API instead of filtering only the visible page.
+UNIWAY-GLOBAL-PAGINATION-AND-SLIDERS-001 tightened this pattern: `PaginationControls` now supports `pageSize`, `totalCount`, and first/last page controls while preserving the older `onPrevious`/`onNext`/`onPageSelect` callback style. The university catalog remains backend-paginated at 21 cards per page and now exposes city, verification-status, QS ranking, tuition, and total-cost filters/sorts through the same paginated API instead of filtering only the visible page.
 
 ## ADR-030: Normalized academics, sourced costs, and fit score foundation
 
 - **Status:** Accepted
 - **Date:** 2026-06-30
 
-EduVerse stores a student's raw academic record and derived comparison values separately. `StudentProfile.original_gpa_value`, `original_gpa_scale`, `original_gpa_scale_type`, curriculum fields, and normalization confidence preserve the source context; `normalized_gpa_4` is the comparable value used by readiness and university fit. A raw 5-point GPA is never compared directly to a 4-point university range. Unsupported curricula keep a low-confidence note instead of a forced conversion.
+UniWay stores a student's raw academic record and derived comparison values separately. `StudentProfile.original_gpa_value`, `original_gpa_scale`, `original_gpa_scale_type`, curriculum fields, and normalization confidence preserve the source context; `normalized_gpa_4` is the comparable value used by readiness and university fit. A raw 5-point GPA is never compared directly to a 4-point university range. Unsupported curricula keep a low-confidence note instead of a forced conversion.
 
-University affordability comparisons also separate source values from comparable values. Tuition and total cost preserve original amount/currency, and USD fields are populated only from native USD amounts or a stored `ExchangeRate`. EduVerse does not hardcode live exchange rates, fetch rates at request time, or silently treat non-USD values as USD.
+University affordability comparisons also separate source values from comparable values. Tuition and total cost preserve original amount/currency, and USD fields are populated only from native USD amounts or a stored `ExchangeRate`. UniWay does not hardcode live exchange rates, fetch rates at request time, or silently treat non-USD values as USD.
 
 The university fit response is an evidence-based 1-100 `fit_score` with categorical labels (`dream`, `reach`, `competitive`, `target`, `safety`), component subscores, risks, missing data, confidence, and a disclaimer. It is not an admission probability and must not be described as odds, chance, likelihood of acceptance, or a guarantee. Planned retakes may be shown as conditional context only; current IELTS/SAT gaps still remain visible.
 
@@ -321,7 +321,7 @@ The same severity thresholds feed the Fit Score's academic subscore so a ~300-po
 
 Each tracked application gets an independent, source-aware planning timeline without new persistence or a parallel suggestion system. `GET /api/applications/{id}/timeline/` (backed by the pure `application_service/timeline.py`) assembles the view fresh on each request from data that already exists — the tracker item, the linked university's verified/imported deadline and scholarships, the caller's essays for that university, official College Board exam dates, linked roadmap tasks, and milestones. Deadlines already lived on `University.application_deadline` + `deadlines_text`, `UniversityScholarship.deadline`, and the tracker's own date fields (there is no separate `UniversityDeadline`/`UniversityEssay` model), so the timeline derives rather than duplicates.
 
-Every date carries an explicit confidence: `verified` (university deadline with a `verified` field verification), `partial` (imported/source-aware value without a verified record, or an official scholarship date), `user_provided` (entered on the tracker/milestone), `estimated` (a suggested checkpoint), or `missing`. A missing deadline is surfaced as "Deadline not verified yet" with a verify action — never treated as safe — and EduVerse never invents an official university or exam date. Urgency is a pure function of days remaining (`far`/`upcoming`/`soon`/`urgent`/`critical`/`overdue` at 90/30/14/7/0 boundaries), mirrored identically in the frontend list filter and dashboard widget.
+Every date carries an explicit confidence: `verified` (university deadline with a `verified` field verification), `partial` (imported/source-aware value without a verified record, or an official scholarship date), `user_provided` (entered on the tracker/milestone), `estimated` (a suggested checkpoint), or `missing`. A missing deadline is surfaced as "Deadline not verified yet" with a verify action — never treated as safe — and UniWay never invents an official university or exam date. Urgency is a pure function of days remaining (`far`/`upcoming`/`soon`/`urgent`/`critical`/`overdue` at 90/30/14/7/0 boundaries), mirrored identically in the frontend list filter and dashboard widget.
 
 Suggested finish dates are phase-aware: each checkpoint (exam registration, essay brainstorm, essay draft, recommendation request, financial-aid forms, final review) is worked back from a real reference deadline by a fixed offset and only appears when days-until-deadline falls in that checkpoint's applicable window. A deadline more than ~6 months out therefore produces only calm long-lead planning items, and one inside ~2 weeks produces only a final review — never unrealistic long-term work. These suggested dates are informational in the timeline; the actionable, idempotent "Add to roadmap" continues through the existing `suggestions_service`, which already generates the same windows, so there is a single source of truth for roadmap creation.
 
@@ -347,7 +347,7 @@ Linked exams reuse the ADR-032 gap-severity helpers, add planned-retake context 
 - **Status:** Accepted
 - **Date:** 2026-07-01
 
-Editable EduVerse workflows should never trap the user or silently discard work. A shared frontend guard (`useUnsavedChangesGuard` plus `UnsavedChangesDialog`) now provides the standard pattern for forms and long text editors: dirty-state detection, browser refresh warning, explicit stay/discard choices, and a "save and leave" path that only continues with the pending close/navigation action when the save succeeds.
+Editable UniWay workflows should never trap the user or silently discard work. A shared frontend guard (`useUnsavedChangesGuard` plus `UnsavedChangesDialog`) now provides the standard pattern for forms and long text editors: dirty-state detection, browser refresh warning, explicit stay/discard choices, and a "save and leave" path that only continues with the pending close/navigation action when the save succeeds.
 
 The pattern is intentionally client-side UX only. Backend authorization, ownership, validation, and moderation rules remain authoritative. Forms still reset loading states in `finally` blocks and surface request errors instead of leaving buttons stuck. Screens with special semantics can adapt the same guard: onboarding saves the current profile draft before logout, organizer event drafts save before returning to the list, and the essay editor protects the unsaved draft buffer when switching essays.
 
@@ -358,7 +358,7 @@ Profile onboarding JSON list validation was also narrowed from a blanket 120-cha
 - **Status:** Accepted
 - **Date:** 2026-07-02
 
-EduVerse event infrastructure now supports organizer-defined registration form fields, student answers, ticket codes, idempotent check-in, verified participation records, privacy-limited CSV participant export, aggregate organizer analytics, and internal event notification records.
+UniWay event infrastructure now supports organizer-defined registration form fields, student answers, ticket codes, idempotent check-in, verified participation records, privacy-limited CSV participant export, aggregate organizer analytics, and internal event notification records.
 
 These capabilities remain inside the authenticated event workflow. Organizers can manage only owned events, admins can manage any event, student-facing records are self-only, and all participant exports use the same privacy-limited projection as the participant API. Ticket codes are attendance identifiers, not payment inventory or admissions credentials.
 
@@ -369,18 +369,18 @@ External Telegram delivery, QR image rendering/scanning, paid ticketing, and hig
 - **Status:** Accepted
 - **Date:** 2026-07-02
 
-University application deadlines can have a verified month/day but a stale source year. EduVerse now treats the stored value as source context and derives the user-facing planning date from `StudentProfile.expected_graduation_year`: August-December deadlines belong to `graduation_year - 1`, and January-July deadlines belong to `graduation_year`. The raw `source_date` remains visible in API payloads where relevant, but planning logic (`days_remaining`, urgency, recommendations, roadmap, suggestions, and application timeline checkpoints) uses only the normalized user-cycle date. If the profile has no expected graduation year, EduVerse does not treat the stale source year as current-cycle guidance; planning dates remain unknown until the student adds the graduation year.
+University application deadlines can have a verified month/day but a stale source year. UniWay now treats the stored value as source context and derives the user-facing planning date from `StudentProfile.expected_graduation_year`: August-December deadlines belong to `graduation_year - 1`, and January-July deadlines belong to `graduation_year`. The raw `source_date` remains visible in API payloads where relevant, but planning logic (`days_remaining`, urgency, recommendations, roadmap, suggestions, and application timeline checkpoints) uses only the normalized user-cycle date. If the profile has no expected graduation year, UniWay does not treat the stale source year as current-cycle guidance; planning dates remain unknown until the student adds the graduation year.
 
 Grade normalization now explicitly supports 10-point and 20-point scales with the same proportional comparison model used for 5-point/local scales. The conversion remains approximate and confidence-bounded; raw GPA values are preserved separately from normalized 4.0/100-point comparison values.
 
-Recommendation payloads still expose the internal `cost_risk` code for filtering, but the UI labels it as cost context / review-needed information rather than "low cost" or "high cost" affordability. EduVerse has no student budget model yet, so it must not imply affordability certainty from catalog cost data alone.
+Recommendation payloads still expose the internal `cost_risk` code for filtering, but the UI labels it as cost context / review-needed information rather than "low cost" or "high cost" affordability. UniWay has no student budget model yet, so it must not imply affordability certainty from catalog cost data alone.
 
 ## ADR-038: Major-cluster and subject-ranking matching stays a presentation layer over the fit engine
 
 - **Status:** Accepted
 - **Date:** 2026-07-03
 
-EduVerse now infers a student's likely major clusters (`services/university_service/major_matching.py::infer_major_clusters`) from declared intended majors first, falling back to activities/research/portfolio/olympiad/essay text when no major is declared, and returns `unknown`/low confidence rather than guessing when no signal exists at all. `score_program_fit` scores each university program against that inference: academics (normalized GPA, test score, curriculum rigor) remain the dominant weight (45%), with program/major relevance (30%), essay readiness (10%), and stated program requirements (15%) layered on top — optional evidence (research, portfolio, olympiads, volunteering) can only nudge the profile-relevance component, never overtake the academic component. A verified `UniversitySubjectRanking` adds a small bonus (2-4 points) only when one exists and matches the inferred cluster; its absence is reported as `subject_ranking_not_available`, never faked as a neutral/zero ranking.
+UniWay now infers a student's likely major clusters (`services/university_service/major_matching.py::infer_major_clusters`) from declared intended majors first, falling back to activities/research/portfolio/olympiad/essay text when no major is declared, and returns `unknown`/low confidence rather than guessing when no signal exists at all. `score_program_fit` scores each university program against that inference: academics (normalized GPA, test score, curriculum rigor) remain the dominant weight (45%), with program/major relevance (30%), essay readiness (10%), and stated program requirements (15%) layered on top — optional evidence (research, portfolio, olympiads, volunteering) can only nudge the profile-relevance component, never overtake the academic component. A verified `UniversitySubjectRanking` adds a small bonus (2-4 points) only when one exists and matches the inferred cluster; its absence is reported as `subject_ranking_not_available`, never faked as a neutral/zero ranking.
 
 `UniversityProgram` gained `major_cluster`, `department_or_school`, `degree_level`, `official_url`, `portfolio_required`, `research_heavy`, `stem_heavy`, `interdisciplinary`, `program_requirements_summary`, `source_url`, `source_confidence`, and `last_verified_date`. `University` gained `global_rank`, `the_rank`, `national_rank`, `ranking_source(_url)`, `ranking_year`, `ranking_last_verified_date`, and `ranking_confidence` alongside the existing `qs_ranking`. A new `UniversitySubjectRanking` model (university + optional program FK, subject area, cluster, numeric rank, source, year, confidence) holds subject-specific rankings separately from the university-level ranking fields. All new fields are nullable/blank-safe so existing universities/programs without this data continue to serialize normally; the frontend shows an explicit "not verified yet" state instead of a fake score whenever `program_data_verified` is `false` or a ranking is absent. No ranking, program requirement, or official-deadline data is invented anywhere in this layer — it only structures and scores data that is already stored.
 
@@ -391,7 +391,7 @@ Program-level matching (`program_matching`) is computed only in the university d
 - **Status:** Accepted
 - **Date:** 2026-07-03
 
-EduVerse can use AI to summarize a student's saved admissions profile, but it must not call an AI provider during every university fit calculation and must not present admissions probabilities. The profile-assessment flow therefore runs through a dedicated backend service that builds a compact sanitized input summary, sends it to Gemini only when explicitly requested, validates strict JSON, stores the result, and reuses it while the profile snapshot hash remains unchanged.
+UniWay can use AI to summarize a student's saved admissions profile, but it must not call an AI provider during every university fit calculation and must not present admissions probabilities. The profile-assessment flow therefore runs through a dedicated backend service that builds a compact sanitized input summary, sends it to Gemini only when explicitly requested, validates strict JSON, stores the result, and reuses it while the profile snapshot hash remains unchanged.
 
 The snapshot hash is based on meaningful admissions data rather than account identifiers. The AI input excludes passwords, payment data, email, phone, Telegram username, proof URLs, and raw essay text. The stored assessment includes public scores and guidance plus private internal keywords/rationales for later non-AI ranking logic; student endpoints expose only public fields. The Gemini key remains backend-only, controlled by environment variables, and the public endpoints return safe unavailable/cached/daily-limit states instead of leaking provider failures.
 
@@ -402,7 +402,7 @@ Profile reassessment is limited to once per day when the profile changed; unchan
 - **Status:** Accepted
 - **Date:** 2026-07-03
 
-EduVerse may use AI to score a saved essay draft against a fixed admissions-readiness rubric, but it must not write or rewrite application essays. The AI essay scorer therefore runs only on the backend, only for the caller's own `EssayWorkspace`, and returns numeric readiness/subscores, flags, source warnings, and short high-level suggestions. The response never contains replacement paragraphs, generated drafts, or essay text written for the student.
+UniWay may use AI to score a saved essay draft against a fixed admissions-readiness rubric, but it must not write or rewrite application essays. The AI essay scorer therefore runs only on the backend, only for the caller's own `EssayWorkspace`, and returns numeric readiness/subscores, flags, source warnings, and short high-level suggestions. The response never contains replacement paragraphs, generated drafts, or essay text written for the student.
 
 The provider input is intentionally narrow: the current essay text, essay metadata, word count/limit, linked university/application/program names when present, verified official prompt text/source metadata when present, rubric version, and a small set of cached profile-assessment keywords if already available. It does not send credentials, payment data, unrelated profile data, other essays, or the university database. API keys remain backend environment variables.
 
@@ -415,7 +415,7 @@ The backend treats provider output as untrusted. It validates an allowlisted JSO
 - **Status:** Accepted
 - **Date:** 2026-07-04
 
-EduVerse screens should not feel like every admissions tool is competing for the first viewport. The app shell keeps the core workflow in the top-level sidebar, while Recommendations and Strategy remain available through their existing routes and are exposed as contextual tabs under Universities/Applications. This preserves deep links and avoids a crowded sidebar.
+UniWay screens should not feel like every admissions tool is competing for the first viewport. The app shell keeps the core workflow in the top-level sidebar, while Recommendations and Strategy remain available through their existing routes and are exposed as contextual tabs under Universities/Applications. This preserves deep links and avoids a crowded sidebar.
 
 Filter-heavy pages use a shared collapsible filter panel. Pages show active-filter and result counts in the panel header, keep clear/reset actions close to the filters, and default heavy controls closed unless the screen has a strong reason to show them. This keeps desktop density compact and protects narrow mobile widths from long filter walls.
 

@@ -53,7 +53,7 @@ def backfill_academic_normalization(apps, schema_editor):
         percentage = _round(profile.gpa / profile.gpa_scale * Decimal("100"))
         normalized = None
         confidence = "low"
-        note = "GPA scale is custom or unknown; EduVerse will not compare it as a 4.0 GPA."
+        note = "GPA scale is custom or unknown; UniWay will not compare it as a 4.0 GPA."
         if scale_type == "4_0":
             normalized = _round(profile.gpa)
             confidence = "high"

@@ -25,13 +25,13 @@ class ExamSection(models.Model):
 
 class Question(models.Model):
     class Origin(models.TextChoices):
-        ORIGINAL = "original", "Original EduVerse content"
+        ORIGINAL = "original", "Original UniWay content"
         LICENSED = "licensed", "Licensed content"
 
     section = models.ForeignKey(ExamSection, on_delete=models.CASCADE, related_name="questions")
     prompt = models.TextField()
     origin = models.CharField(max_length=20, choices=Origin.choices, default=Origin.ORIGINAL)
-    provenance_note = models.CharField(max_length=240, default="Original EduVerse demonstration content")
+    provenance_note = models.CharField(max_length=240, default="Original UniWay demonstration content")
     is_published = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

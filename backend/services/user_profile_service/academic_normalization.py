@@ -141,7 +141,7 @@ def normalize_academic_record(
             normalized_gpa_4=None,
             normalized_percentage=None,
             confidence=CONFIDENCE_LOW,
-            note="GPA value or scale is missing, so EduVerse cannot compare GPA safely.",
+            note="GPA value or scale is missing, so UniWay cannot compare GPA safely.",
         )
 
     if scale <= 0 or value < 0 or value > scale:
@@ -219,7 +219,7 @@ def normalize_academic_record(
         normalized_gpa_4=None,
         normalized_percentage=percentage,
         confidence=CONFIDENCE_LOW,
-        note="GPA scale is custom or unknown; EduVerse will not compare it as a 4.0 GPA.",
+        note="GPA scale is custom or unknown; UniWay will not compare it as a 4.0 GPA.",
     )
 
 

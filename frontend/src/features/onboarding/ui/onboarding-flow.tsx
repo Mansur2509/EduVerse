@@ -45,7 +45,7 @@ import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 import { AdmissionsProposals } from "./admissions-proposals";
 import { MajorAssessment } from "./major-assessment";
 
-const DRAFT_KEY = "eduverse.onboarding.draft.v1";
+const DRAFT_KEY = "uniway.onboarding.draft.v1";
 const stepSections: Array<OnboardingSection | null> = [
   "identity",
   "academic",
@@ -803,7 +803,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
               E
             </span>
             <div>
-              <p className="font-serif text-lg font-semibold">EduVerse</p>
+              <p className="font-serif text-lg font-semibold">UniWay</p>
               <p className="text-[0.65rem] uppercase tracking-[0.16em] text-white/55">
                 {t("onboarding.required")}
               </p>

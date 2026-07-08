@@ -1,7 +1,7 @@
 // The DRF default router (universities, exams, profiles, subscriptions) is
 // mounted under `/api/v1/`, so `apiBaseUrl` MUST end with `/api/v1`. A real
 // production incident came from setting NEXT_PUBLIC_API_BASE_URL to the bare
-// backend origin (e.g. `https://eduverse-vvw2.onrender.com`) without that
+// backend origin (e.g. the current Render host) without that
 // suffix: every `base: "api"` call (e.g. the university catalog) then hit
 // `<origin>/universities/` and 404'd, while auth/events/roadmap/essays/etc kept
 // working because they are rebuilt from `new URL(apiBaseUrl).origin` below.

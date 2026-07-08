@@ -62,7 +62,7 @@ def valid_ai_output(**overrides):
         "improvement_areas": ["add research details"],
         "internal_keywords": ["research-driven", "leadership-heavy"],
         "category_rationales": {
-            category: "Evidence was assessed from saved EduVerse profile data."
+            category: "Evidence was assessed from saved UniWay profile data."
             for category in PROFILE_ASSESSMENT_CATEGORIES
         },
         "warnings": [],

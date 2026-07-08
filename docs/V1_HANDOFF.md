@@ -1,4 +1,4 @@
-# EduVerse V1 Beta Handoff
+# UniWay V1 Beta Handoff
 
 Date: 2026-06-23
 
@@ -6,7 +6,7 @@ This document freezes the current V1 beta state. Do not start a new feature unti
 
 ## Current product state
 
-EduVerse V1 beta is a local founder-reviewable product shell with authenticated access, mandatory onboarding, student profile, event catalog/registration, organizer event management, admin moderation, dashboard, pricing, and honest preview pages for future modules.
+UniWay V1 beta is a local founder-reviewable product shell with authenticated access, mandatory onboarding, student profile, event catalog/registration, organizer event management, admin moderation, dashboard, pricing, and honest preview pages for future modules.
 
 The app is gated by backend-confirmed auth and onboarding. Demo users exist for student, organizer, and admin role review.
 
@@ -68,7 +68,7 @@ The app is gated by backend-confirmed auth and onboarding. Demo users exist for 
 Exact next prompt title to use later:
 
 ```text
-FOUNDER-VISUAL-REVIEW-001: Manual founder visual QA for EduVerse V1 beta.
+FOUNDER-VISUAL-REVIEW-001: Manual founder visual QA for UniWay V1 beta.
 ```
 
 ## Latest checks passed
@@ -109,13 +109,13 @@ Register/login/onboarding smoke QA also passed:
 Backend terminal:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\Eduverce\backend\scripts\run-local-preview.ps1
+powershell -ExecutionPolicy Bypass -File D:\UniWay\backend\scripts\run-local-preview.ps1
 ```
 
 Frontend terminal:
 
 ```powershell
-cd D:\Eduverce\frontend
+cd D:\UniWay\frontend
 npm run preview:beta
 ```
 
@@ -130,9 +130,9 @@ http://127.0.0.1:3000
 Password for all demo accounts:
 
 ```text
-EduVerse-Demo-842!
+UniWay-Demo-842!
 ```
 
-- `student.demo@eduverse.local`
-- `organizer.demo@eduverse.local`
-- `admin.demo@eduverse.local`
+- `student.demo@uniway.local`
+- `organizer.demo@uniway.local`
+- `admin.demo@uniway.local`

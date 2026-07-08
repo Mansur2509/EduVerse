@@ -15,7 +15,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { LanguageSwitcher } from "@/shared/ui/language-switcher";
 
-const ASSESSMENT_DRAFT_KEY = "eduverse.onboarding.assessment.v1";
+const ASSESSMENT_DRAFT_KEY = "uniway.onboarding.assessment.v1";
 
 export function MajorAssessment({
   initialMajors,

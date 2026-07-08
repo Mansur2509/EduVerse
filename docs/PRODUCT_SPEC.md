@@ -2,7 +2,7 @@
 
 ## Purpose
 
-EduVerse helps school students and applicants make structured, evidence-aware progress across admissions, exams, events, activities, research, careers, and financial literacy. Uzbekistan is the initial market, followed by Central Asia and broader international expansion.
+UniWay helps school students and applicants make structured, evidence-aware progress across admissions, exams, events, activities, research, careers, and financial literacy. Uzbekistan is the initial market, followed by Central Asia and broader international expansion.
 
 ## Product principles
 
@@ -53,7 +53,7 @@ Do not show exact invented probabilities. Compare a profile against official pub
 
 Required disclaimer:
 
-> EduVerse does not guarantee admission. Comparisons are based on publicly available data and are for informational purposes only. Always verify important information with official university sources.
+> UniWay does not guarantee admission. Comparisons are based on publicly available data and are for informational purposes only. Always verify important information with official university sources.
 
 ### Essays
 

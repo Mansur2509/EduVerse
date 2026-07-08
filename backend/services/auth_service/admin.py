@@ -5,9 +5,9 @@ from .models import User
 
 
 @admin.register(User)
-class EduVerseUserAdmin(UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (("EduVerse", {"fields": ("role",)}),)
-    add_fieldsets = UserAdmin.add_fieldsets + (("EduVerse", {"fields": ("email", "role")}),)
+class UniWayUserAdmin(UserAdmin):
+    fieldsets = UserAdmin.fieldsets + (("UniWay", {"fields": ("role",)}),)
+    add_fieldsets = UserAdmin.add_fieldsets + (("UniWay", {"fields": ("email", "role")}),)
     list_display = ("username", "email", "role", "is_staff", "is_active")
     list_filter = ("role", "is_staff", "is_active")
 

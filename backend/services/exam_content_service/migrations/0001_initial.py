@@ -36,8 +36,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('prompt', models.TextField()),
-                ('origin', models.CharField(choices=[('original', 'Original EduVerse content'), ('licensed', 'Licensed content')], default='original', max_length=20)),
-                ('provenance_note', models.CharField(default='Original EduVerse demonstration content', max_length=240)),
+                ('origin', models.CharField(choices=[('original', 'Original UniWay content'), ('licensed', 'Licensed content')], default='original', max_length=20)),
+                ('provenance_note', models.CharField(default='Original UniWay demonstration content', max_length=240)),
                 ('is_published', models.BooleanField(db_index=True, default=False)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('section', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='questions', to='exam_content_service.examsection')),

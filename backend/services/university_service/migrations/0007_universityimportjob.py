@@ -1,4 +1,4 @@
-# Generated for EDUVERSE-UNIVERSITY-IMPORT-ADMIN-001.
+# Generated for UNIWAY-UNIVERSITY-IMPORT-ADMIN-001.
 
 from __future__ import annotations
 

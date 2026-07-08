@@ -54,7 +54,8 @@ class TargetUniversity:
 
 
 def _is_demo_user(user) -> bool:
-    return bool(getattr(user, "email", "").endswith("@eduverse.local"))
+    email = getattr(user, "email", "")
+    return bool(email.endswith("@uniway.local") or email.endswith("@eduverse.local"))
 
 
 def _as_list(value) -> list:
@@ -302,7 +303,7 @@ def _add_university_date_suggestions(
                 linked_university=university,
                 linked_application=application,
                 source_url=university.admissions_url or university.official_website,
-                evidence_note="Missing official deadline. EduVerse will not invent one.",
+                evidence_note="Missing official deadline. UniWay will not invent one.",
             )
 
         deadline_for_documents = (
@@ -450,7 +451,7 @@ def _add_scholarship_suggestions(
                 linked_university=university,
                 linked_application=application,
                 source_url=university.financial_aid_url or university.official_website,
-                evidence_note="Missing scholarship source data; EduVerse does not infer award availability.",
+                evidence_note="Missing scholarship source data; UniWay does not infer award availability.",
             )
 
 
@@ -526,7 +527,7 @@ def _add_essay_suggestions(
                 linked_university=university,
                 linked_essay=essay,
                 source_url=source_url,
-                evidence_note="Missing word limit. EduVerse will not guess it.",
+                evidence_note="Missing word limit. UniWay will not guess it.",
             )
 
         deadline = _deadline_for_university(targets, university.id if university else None, profile)

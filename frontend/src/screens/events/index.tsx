@@ -132,7 +132,7 @@ export function EventsScreen() {
         activeCount={activeFilterCount}
         onClear={clearFilters}
         resultCount={totalCount}
-        storageKey="eduverse.filters.events"
+        storageKey="uniway.filters.events"
       >
         <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleSubmit}>
           <label className="block">

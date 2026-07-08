@@ -10,7 +10,7 @@ and can hit a Supabase statement timeout while locking those rows.
 
 from __future__ import annotations
 
-# Real EduVerse operators who should hold admin access (e.g. for the admin-only
+# Real UniWay operators who should hold admin access (e.g. for the admin-only
 # university import page). Add an email here and, once that person has registered,
 # the next deploy (or a `bootstrap_admins` run) grants them admin — no Render shell.
 KNOWN_ADMIN_EMAILS = (
@@ -19,7 +19,7 @@ KNOWN_ADMIN_EMAILS = (
     "iilich6304@gmail.com",
 )
 
-# Fields that define EduVerse admin access. `User.is_admin_role` is
+# Fields that define UniWay admin access. `User.is_admin_role` is
 # `is_staff or is_superuser or role == "admin"`, checked by the `IsAdminRole`
 # permission; `is_superuser` is intentionally left untouched.
 ADMIN_ROLE = "admin"

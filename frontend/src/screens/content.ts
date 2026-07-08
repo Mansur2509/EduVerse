@@ -67,7 +67,7 @@ export const screenContent = {
     secondaryHref: "/roadmap",
     highlights: [
       { title: "Focused sections", detail: "Move between skills, lessons, timed practice, and explanations." },
-      { title: "Original questions", detail: "Use content created for EduVerse rather than copied proprietary banks." },
+      { title: "Original questions", detail: "Use content created for UniWay rather than copied proprietary banks." },
       { title: "Useful review", detail: "Understand mistakes and identify the next skill to practice." }
     ]
   },

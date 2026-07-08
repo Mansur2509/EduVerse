@@ -370,7 +370,7 @@ export function RecommendationsScreen() {
         activeCount={activeFilterCount}
         onClear={clearFilters}
         resultCount={filtered.length}
-        storageKey="eduverse.filters.recommendations"
+        storageKey="uniway.filters.recommendations"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">

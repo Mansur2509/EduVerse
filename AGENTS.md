@@ -1,6 +1,6 @@
-# EduVerse Agent Guide
+# UniWay Agent Guide
 
-EduVerse is a production-minded student success platform. Repository documentation is the project memory and the source of truth for implementation decisions.
+UniWay is a production-minded student success platform. Repository documentation is the project memory and the source of truth for implementation decisions.
 
 ## Required reading
 

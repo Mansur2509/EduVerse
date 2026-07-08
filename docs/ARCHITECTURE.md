@@ -2,7 +2,7 @@
 
 ## Overview
 
-EduVerse is a monorepo with a Next.js frontend, a modular Django/DRF backend, and PostgreSQL. The MVP deploys as a modular monolith, while service boundaries are kept explicit enough to extract later if operational needs justify it.
+UniWay is a monorepo with a Next.js frontend, a modular Django/DRF backend, and PostgreSQL. The MVP deploys as a modular monolith, while service boundaries are kept explicit enough to extract later if operational needs justify it.
 
 ```text
 Browser
@@ -49,7 +49,7 @@ Theme values are semantic CSS variables declared in `frontend/src/app/globals.cs
 
 The internal localization layer lives in `frontend/src/shared/i18n/`. `I18nProvider` is mounted at the application root and exposes the current locale and the typed `t()` helper. Shared dictionaries are the source of truth for interface text. Navigation, auth, profile, dashboard, common actions, errors, empty states, and accessibility labels use translation keys.
 
-The selected locale is stored under `eduverse.locale`, while `lang` and `dir` are synchronized on the document root. English is the deterministic server-rendered default; locale-aware routes and translated metadata can be added later if SEO requires them.
+The selected locale is stored under `uniway.locale`, while `lang` and `dir` are synchronized on the document root. English is the deterministic server-rendered default; locale-aware routes and translated metadata can be added later if SEO requires them.
 
 ### Application authentication gate
 
@@ -184,7 +184,7 @@ The frontend surfaces the university/roadmap connection without new backend surf
 
 `UniversityImportJob` provides the production-facing admin workflow under `/api/admin/university-import/`: dry-run upload, execute upload, and job status reads. Access is admin/staff only; students, organizers, and anonymous users are blocked by DRF permissions. Uploads accept `.xlsx` files only, enforce a 10 MB limit, save to a secure temporary path, and delete the temporary file after processing when the OS permits. Running jobs persist progress (`row_count`, `processed_count`, current row/university, and `last_heartbeat_at`) so admins can tell whether an execute is moving. A running job with no heartbeat past the configured stale window is marked failed with an explicit timeout message on status read, rather than remaining `running` forever.
 
-Because EduVerse does not yet run a dedicated background queue, imports are processed by a beta-only daemon thread after the job row is created. This deliberately keeps heavy imports out of Django migrations and web-service startup, so Render can open its port before long data work begins. A future queue (Celery/RQ/managed jobs) should replace the daemon thread only when operational needs justify the extra dependency.
+Because UniWay does not yet run a dedicated background queue, imports are processed by a beta-only daemon thread after the job row is created. This deliberately keeps heavy imports out of Django migrations and web-service startup, so Render can open its port before long data work begins. A future queue (Celery/RQ/managed jobs) should replace the daemon thread only when operational needs justify the extra dependency.
 
 ## Data ownership
 

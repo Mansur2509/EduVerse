@@ -334,7 +334,7 @@ Authenticated and self-only. Returns the caller's latest cached AI-assisted prof
   "can_refresh": false,
   "next_available_at": null,
   "ai_available": true,
-  "disclaimer": "This is a profile-readiness estimate based on saved EduVerse profile data. It is not an admissions decision and does not promise an outcome."
+  "disclaimer": "This is a profile-readiness estimate based on saved UniWay profile data. It is not an admissions decision and does not promise an outcome."
 }
 ```
 
@@ -395,15 +395,15 @@ Example item:
 ```json
 {
   "id": 1,
-  "title": "EduVerse Demo Planning Workshop",
-  "slug": "eduverse-demo-planning-workshop",
+  "title": "UniWay Demo Planning Workshop",
+  "slug": "uniway-demo-planning-workshop",
   "short_description": "A fictional workshop for testing event discovery and registration.",
   "description": "Fictional local development event...",
   "category": {
     "name": "Workshop",
     "slug": "workshop"
   },
-  "organizer_name": "EduVerse Demo Organizer",
+  "organizer_name": "UniWay Demo Organizer",
   "location": {
     "country": "Uzbekistan",
     "city": "Tashkent",
@@ -412,7 +412,7 @@ Example item:
     "longitude": null
   },
   "is_online": true,
-  "online_url": "https://example.com/eduverse-demo-planning-workshop",
+  "online_url": "https://example.com/uniway-demo-planning-workshop",
   "format": "hybrid",
   "start_at": "2026-08-06T10:00:00Z",
   "end_at": "2026-08-06T12:00:00Z",
@@ -429,7 +429,7 @@ Example item:
   "eligibility": "Demonstration only",
   "source": {
     "source_title": "Fictional demonstration source",
-    "source_url": "https://example.com/eduverse-demo-planning-workshop",
+    "source_url": "https://example.com/uniway-demo-planning-workshop",
     "is_official": false,
     "retrieved_at": "2026-06-22T10:00:00Z"
   },
@@ -900,7 +900,7 @@ The score response is:
     "source_warnings": [],
     "disclaimers": [
       "This is an automated essay-readiness estimate, not an admissions decision or guarantee.",
-      "Scores are based only on the essay text and verified EduVerse context available.",
+      "Scores are based only on the essay text and verified UniWay context available.",
       "AI/paraphrase style signal is not proof of AI use.",
       "For important submissions, verify requirements yourself and ideally review with a qualified human reviewer."
     ],

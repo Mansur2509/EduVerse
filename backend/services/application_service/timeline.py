@@ -5,7 +5,7 @@ exists (the tracker item, the linked university's verified/imported fields,
 the user's essays/exam plans, official College Board exam dates, linked
 roadmap tasks, and user milestones). Suggested planning dates are always
 derived from a *real* reference deadline and are clearly labelled
-``estimated`` — EduVerse never invents an official university or exam date.
+``estimated`` — UniWay never invents an official university or exam date.
 """
 
 from __future__ import annotations

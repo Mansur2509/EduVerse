@@ -284,7 +284,7 @@ export function UniversitiesScreen() {
         activeCount={activeFilterCount}
         onClear={clearFilters}
         resultCount={shortlistOnly ? visibleUniversities.length : totalCount}
-        storageKey="eduverse.filters.universities"
+        storageKey="uniway.filters.universities"
       >
         <form className="space-y-5" onSubmit={handleSubmit}>
           <section className="space-y-3">

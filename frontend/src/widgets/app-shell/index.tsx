@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             E
           </span>
           <span>
-            <strong className="block font-serif text-lg">EduVerse</strong>
+            <strong className="block font-serif text-lg">UniWay</strong>
             <span className="text-xs text-white/55">{t("shell.productSubtitle")}</span>
           </span>
         </Link>

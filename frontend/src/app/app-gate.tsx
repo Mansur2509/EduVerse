@@ -31,7 +31,7 @@ function AcademicBrand() {
           E
         </span>
         <div>
-          <p className="font-serif text-2xl font-semibold tracking-tight">EduVerse</p>
+          <p className="font-serif text-2xl font-semibold tracking-tight">UniWay</p>
           <p className="text-xs uppercase tracking-[0.18em] text-white/65">
             {t("auth.gateway.institution")}
           </p>

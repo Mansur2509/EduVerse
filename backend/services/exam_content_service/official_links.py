@@ -1,6 +1,6 @@
 """Static, non-invented links to official exam registration/date pages.
 
-Unlike SAT/AP (backed by verified ``OfficialExamDate`` rows), EduVerse has no
+Unlike SAT/AP (backed by verified ``OfficialExamDate`` rows), UniWay has no
 verified date dataset for IELTS/TOEFL. Rather than guessing or scraping live
 dates, these are stable links to each test's official organization so a
 student can check current dates themselves. No date, deadline, or score is

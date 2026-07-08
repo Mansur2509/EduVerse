@@ -12,7 +12,7 @@ import { Button } from "./button";
 import { fieldClassName } from "./field";
 
 export const SUPPORT_URL = "https://t.me/Otvet_mne_uje_nakonec";
-const FEEDBACK_STORAGE_KEY = "eduverse.feedback.local.v1";
+const FEEDBACK_STORAGE_KEY = "uniway.feedback.local.v1";
 const FEEDBACK_TYPES = ["issue", "idea", "confusing", "data"] as const;
 
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];

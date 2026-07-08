@@ -154,7 +154,7 @@ export function AdminFeedbackScreen() {
         activeCount={activeFilterCount}
         onClear={resetFilters}
         resultCount={totalCount}
-        storageKey="eduverse.filters.adminFeedback"
+        storageKey="uniway.filters.adminFeedback"
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">{t("adminFeedback.filters.title")}</h2>

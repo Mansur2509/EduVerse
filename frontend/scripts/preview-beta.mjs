@@ -37,10 +37,10 @@ function checkPort(port, host) {
 if (!fs.existsSync(nextCommand)) {
   console.error(
     [
-      "EduVerse frontend dependencies are not installed.",
+      "UniWay frontend dependencies are not installed.",
       "",
       "Run these commands once:",
-      "  cd D:\\Eduverce\\frontend",
+      "  cd D:\\UniWay\\frontend",
       "  npm install",
       "",
       "Then start the beta preview:",
@@ -53,14 +53,14 @@ if (!fs.existsSync(nextCommand)) {
 if (!fs.existsSync(envLocalPath)) {
   console.error(
     [
-      "EduVerse frontend environment file is missing.",
+      "UniWay frontend environment file is missing.",
       "",
       "Create it once in PowerShell:",
-      "  cd D:\\Eduverce\\frontend",
+      "  cd D:\\UniWay\\frontend",
       "  Copy-Item .env.example .env.local",
       "",
       "Or in Git Bash:",
-      "  cd /d/Eduverce/frontend",
+      "  cd /d/UniWay/frontend",
       "  cp .env.example .env.local"
     ].join("\n")
   );
@@ -71,7 +71,7 @@ if (await checkPort(3000, "127.0.0.1")) {
   console.error(
     [
       "Port 3000 is already in use.",
-      "An EduVerse preview may already be open at http://127.0.0.1:3000.",
+      "An UniWay preview may already be open at http://127.0.0.1:3000.",
       "Close the older preview terminal with Ctrl+C before starting another one."
     ].join("\n")
   );
@@ -84,16 +84,16 @@ try {
   });
   if (!response.ok) {
     console.warn(
-      `EduVerse backend health check returned HTTP ${response.status}.`
+      `UniWay backend health check returned HTTP ${response.status}.`
     );
   }
 } catch {
   console.warn(
     [
-      "EduVerse backend is not reachable at http://127.0.0.1:8000.",
+      "UniWay backend is not reachable at http://127.0.0.1:8000.",
       "The interface will show a protected retry screen until the backend is available.",
       "Start the backend in another PowerShell window:",
-      "  powershell -ExecutionPolicy Bypass -File D:\\Eduverce\\backend\\scripts\\run-local-preview.ps1",
+      "  powershell -ExecutionPolicy Bypass -File D:\\UniWay\\backend\\scripts\\run-local-preview.ps1",
       ""
     ].join("\n")
   );

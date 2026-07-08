@@ -152,8 +152,8 @@ class SuggestionsApiTests(APITestCase):
 
     def test_demo_university_is_ignored_for_normal_user_suggestions(self):
         demo_university = create_university(
-            "eduverse-demo-university",
-            name="EduVerse Demo University",
+            "uniway-demo-university",
+            name="UniWay Demo University",
             is_demo=True,
             application_deadline=self.today + timedelta(days=90),
         )
