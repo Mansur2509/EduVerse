@@ -2,6 +2,8 @@ from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -510,6 +512,48 @@ class RoadmapApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(len(response.data["plan"]["tasks"]), 0)
         self.assertIn("missing_data_warnings", response.data)
+
+    def test_plan_and_task_list_query_count_does_not_grow_with_task_count(self):
+        # Regression guard for RoadmapPlanSerializer.get_tasks() and
+        # RoadmapTaskViewSet.get_queryset(), which both select_related the
+        # FKs the serializer dereferences (linked_university,
+        # linked_application__university, linked_event) -- a query count
+        # that grows with N here means one of those was dropped.
+        self.client.force_authenticate(self.user1)
+        plan = RoadmapPlan.objects.create(user=self.user1)
+
+        def make_tasks(count, offset):
+            for index in range(count):
+                university = create_university(f"query-count-university-{offset + index}")
+                application = ApplicationTrackerItem.objects.create(
+                    user=self.user1, university=university
+                )
+                RoadmapTask.objects.create(
+                    user=self.user1,
+                    plan=plan,
+                    title=f"Task {offset + index}",
+                    category=RoadmapTask.Category.UNIVERSITIES,
+                    linked_university=university,
+                    linked_application=application,
+                    dedup_key=f"query-count:{offset + index}",
+                )
+
+        make_tasks(3, offset=0)
+        with CaptureQueriesContext(connection) as small:
+            plan_response = self.client.get("/api/roadmap/")
+            tasks_response = self.client.get("/api/roadmap/tasks/")
+        self.assertEqual(plan_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(tasks_response.status_code, status.HTTP_200_OK)
+
+        make_tasks(6, offset=3)
+        with CaptureQueriesContext(connection) as large:
+            plan_response = self.client.get("/api/roadmap/")
+            tasks_response = self.client.get("/api/roadmap/tasks/")
+        self.assertEqual(plan_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(tasks_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(tasks_response.data["results"]), 9)
+
+        self.assertEqual(len(small), len(large))
 
     def test_plan_endpoint_returns_generated_plan(self):
         self.client.force_authenticate(self.user1)

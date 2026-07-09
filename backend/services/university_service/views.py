@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db.models import F, Prefetch, Q
 from rest_framework import status
 from rest_framework.decorators import action
@@ -47,6 +48,14 @@ SELF_SERVICE_ACTIONS = {
     "recommendations",
     "strategy",
 }
+
+# filter_options scans every published university across ~9 distinct-value/
+# existence queries (~23 total with the per-choice .exists() checks for
+# institution types and major clusters) -- this data changes only when the
+# catalogue is edited or re-imported, so a short cache turns "every request"
+# into "once per TTL per process" without risking stale data for long.
+FILTER_OPTIONS_CACHE_SECONDS = 600
+FILTER_OPTIONS_CACHE_KEY_TEMPLATE = "university-filter-options:include_demo={include_demo}"
 
 UNIVERSITY_NULLS_LAST_ORDERINGS = {
     "acceptance_rate": (F("acceptance_rate").asc(nulls_last=True), "name"),
@@ -109,6 +118,73 @@ UNIVERSITY_LIST_ONLY_FIELDS = (
     "created_at",
     "updated_at",
 )
+
+
+def build_university_filter_options(*, include_demo: bool) -> dict:
+    """Recomputes the full filter-options payload (~23 queries: 9 distinct-
+    value scans plus a per-choice .exists() check for each institution type
+    and major cluster). Pulled out of the view so it can be cached by
+    `cache.get_or_set` and unit-tested without going through a request.
+    """
+
+    queryset = University.objects.filter(is_published=True)
+    if not include_demo:
+        queryset = queryset.exclude(is_demo=True)
+
+    def distinct_text(field_name: str) -> list[str]:
+        return sorted(
+            {
+                value.strip()
+                for value in queryset.values_list(field_name, flat=True)
+                if isinstance(value, str) and value.strip()
+            },
+            key=str.lower,
+        )
+
+    university_suggestions = list(
+        queryset.order_by("name").values("name", "slug", "country", "city")[:200]
+    )
+    return {
+        "countries": distinct_text("country"),
+        "cities": distinct_text("city"),
+        "institution_types": [
+            choice
+            for choice, _label in University.InstitutionType.choices
+            if queryset.filter(institution_type=choice).exists()
+        ],
+        "cost_confidences": distinct_text("currency_conversion_confidence"),
+        "verification_statuses": [choice for choice, _label in UniversityFieldVerification.Status.choices],
+        "major_clusters": [
+            choice
+            for choice, _label in UniversityProgram.MajorCluster.choices
+            if queryset.filter(programs__major_cluster=choice).exists()
+        ],
+        "program_names": sorted(
+            {
+                value.strip()
+                for value in queryset.values_list("programs__name", flat=True)
+                if isinstance(value, str) and value.strip()
+            },
+            key=str.lower,
+        )[:500],
+        "subject_areas": sorted(
+            {
+                value.strip()
+                for value in queryset.values_list("subject_rankings__subject_area", flat=True)
+                if isinstance(value, str) and value.strip()
+            },
+            key=str.lower,
+        )[:500],
+        "ranking_sources": sorted(
+            {
+                value.strip()
+                for value in queryset.values_list("subject_rankings__source_name", flat=True)
+                if isinstance(value, str) and value.strip()
+            },
+            key=str.lower,
+        ),
+        "universities": university_suggestions,
+    }
 
 
 class UniversityViewSet(ModelViewSet):
@@ -199,70 +275,17 @@ class UniversityViewSet(ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="filter-options")
     def filter_options(self, request):
-        queryset = University.objects.filter(is_published=True)
-        if not (request.user.is_authenticated and request.user.is_admin_role):
-            queryset = queryset.exclude(is_demo=True)
-        elif request.query_params.get("include_demo", "").lower() != "true":
-            queryset = queryset.exclude(is_demo=True)
-
-        def distinct_text(field_name: str) -> list[str]:
-            return sorted(
-                {
-                    value.strip()
-                    for value in queryset.values_list(field_name, flat=True)
-                    if isinstance(value, str) and value.strip()
-                },
-                key=str.lower,
-            )
-
-        university_suggestions = list(
-            queryset.order_by("name").values("name", "slug", "country", "city")[:200]
+        include_demo = bool(
+            request.user.is_authenticated
+            and request.user.is_admin_role
+            and request.query_params.get("include_demo", "").lower() == "true"
         )
-        return Response(
-            {
-                "countries": distinct_text("country"),
-                "cities": distinct_text("city"),
-                "institution_types": [
-                    choice
-                    for choice, _label in University.InstitutionType.choices
-                    if queryset.filter(institution_type=choice).exists()
-                ],
-                "cost_confidences": distinct_text("currency_conversion_confidence"),
-                "verification_statuses": [
-                    choice for choice, _label in UniversityFieldVerification.Status.choices
-                ],
-                "major_clusters": [
-                    choice
-                    for choice, _label in UniversityProgram.MajorCluster.choices
-                    if queryset.filter(programs__major_cluster=choice).exists()
-                ],
-                "program_names": sorted(
-                    {
-                        value.strip()
-                        for value in queryset.values_list("programs__name", flat=True)
-                        if isinstance(value, str) and value.strip()
-                    },
-                    key=str.lower,
-                )[:500],
-                "subject_areas": sorted(
-                    {
-                        value.strip()
-                        for value in queryset.values_list("subject_rankings__subject_area", flat=True)
-                        if isinstance(value, str) and value.strip()
-                    },
-                    key=str.lower,
-                )[:500],
-                "ranking_sources": sorted(
-                    {
-                        value.strip()
-                        for value in queryset.values_list("subject_rankings__source_name", flat=True)
-                        if isinstance(value, str) and value.strip()
-                    },
-                    key=str.lower,
-                ),
-                "universities": university_suggestions,
-            }
+        cache_key = FILTER_OPTIONS_CACHE_KEY_TEMPLATE.format(include_demo=include_demo)
+        payload = cache.get_or_set(
+            cache_key, lambda: build_university_filter_options(include_demo=include_demo),
+            FILTER_OPTIONS_CACHE_SECONDS,
         )
+        return Response(payload)
 
     def _apply_program_and_ranking_filters(self, queryset):
         params = self.request.query_params

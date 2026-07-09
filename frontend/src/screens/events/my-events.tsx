@@ -9,6 +9,7 @@ import { useI18n } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
+import { SkeletonCards } from "@/shared/ui/skeleton";
 
 import { MyEventsCalendar } from "./my-events-calendar";
 
@@ -75,10 +76,10 @@ export function MyEventsScreen() {
         </div>
       </section>
 
-      {isLoading ? (
-        <Card>
-          <p className="text-sm text-muted-foreground">{t("events.states.loadingMy")}</p>
-        </Card>
+      {isLoading && registrations.length === 0 ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <SkeletonCards count={6} />
+        </div>
       ) : hasError ? (
         <Card className="border-danger/35 bg-danger/10">
           <p className="text-sm text-danger" role="alert">

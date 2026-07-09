@@ -34,26 +34,30 @@ export function OrganizerEventsScreen() {
   const [actionSlug, setActionSlug] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const fetchEvents = useCallback(async () => {
+    const [response, analyticsResponse]: [
+      PaginatedResponse<OrganizerEvent>,
+      OrganizerEventAnalytics
+    ] = await Promise.all([
+      getOrganizerEventsRequest({ page: currentPage, page_size: DEFAULT_PAGE_SIZE }),
+      getOrganizerEventAnalyticsRequest()
+    ]);
+    setEvents(response.results);
+    setTotalCount(response.count);
+    setAnalytics(analyticsResponse);
+  }, [currentPage]);
+
   const loadEvents = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [response, analyticsResponse]: [
-        PaginatedResponse<OrganizerEvent>,
-        OrganizerEventAnalytics
-      ] = await Promise.all([
-        getOrganizerEventsRequest({ page: currentPage, page_size: DEFAULT_PAGE_SIZE }),
-        getOrganizerEventAnalyticsRequest()
-      ]);
-      setEvents(response.results);
-      setTotalCount(response.count);
-      setAnalytics(analyticsResponse);
+      await fetchEvents();
     } catch {
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage]);
+  }, [fetchEvents]);
 
   useEffect(() => {
     void loadEvents();
@@ -99,7 +103,11 @@ export function OrganizerEventsScreen() {
       } else {
         await archiveOrganizerEventRequest(event.slug);
       }
-      await loadEvents();
+      // Refresh in place -- the mutation already succeeded, so re-fetching
+      // through loadEvents() (which flips isLoading) would blank the whole
+      // analytics summary and event grid for a refresh the user didn't ask
+      // to see a loader for.
+      await fetchEvents();
     } catch {
       setActionError(event.slug);
     } finally {

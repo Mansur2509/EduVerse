@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useI18n } from "@/shared/i18n";
 
 import { Button } from "./button";
+import { SkeletonCards, SkeletonRows } from "./skeleton";
 
 export const DEFAULT_PAGE_SIZE = 21;
 
@@ -204,9 +205,7 @@ export function PaginatedGrid<Item>({
         className={`grid gap-5 ${getGridColumnClass(columnsDesktop)}`}
       >
         {isLoading && items.length === 0 ? (
-          <div className="rounded-sm border bg-card p-5 text-sm font-semibold text-muted-foreground">
-            {t("pagination.loadingPage")}
-          </div>
+          <SkeletonCards count={Math.min(resolvedPageSize, 6)} />
         ) : (
           items.map((item, index) => (
             <div key={getItemKey?.(item, index) ?? index}>{renderItem(item)}</div>
@@ -249,7 +248,6 @@ export function PaginatedList<Item>({
   loadingState,
   className = ""
 }: PaginatedListProps<Item>) {
-  const { t } = useI18n();
   const resolvedPageSize = pageSize ?? itemsPerPage ?? DEFAULT_PAGE_SIZE;
   const count = totalCount ?? items.length;
 
@@ -273,9 +271,7 @@ export function PaginatedList<Item>({
       ) : null}
       <div className="space-y-3">
         {isLoading && items.length === 0 ? (
-          <div className="rounded-sm border bg-card p-5 text-sm font-semibold text-muted-foreground">
-            {t("pagination.loadingPage")}
-          </div>
+          <SkeletonRows count={Math.min(resolvedPageSize, 6)} />
         ) : (
           items.map((item, index) => (
             <div key={getItemKey?.(item, index) ?? index}>{renderItem(item)}</div>

@@ -22,9 +22,9 @@ import { Card } from "@/shared/ui/card";
 import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
-import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
 import { SectionTabs } from "@/shared/ui/section-tabs";
+import { SkeletonCards } from "@/shared/ui/skeleton";
 
 const emptyFilters: UniversityFilters = {
   search: "",
@@ -938,8 +938,10 @@ export function UniversitiesScreen() {
         </form>
       </CollapsibleFilterPanel>
 
-      {isLoading ? (
-        <LoadingNotice message={t("universities.states.loading")} />
+      {isLoading && universities.length === 0 ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <SkeletonCards count={6} />
+        </div>
       ) : hasError ? (
         <Card className="border-danger/35 bg-danger/10">
           <p className="text-sm text-danger" role="alert">
@@ -964,6 +966,7 @@ export function UniversitiesScreen() {
             {t("universities.list.total", {
               count: shortlistOnly ? visibleUniversities.length : totalCount
             })}
+            {isLoading ? ` · ${t("universities.states.refreshing")}` : ""}
           </p>
           <PaginatedGrid
             currentPage={currentPage}

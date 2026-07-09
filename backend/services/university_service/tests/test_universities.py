@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -48,6 +49,7 @@ def create_university(slug, **overrides):
 
 class UniversityCatalogTests(APITestCase):
     def setUp(self):
+        cache.clear()  # filter-options is cached; each test needs a clean slate.
         self.user = User.objects.create_user(
             username="student1", email="student1@test.com", password="testpass123"
         )
@@ -165,6 +167,27 @@ class UniversityCatalogTests(APITestCase):
         slugs = [item["slug"] for item in response.data["universities"]]
         self.assertIn("option-private-university", slugs)
         self.assertNotIn(demo.slug, slugs)
+
+    def test_filter_options_are_cached_across_requests(self):
+        create_university("cached-option-university", country="Canada", city="Toronto")
+        self.client.force_authenticate(self.user)
+
+        first = self.client.get("/api/v1/universities/filter-options/")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertIn("Canada", first.data["countries"])
+
+        # A university created after the first (now-cached) call must not
+        # appear in a second call within the TTL, and the second call must
+        # not touch the database at all -- proves the response is actually
+        # served from cache rather than recomputed every request.
+        create_university("post-cache-university", country="Uncached Country", city="Uncached City")
+        with CaptureQueriesContext(connection) as queries:
+            second = self.client.get("/api/v1/universities/filter-options/")
+
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.data, first.data)
+        self.assertNotIn("Uncached Country", second.data["countries"])
+        self.assertEqual(len(queries), 0)
 
     def test_institution_scholarship_and_confidence_filters(self):
         private_aid = create_university(

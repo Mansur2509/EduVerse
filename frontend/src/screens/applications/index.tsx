@@ -426,7 +426,7 @@ export function ApplicationsScreen() {
     sortBy !== "nearest_deadline"
   ].filter(Boolean).length;
 
-  if (isLoading) {
+  if (isLoading && applications.length === 0) {
     return <LoadingNotice message={t("applications.states.loading")} />;
   }
 
@@ -631,6 +631,7 @@ export function ApplicationsScreen() {
               end: pageEnd,
               total: totalCount
             })}
+            {isLoading ? ` · ${t("applications.states.refreshing")}` : ""}
           </p>
           <div className="grid gap-3 overflow-x-auto pb-2 lg:grid-cols-7">
             {[...APPLICATION_BOARD_COLUMNS, "decisions"].map((column) => (

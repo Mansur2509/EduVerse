@@ -17,8 +17,8 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
-import { LoadingNotice } from "@/shared/ui/loading-notice";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid } from "@/shared/ui/pagination";
+import { SkeletonCards } from "@/shared/ui/skeleton";
 
 const emptyFilters: EventFilters = {
   search: "",
@@ -233,8 +233,10 @@ export function EventsScreen() {
         <EventMapPreview events={events} />
       ) : null}
 
-      {isLoading ? (
-        <LoadingNotice message={t("events.states.loading")} />
+      {isLoading && events.length === 0 ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <SkeletonCards count={6} />
+        </div>
       ) : hasError ? (
         <Card className="border-danger/35 bg-danger/10">
           <p className="text-sm text-danger" role="alert">

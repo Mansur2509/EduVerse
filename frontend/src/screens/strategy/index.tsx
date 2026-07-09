@@ -6,6 +6,7 @@ import type { RecommendationCategory } from "@/entities/recommendation";
 import type { ApplicationStrategyResponse, StrategySchool } from "@/entities/strategy";
 import { getApplicationStrategyRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
@@ -77,6 +78,9 @@ export function StrategyScreen() {
         <p className="text-sm text-danger" role="alert">
           {t("strategy.states.loadError")}
         </p>
+        <Button className="mt-4" onClick={() => void load()} type="button">
+          {t("strategy.actions.retry")}
+        </Button>
       </Card>
     );
   }

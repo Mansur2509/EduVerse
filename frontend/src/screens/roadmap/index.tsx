@@ -46,6 +46,7 @@ import { CollapsibleFilterPanel } from "@/shared/ui/collapsible-filter-panel";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 import { DEFAULT_PAGE_SIZE, PaginatedGrid, PaginatedList } from "@/shared/ui/pagination";
+import { SkeletonCards, SkeletonRow } from "@/shared/ui/skeleton";
 
 type ActiveBucketFilter = Exclude<RoadmapBucket, "completed"> | "all";
 type RoadmapViewMode = "list" | "timeline";
@@ -444,11 +445,14 @@ export function RoadmapScreen() {
     bucket !== "all"
   ].filter(Boolean).length;
 
-  if (isLoading) {
+  if (isLoading && !plan) {
     return (
-      <Card>
-        <p className="text-sm text-muted-foreground">{t("roadmap.states.loading")}</p>
-      </Card>
+      <div className="space-y-3">
+        <SkeletonRow />
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <SkeletonCards count={6} />
+        </div>
+      </div>
     );
   }
 
