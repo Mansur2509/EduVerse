@@ -9,6 +9,12 @@ from services.exam_content_service.views import (
     OfficialExamDateViewSet,
     QuestionViewSet,
 )
+from services.profile_assessment_service.views import (
+    LatestProfileAssessmentView,
+    ProfileRecommendationsView,
+    ProfileStrategyView,
+    RunProfileAssessmentView,
+)
 from services.subscription_service.views import SubscriptionViewSet
 from services.university_service.views import UniversityViewSet
 from services.user_profile_service.views import ProfileViewSet
@@ -40,6 +46,21 @@ urlpatterns = [
     path("api/admin/feedback/", include("services.feedback_service.admin_urls")),
     path("api/v1/health/", HealthView.as_view(), name="health"),
     path("api/v1/ai/", include("services.ai_gateway_service.urls")),
+    # PROTOCOL-008 PART 7: additive `/api/v1/` paths reusing the same cached-
+    # assessment views/service functions as the existing `/api/profile/
+    # assessment/latest|run/` routes above -- the old paths are untouched.
+    path(
+        "api/v1/profile-assessment/me/",
+        LatestProfileAssessmentView.as_view(),
+        name="profile-assessment-me",
+    ),
+    path(
+        "api/v1/profile-assessment/refresh/",
+        RunProfileAssessmentView.as_view(),
+        name="profile-assessment-refresh",
+    ),
+    path("api/v1/recommendations/me/", ProfileRecommendationsView.as_view(), name="recommendations-me"),
+    path("api/v1/strategy/me/", ProfileStrategyView.as_view(), name="strategy-me"),
     path("api/v1/", include(router.urls)),
     path("api-auth/", include("rest_framework.urls")),
 ]

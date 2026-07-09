@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from statistics import mean
 from typing import Any
 
 from django.conf import settings
@@ -18,6 +19,8 @@ from services.ai_gateway_service.exceptions import AIProviderError, AIProviderUn
 from services.ai_gateway_service.gemini_client import GeminiProfileAssessmentClient
 from services.application_service.models import ApplicationTrackerItem
 from services.essay_service.models import EssayFeedback, EssayWorkspace
+from services.university_service.benchmark import resolve_benchmark
+from services.university_service.fit_vector import SIGNAL_NAMES
 from services.university_service.models import SavedUniversity
 from services.user_profile_service.academic_normalization import normalize_profile_academics
 from services.user_profile_service.models import (
@@ -31,8 +34,10 @@ from services.user_profile_service.models import (
     Sport,
     Volunteer,
 )
+from services.user_profile_service.readiness import calculate_application_readiness
 from services.user_profile_service.services import ensure_profile_records
 
+from .deterministic import compute_deterministic_comparisons, compute_deterministic_student_scores
 from .models import AIProfileAssessment
 
 logger = logging.getLogger(__name__)
@@ -568,14 +573,34 @@ def store_profile_assessment(
     output: dict,
     provider_name: str,
     model_name: str,
+    status: str = AIProfileAssessment.Status.OK,
 ) -> AIProfileAssessment:
     normalized = validate_ai_profile_assessment_json(output)
     current_hash = compute_profile_snapshot_hash(user)
+    profile, preferences = ensure_profile_records(user)
+
+    # PROTOCOL-008 PART 5: compute the benchmark fallback chain (PART 2),
+    # deterministic comparisons (PART 4), and six-section readiness (PART 6)
+    # once, at write time, and cache all of it alongside the AI category
+    # scores so a page render never has to recompute them or call AI again.
+    student_scores = {
+        signal: normalized["category_scores"][f"{signal}_score"] for signal in SIGNAL_NAMES
+    }
+    benchmark = resolve_benchmark(profile)
+    deterministic_comparisons = compute_deterministic_comparisons(
+        profile, preferences, benchmark=benchmark, student_scores=student_scores
+    )
+    readiness = calculate_application_readiness(
+        profile, preferences, deterministic_comparisons=deterministic_comparisons
+    )
+
     AIProfileAssessment.objects.filter(user=user, is_stale=False).update(is_stale=True)
     return AIProfileAssessment.objects.create(
         user=user,
         profile_snapshot_hash=current_hash,
         assessment_version=ASSESSMENT_VERSION,
+        prompt_version=ASSESSMENT_VERSION,
+        status=status,
         model_provider=provider_name,
         model_name=model_name,
         raw_input_summary_json=input_summary,
@@ -589,9 +614,52 @@ def store_profile_assessment(
         internal_keywords=normalized["internal_keywords"],
         category_rationales=normalized["category_rationales"],
         target_context_used=normalized["target_context_used"],
+        benchmark_source=benchmark.source,
+        benchmark_sample_size=benchmark.sample_size,
+        benchmark_scores=benchmark.scores,
+        benchmark_academic=benchmark.academic,
+        deterministic_scores=deterministic_comparisons,
+        readiness_scores={
+            "status": readiness.level,
+            "cap_reason": readiness.cap_reason,
+            "reasons": readiness.reasons,
+            "next_actions": readiness.next_actions,
+            "sections": readiness.sections,
+        },
+        overall_readiness_score=readiness.stars,
         expires_at=timezone.now() + timedelta(days=ASSESSMENT_CACHE_DAYS),
+        next_allowed_refresh_at=_next_available_at(),
         **normalized["category_scores"],
     )
+
+
+def _build_deterministic_fallback_output(profile) -> dict:
+    """PROTOCOL-008 PART 3's fallback path: used only when the AI provider's
+    output fails schema validation twice in a row (initial attempt + one
+    repair retry). Builds a schema-valid synthetic output from real evidence
+    counts, so the student still gets a cached, honest assessment instead of
+    an outright failure.
+    """
+
+    deterministic_scores = compute_deterministic_student_scores(profile)
+    category_scores = {f"{signal}_score": deterministic_scores[signal] for signal in SIGNAL_NAMES}
+    rationale = "Deterministic fallback score based on profile evidence counts; AI scoring was unavailable."
+    return {
+        "overall_profile_score": round(mean(category_scores.values()) * 10),
+        "category_scores": category_scores,
+        "confidence": AIProfileAssessment.Confidence.LOW,
+        "target_context_used": False,
+        "public_summary": (
+            "This is a deterministic evidence-based estimate. AI scoring could not "
+            "produce a valid result, so scores reflect profile evidence counts only."
+        ),
+        "evidence_used": [],
+        "missing_data": [],
+        "improvement_areas": [],
+        "internal_keywords": [],
+        "category_rationales": dict.fromkeys(category_scores, rationale),
+        "warnings": ["deterministic_fallback_used"],
+    }
 
 
 def latest_assessment_envelope(user) -> AssessmentRunResult:
@@ -611,6 +679,38 @@ def latest_assessment_envelope(user) -> AssessmentRunResult:
         can_refresh=can_refresh,
         next_available_at=_next_available_at() if latest and not can_refresh else None,
         ai_available=profile_assessment_ai_available(),
+    )
+
+
+def _log_provider_error(assessment_client, error: AIProviderError | AIProviderUnavailable) -> None:
+    # Never log the profile input, the prompt, or the API key -- only enough
+    # structured, sanitized detail (status code, wrapped-exception class,
+    # Gemini's own error code/status, message, and truncated provider error
+    # body) to diagnose a production failure from Render logs.
+    logger.warning(
+        "Gemini provider error feature=profile_assessment model=%s status=%s exception=%s cause=%s "
+        "provider_code=%s provider_status=%s message=\"%s\" error=\"%s\"",
+        getattr(assessment_client, "model_name", settings.AI_PROFILE_ASSESSMENT_MODEL),
+        getattr(error, "status_code", None),
+        type(error).__name__,
+        getattr(error, "cause_class", None),
+        getattr(error, "provider_code", None),
+        getattr(error, "provider_status", None),
+        str(error)[:1000],
+        getattr(error, "error_body", "")[:1000],
+    )
+
+
+def _log_validation_error(assessment_client, error: AssessmentValidationError, *, attempt: int) -> None:
+    # `error` only ever names a schema field/key or an out-of-range value
+    # (see the _validate_* helpers above) -- never raw profile text. Still
+    # truncated defensively since one branch echoes back whatever value the
+    # AI put in an enum field.
+    logger.warning(
+        "Gemini schema validation error feature=profile_assessment model=%s attempt=%s message=\"%s\"",
+        getattr(assessment_client, "model_name", settings.AI_PROFILE_ASSESSMENT_MODEL),
+        attempt,
+        str(error)[:300],
     )
 
 
@@ -678,37 +778,14 @@ def _run_profile_assessment_impl(user, *, force: bool = False, client=None) -> A
 
     input_summary = build_profile_assessment_input(user)
     assessment_client = client or get_profile_assessment_client()
+    profile, _preferences = ensure_profile_records(user)
+
+    used_fallback = False
     try:
         output = assessment_client.generate_profile_assessment(input_summary)
-        assessment = store_profile_assessment(
-            user,
-            input_summary=input_summary,
-            output=output,
-            provider_name=getattr(assessment_client, "provider_name", "unknown"),
-            model_name=getattr(
-                assessment_client,
-                "model_name",
-                settings.AI_PROFILE_ASSESSMENT_MODEL,
-            ),
-        )
+        validate_ai_profile_assessment_json(output)
     except (AIProviderError, AIProviderUnavailable) as error:
-        # Never log the profile input, the prompt, or the API key -- only
-        # enough structured, sanitized detail (status code, wrapped-exception
-        # class, Gemini's own error code/status, message, and truncated
-        # provider error body) to diagnose a production failure from Render
-        # logs.
-        logger.warning(
-            "Gemini provider error feature=profile_assessment model=%s status=%s exception=%s cause=%s "
-            "provider_code=%s provider_status=%s message=\"%s\" error=\"%s\"",
-            getattr(assessment_client, "model_name", settings.AI_PROFILE_ASSESSMENT_MODEL),
-            getattr(error, "status_code", None),
-            type(error).__name__,
-            getattr(error, "cause_class", None),
-            getattr(error, "provider_code", None),
-            getattr(error, "provider_status", None),
-            str(error)[:1000],
-            getattr(error, "error_body", "")[:1000],
-        )
+        _log_provider_error(assessment_client, error)
         return AssessmentRunResult(
             assessment=latest,
             cached=False,
@@ -717,29 +794,54 @@ def _run_profile_assessment_impl(user, *, force: bool = False, client=None) -> A
             next_available_at=None,
             ai_available=False,
         )
-    except AssessmentValidationError as error:
-        # `error` only ever names a schema field/key or an out-of-range value
-        # (see the _validate_* helpers above) -- never raw profile text.
-        # Still truncated defensively since one branch echoes back whatever
-        # value the AI put in an enum field.
-        logger.warning(
-            "Gemini schema validation error feature=profile_assessment model=%s message=\"%s\"",
-            getattr(assessment_client, "model_name", settings.AI_PROFILE_ASSESSMENT_MODEL),
-            str(error)[:300],
-        )
-        return AssessmentRunResult(
-            assessment=latest,
-            cached=False,
-            reason="validation_failed",
-            can_refresh=False,
-            next_available_at=None,
-            ai_available=True,
-        )
+    except AssessmentValidationError as first_error:
+        _log_validation_error(assessment_client, first_error, attempt=1)
+        # PROTOCOL-008 PART 3: retry once with a repair prompt before giving
+        # up -- most schema misses are a one-off formatting slip the model
+        # can correct when told exactly what was wrong.
+        try:
+            output = assessment_client.generate_profile_assessment(
+                input_summary, repair_reason=str(first_error)
+            )
+            validate_ai_profile_assessment_json(output)
+        except (AIProviderError, AIProviderUnavailable) as error:
+            _log_provider_error(assessment_client, error)
+            return AssessmentRunResult(
+                assessment=latest,
+                cached=False,
+                reason="ai_unavailable",
+                can_refresh=False,
+                next_available_at=None,
+                ai_available=False,
+            )
+        except AssessmentValidationError as second_error:
+            _log_validation_error(assessment_client, second_error, attempt=2)
+            logger.warning(
+                "Profile assessment deterministic fallback used feature=profile_assessment "
+                "model=%s user_id=%s reason=validation_failed_twice",
+                getattr(assessment_client, "model_name", settings.AI_PROFILE_ASSESSMENT_MODEL),
+                user.id,
+            )
+            output = _build_deterministic_fallback_output(profile)
+            used_fallback = True
+
+    assessment = store_profile_assessment(
+        user,
+        input_summary=input_summary,
+        output=output,
+        provider_name=getattr(assessment_client, "provider_name", "unknown"),
+        model_name=getattr(assessment_client, "model_name", settings.AI_PROFILE_ASSESSMENT_MODEL),
+        status=AIProfileAssessment.Status.FALLBACK_USED if used_fallback else AIProfileAssessment.Status.OK,
+    )
 
     return AssessmentRunResult(
         assessment=assessment,
         cached=False,
-        reason="no_previous_assessment" if latest is None else "profile_changed",
+        reason=(
+            "fallback_used"
+            if used_fallback
+            else ("no_previous_assessment" if latest is None else "profile_changed")
+        ),
         can_refresh=False,
         next_available_at=None,
         ai_available=True,

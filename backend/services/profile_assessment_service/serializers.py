@@ -23,6 +23,15 @@ class AIProfileAssessmentSerializer(serializers.ModelSerializer):
             "expires_at",
             "is_stale",
             "created_at",
+            "status",
+            "benchmark_source",
+            "benchmark_sample_size",
+            "benchmark_scores",
+            "benchmark_academic",
+            "deterministic_scores",
+            "readiness_scores",
+            "overall_readiness_score",
+            "next_allowed_refresh_at",
         )
 
     def get_category_scores(self, obj):

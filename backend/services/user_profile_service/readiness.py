@@ -24,6 +24,11 @@ class ApplicationReadiness:
     comparison_status: str
     compared_universities: list[str]
     official_sources: list[dict[str, str]]
+    # PROTOCOL-008 PART 6: the same 6 categories, enriched with the exact
+    # per-section shape the readiness widget needs (main_strength/main_risk/
+    # missing_items/next_action) plus any section-specific cap reasons.
+    # Additive -- `categories` above is untouched for existing callers.
+    sections: list[dict[str, object]]
 
 
 LEVELS = {
@@ -416,9 +421,125 @@ def _readiness_next_actions(categories: list[dict[str, object]]) -> list[str]:
     return [str(item["key"]) for item in sorted_categories[:3]]
 
 
+def _build_readiness_sections(
+    categories: list[dict[str, object]], components: dict[str, int]
+) -> list[dict[str, object]]:
+    """PROTOCOL-008 PART 6's exact per-section shape: main_strength/
+    main_risk/missing_items/next_action, derived from the same sub-component
+    scores `categories` already summarizes -- never a second, independently
+    invented score.
+    """
+
+    sections = []
+    for category in categories:
+        source_keys = [str(key) for key in category["source_keys"]]
+        sub_scores = {key: components[key] for key in source_keys}
+        strongest = max(sub_scores, key=lambda key: sub_scores[key]) if sub_scores else None
+        weakest = min(sub_scores, key=lambda key: sub_scores[key]) if sub_scores else None
+        missing_items = [key for key in source_keys if components[key] <= 1]
+        sections.append(
+            {
+                "key": category["key"],
+                "score": category["score"],
+                "status": category["status"],
+                "main_strength": strongest if strongest and sub_scores[strongest] >= 3 else None,
+                "main_risk": weakest if weakest and sub_scores[weakest] <= 2 else None,
+                "missing_items": missing_items,
+                "next_action": f"improve_{missing_items[0]}" if missing_items else f"maintain_{category['key']}",
+                "cap_reasons": category.get("cap_reasons", []),
+            }
+        )
+    return sections
+
+
+# Below this acceptance rate, a target university is treated as "very
+# selective" for the honors/competitions cap rule -- a real, verified
+# statistic already on the University record, never invented.
+VERY_SELECTIVE_ACCEPTANCE_RATE = 15
+
+
+def _targets_very_selective(profile: StudentProfile) -> bool:
+    targets = [value.strip() for value in profile.target_universities if value.strip()]
+    if not targets:
+        return False
+    return University.objects.filter(
+        is_published=True, name__in=targets, acceptance_rate__lt=VERY_SELECTIVE_ACCEPTANCE_RATE
+    ).exists()
+
+
+def _has_no_evidence(profile: StudentProfile, related_name: str) -> bool:
+    """Whether the student has zero real evidence rows for this category --
+    checked directly against the evidence tables, not the 1-5 component
+    score, since several `_score_*` helpers deliberately floor at 2 via a
+    legacy self-reported fallback and would never satisfy a `<= 1` check.
+    """
+
+    return getattr(profile.user, related_name).count() == 0
+
+
+def _apply_section_caps(
+    profile: StudentProfile,
+    categories: list[dict[str, object]],
+    *,
+    very_selective: bool,
+    deterministic_comparisons: dict | None,
+) -> list[dict[str, object]]:
+    """PROTOCOL-008 PART 6's exact section-level caps -- applied on top of
+    the already-computed category scores so one strong sub-score never
+    inflates a section where required evidence is missing.
+    """
+
+    by_key = {str(category["key"]): category for category in categories}
+    for category in categories:
+        category.setdefault("cap_reasons", [])
+
+    def _cap(key: str, maximum: int, reason: str) -> None:
+        # Record `reason` whenever the triggering condition is true, even if
+        # the score was already at or below `maximum` for some other cause --
+        # the reason still explains *why* the section can't score higher,
+        # which is exactly what a caller needs to show the student.
+        category = by_key.get(key)
+        if category is None:
+            return
+        category["cap_reasons"] = [*category["cap_reasons"], reason]
+        if int(category["score"]) > maximum:
+            category["score"] = maximum
+            category["status"] = LEVELS[maximum]
+
+    no_essays = _has_no_evidence(profile, "profile_essays") and profile.essay_status != StudentProfile.EssayStatus.YES
+    no_recommenders = _has_no_evidence(profile, "profile_recommenders")
+    no_activities = _has_no_evidence(profile, "profile_activities") and not any(
+        isinstance(value, list) and value for value in (profile.activities or {}).values()
+    )
+    no_research = _has_no_evidence(profile, "profile_research_projects")
+    no_portfolio = _has_no_evidence(profile, "profile_portfolio_projects")
+    no_honors = _has_no_evidence(profile, "profile_honors")
+    no_olympiads = _has_no_evidence(profile, "profile_olympiads")
+
+    if no_essays:
+        _cap("application_execution", 3, "essays_missing")
+    if no_recommenders:
+        _cap("application_execution", 3, "recommendation_letters_missing")
+    if no_activities:
+        for key in READINESS_CATEGORY_KEYS:
+            _cap(key, 3, "activities_missing")
+    if no_research and no_portfolio:
+        _cap("research_portfolio", 2, "research_and_portfolio_missing")
+    if very_selective and no_honors and no_olympiads:
+        _cap("honors_competitions", 2, "honors_missing_for_selective_target")
+    if deterministic_comparisons:
+        sat_status = deterministic_comparisons.get("sat", {}).get("status")
+        ielts_status = deterministic_comparisons.get("ielts", {}).get("status")
+        if sat_status == "below_benchmark" or ielts_status == "below_benchmark":
+            _cap("testing_readiness", 3, "testing_below_benchmark")
+    return categories
+
+
 def calculate_application_readiness(
     profile: StudentProfile,
     preferences: UserPreference,
+    *,
+    deterministic_comparisons: dict | None = None,
 ) -> ApplicationReadiness:
     completion = calculate_profile_completion(profile, preferences)
     components = {
@@ -442,8 +563,17 @@ def calculate_application_readiness(
         components["published_ranges"] = round(mean(published_scores))
 
     categories = _build_readiness_categories(components)
+    categories = _apply_section_caps(
+        profile,
+        categories,
+        very_selective=_targets_very_selective(profile),
+        deterministic_comparisons=deterministic_comparisons,
+    )
     uncapped_stars = _rounded_mean([int(category["score"]) for category in categories])
     max_score, cap_reason = _readiness_cap(components, completion.percentage)
+    if components["activities"] <= 1:
+        max_score = min(max_score, 3) if max_score else 3
+        cap_reason = cap_reason or "activities_missing"
     stars = min(uncapped_stars, max_score)
     strengths = [
         str(category["key"]) for category in categories if int(category["score"]) >= 4
@@ -453,6 +583,7 @@ def calculate_application_readiness(
     ]
     reasons = _readiness_reasons(categories, components, cap_reason)
     next_actions = _readiness_next_actions(categories)
+    sections = _build_readiness_sections(categories, components)
     return ApplicationReadiness(
         stars=stars,
         level=LEVELS[stars],
@@ -466,4 +597,5 @@ def calculate_application_readiness(
         comparison_status="published_ranges" if published_scores else "official_data_needed",
         compared_universities=compared_universities,
         official_sources=sources[:8],
+        sections=sections,
     )

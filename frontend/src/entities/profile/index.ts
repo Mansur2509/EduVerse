@@ -222,6 +222,72 @@ export const PROFILE_ASSESSMENT_CATEGORIES: ProfileAssessmentCategory[] = [
   "olympiads_score"
 ];
 
+export type BenchmarkSource =
+  | "dream_universities"
+  | "major_country_average"
+  | "country_average"
+  | "global_major_average"
+  | "global_average"
+  | "unavailable";
+
+export type ReadinessSection = {
+  key: string;
+  score: number;
+  status: string;
+  main_strength: string | null;
+  main_risk: string | null;
+  missing_items: string[];
+  next_action: string;
+  cap_reasons: string[];
+};
+
+export type ReadinessScoresSummary = {
+  status: string;
+  cap_reason: string;
+  reasons: string[];
+  next_actions: string[];
+  sections: ReadinessSection[];
+};
+
+export type MissingEvidenceFlags = {
+  essays?: boolean;
+  recommendation_letters?: boolean;
+  honors?: boolean;
+  research?: boolean;
+  portfolio?: boolean;
+  activities?: boolean;
+  olympiads?: boolean;
+  volunteering?: boolean;
+};
+
+export type DeterministicScores = {
+  gpa?: { student: number | null; benchmark: number | null; status: string };
+  sat?: {
+    student: number | null;
+    benchmark_p25: number | null;
+    benchmark_p75: number | null;
+    benchmark_average: number | null;
+    status: string;
+  };
+  ielts?: {
+    student: number | null;
+    benchmark_minimum: number | null;
+    benchmark_competitive: number | null;
+    status: string;
+  };
+  toefl?: { student: number | null; present: boolean };
+  ap?: { count: number; structured_subjects_available: boolean; subject_matches_major: boolean | null };
+  missing_evidence?: MissingEvidenceFlags;
+  profile_completion_percentage?: number;
+  score_gaps?: {
+    fit_band: string;
+    signals_compared: number;
+    signals_missing_data: number;
+    counts_by_severity: Record<string, number>;
+    per_signal: Record<string, { gap: number | null; severity: string }>;
+  };
+};
+
 export type AIProfileAssessment = {
   id: number;
   assessment_version: string;
@@ -236,6 +302,15 @@ export type AIProfileAssessment = {
   expires_at: string;
   is_stale: boolean;
   created_at: string;
+  status: "ok" | "fallback_used";
+  benchmark_source: BenchmarkSource;
+  benchmark_sample_size: number;
+  benchmark_scores: Record<string, number>;
+  benchmark_academic: Record<string, number>;
+  deterministic_scores: DeterministicScores;
+  readiness_scores: ReadinessScoresSummary | Record<string, never>;
+  overall_readiness_score: number | null;
+  next_allowed_refresh_at: string | null;
 };
 
 export type ProfileAssessmentReason =
@@ -245,7 +320,8 @@ export type ProfileAssessmentReason =
   | "unchanged_cached"
   | "daily_limit_reached"
   | "ai_unavailable"
-  | "validation_failed";
+  | "validation_failed"
+  | "fallback_used";
 
 export type ProfileAssessmentEnvelope = {
   assessment: AIProfileAssessment | null;
@@ -255,6 +331,69 @@ export type ProfileAssessmentEnvelope = {
   next_available_at: string | null;
   ai_available: boolean;
   disclaimer: string;
+};
+
+// Gap-based recommendations (`/api/v1/recommendations/me/`) -- `title`,
+// `why_it_matters`, and `next_action` are short semantic keys translated via
+// `admissions.recommendation.*` i18n, never raw prose from the backend.
+export type RecommendationPriority = "urgent" | "high" | "medium" | "low";
+
+export type ProfileRecommendation = {
+  title: string;
+  priority: RecommendationPriority;
+  linked_dimension: string;
+  why_it_matters: string;
+  evidence_from_profile: Record<string, unknown>;
+  expected_impact: string;
+  next_action: string;
+};
+
+export type ProfileRecommendationsResponse = {
+  recommendations: ProfileRecommendation[];
+  needs_assessment: boolean;
+};
+
+// Time-bucketed action plan (`/api/v1/strategy/me/`).
+export type StrategyEvent = {
+  type: string;
+  date: string | null;
+  days_remaining: number | null;
+  urgency: string;
+  confidence: string;
+  university?: string;
+  application_id?: number;
+  [key: string]: unknown;
+};
+
+export type ProfileStrategy = {
+  generated_at: string;
+  has_tracked_applications: boolean;
+  has_verified_deadlines: boolean;
+  overdue: StrategyEvent[];
+  next_7_days: StrategyEvent[];
+  next_30_days: StrategyEvent[];
+  next_90_days: StrategyEvent[];
+  before_deadline: StrategyEvent[];
+  unscheduled: StrategyEvent[];
+  testing_plan: Record<string, unknown>;
+  essay_plan: {
+    essays_missing: boolean;
+    planned_dates: StrategyEvent[];
+    workspaces: Array<Record<string, unknown>>;
+    next_action: string;
+  };
+  recommendation_letter_plan: {
+    recommendation_letters_missing: boolean;
+    planned_dates: StrategyEvent[];
+    recommenders: Array<Record<string, unknown>>;
+    next_action: string;
+  };
+  activities_research_plan: {
+    missing_evidence: Record<string, boolean>;
+    next_actions: string[];
+  };
+  university_list_strategy: Record<string, unknown>;
+  needs_assessment: boolean;
 };
 
 // Structured profile items
@@ -410,3 +549,5 @@ export {
   type RecommendationResult
 } from "./recommendation-engine";
 export { ReadinessCard } from "./ui/readiness-card";
+export { GapRecommendationsPanel } from "./ui/gap-recommendations-panel";
+export { StrategyPanel } from "./ui/strategy-panel";

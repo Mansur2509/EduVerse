@@ -251,3 +251,112 @@ class ApplicationReadinessAggregationTests(TestCase):
         )
         for phrase in guarded_phrases:
             self.assertNotIn(phrase, blob.lower())
+
+
+class SectionCapRuleTests(TestCase):
+    """PROTOCOL-008 PART 6's exact per-section caps -- each isolates one
+    missing-evidence rule and confirms strong sub-scores elsewhere cannot
+    inflate the capped section past the spec's stated ceiling."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="section-cap-user",
+            email="sectioncap@test.com",
+            password="testpass123",
+            role=User.Role.STUDENT,
+        )
+        self.profile, self.preferences = ensure_profile_records(self.user)
+
+    def _section(self, readiness, key):
+        return next(category for category in readiness.categories if category["key"] == key)
+
+    def test_missing_essays_caps_application_execution_at_three(self):
+        Recommender.objects.create(
+            user=self.user, name="Counselor", status=Recommender.Status.SUBMITTED
+        )
+        Recommender.objects.create(
+            user=self.user, name="Teacher", status=Recommender.Status.CONFIRMED
+        )
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        execution = self._section(readiness, "application_execution")
+        self.assertLessEqual(execution["score"], 3)
+        self.assertIn("essays_missing", execution["cap_reasons"])
+
+    def test_missing_recommenders_caps_application_execution_at_three(self):
+        EssayDraft.objects.create(user=self.user, status=EssayDraft.Status.REVIEWED)
+        EssayDraft.objects.create(user=self.user, status=EssayDraft.Status.SUBMITTED)
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        execution = self._section(readiness, "application_execution")
+        self.assertLessEqual(execution["score"], 3)
+        self.assertIn("recommendation_letters_missing", execution["cap_reasons"])
+
+    def test_missing_activities_caps_every_section_at_three(self):
+        Olympiad.objects.create(user=self.user, name="A", level="national")
+        Olympiad.objects.create(user=self.user, name="B", level="national")
+        Olympiad.objects.create(user=self.user, name="C", level="national")
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        for category in readiness.categories:
+            self.assertLessEqual(category["score"], 3, category["key"])
+
+    def test_missing_research_and_portfolio_caps_that_section_at_two(self):
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        research_portfolio = self._section(readiness, "research_portfolio")
+        self.assertLessEqual(research_portfolio["score"], 2)
+        self.assertIn("research_and_portfolio_missing", research_portfolio["cap_reasons"])
+
+    def test_research_present_avoids_the_research_portfolio_cap(self):
+        ResearchProject.objects.create(
+            user=self.user, title="Study", current_stage=ResearchProject.Stage.PUBLISHED, countries_region="Global"
+        )
+        ResearchProject.objects.create(
+            user=self.user, title="Study 2", current_stage=ResearchProject.Stage.PUBLISHED, countries_region="Global"
+        )
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        research_portfolio = self._section(readiness, "research_portfolio")
+        self.assertNotIn("research_and_portfolio_missing", research_portfolio["cap_reasons"])
+
+    def test_missing_honors_caps_section_only_for_very_selective_target(self):
+        from services.university_service.tests.test_universities import create_university
+
+        create_university("selective-target-u", name="Selective Target U", acceptance_rate="4.00")
+        self.profile.target_universities = ["Selective Target U"]
+        self.profile.save()
+
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        honors = self._section(readiness, "honors_competitions")
+        self.assertLessEqual(honors["score"], 2)
+        self.assertIn("honors_missing_for_selective_target", honors["cap_reasons"])
+
+    def test_missing_honors_does_not_cap_without_a_very_selective_target(self):
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        honors = self._section(readiness, "honors_competitions")
+        self.assertNotIn("honors_missing_for_selective_target", honors["cap_reasons"])
+
+    def test_testing_below_benchmark_caps_testing_readiness_even_with_strong_gpa(self):
+        self.profile.gpa = "4.00"
+        self.profile.gpa_scale = "4.00"
+        self.profile.test_scores = {"sat": 1550}
+        self.profile.save()
+        deterministic_comparisons = {"sat": {"status": "below_benchmark"}, "ielts": {"status": "meets_or_exceeds"}}
+
+        readiness = calculate_application_readiness(
+            self.profile, self.preferences, deterministic_comparisons=deterministic_comparisons
+        )
+        testing = self._section(readiness, "testing_readiness")
+        self.assertLessEqual(testing["score"], 3)
+        self.assertIn("testing_below_benchmark", testing["cap_reasons"])
+
+    def test_sections_output_has_the_exact_spec_shape(self):
+        readiness = calculate_application_readiness(self.profile, self.preferences)
+        self.assertEqual(len(readiness.sections), 6)
+        for section in readiness.sections:
+            for field in (
+                "key",
+                "score",
+                "status",
+                "main_strength",
+                "main_risk",
+                "missing_items",
+                "next_action",
+            ):
+                self.assertIn(field, section)

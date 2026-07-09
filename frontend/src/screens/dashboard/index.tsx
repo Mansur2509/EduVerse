@@ -21,10 +21,14 @@ import type { EssayWorkspace } from "@/entities/essay";
 import type { EventRegistration } from "@/entities/event";
 import {
   classCatalog,
+  GapRecommendationsPanel,
   ReadinessCard,
+  StrategyPanel,
   type ApplicationReadiness,
   type ProfileAssessmentEnvelope,
   type ProfileCompletion,
+  type ProfileRecommendation,
+  type ProfileStrategy,
   type StudentProfileDetails
 } from "@/entities/profile";
 import type { RecommendationItem } from "@/entities/recommendation";
@@ -38,7 +42,9 @@ import {
   getApplicationReadinessRequest,
   getProfileAssessmentLatestRequest,
   getProfileCompletionRequest,
-  getProfileRequest
+  getProfileRecommendationsRequest,
+  getProfileRequest,
+  getProfileStrategyRequest
 } from "@/features/profile";
 import { generateRoadmapRequest, getRoadmapRequest } from "@/features/roadmap";
 import {
@@ -121,6 +127,9 @@ export function DashboardScreen() {
   const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
   const [essays, setEssays] = useState<EssayWorkspace[]>([]);
   const [topRecommendations, setTopRecommendations] = useState<RecommendationItem[]>([]);
+  const [profileRecommendations, setProfileRecommendations] = useState<ProfileRecommendation[]>([]);
+  const [needsAssessment, setNeedsAssessment] = useState(false);
+  const [profileStrategy, setProfileStrategy] = useState<ProfileStrategy | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
@@ -139,7 +148,9 @@ export function DashboardScreen() {
       applicationsResult,
       essaysResult,
       recommendationsResult,
-      assessmentResult
+      assessmentResult,
+      profileRecommendationsResult,
+      profileStrategyResult
     ] = await Promise.allSettled([
       getProfileCompletionRequest(),
       getProfileRequest(),
@@ -150,7 +161,9 @@ export function DashboardScreen() {
       getApplicationsRequest(),
       getEssaysRequest(),
       getRecommendationsRequest(),
-      getProfileAssessmentLatestRequest()
+      getProfileAssessmentLatestRequest(),
+      getProfileRecommendationsRequest(),
+      getProfileStrategyRequest()
     ]);
 
     if (completionResult.status === "fulfilled") {
@@ -204,6 +217,17 @@ export function DashboardScreen() {
     }
     if (assessmentResult.status === "fulfilled") {
       setProfileAssessment(assessmentResult.value);
+    } else {
+      setHasPartialError(true);
+    }
+    if (profileRecommendationsResult.status === "fulfilled") {
+      setProfileRecommendations(profileRecommendationsResult.value.recommendations);
+      setNeedsAssessment(profileRecommendationsResult.value.needs_assessment);
+    } else {
+      setHasPartialError(true);
+    }
+    if (profileStrategyResult.status === "fulfilled") {
+      setProfileStrategy(profileStrategyResult.value);
     } else {
       setHasPartialError(true);
     }
@@ -979,6 +1003,15 @@ export function DashboardScreen() {
             </Link>
           </Button>
         </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <GapRecommendationsPanel
+          isLoading={isLoading}
+          needsAssessment={needsAssessment}
+          recommendations={profileRecommendations}
+        />
+        <StrategyPanel isLoading={isLoading} strategy={profileStrategy} />
       </section>
 
       <Card className="p-4">

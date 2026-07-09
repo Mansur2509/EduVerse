@@ -27,7 +27,7 @@ class GeminiProfileAssessmentClient:
         self.timeout_seconds = timeout_seconds or settings.AI_TIMEOUT_SECONDS
         self.max_output_tokens = max_output_tokens or settings.AI_MAX_OUTPUT_TOKENS
 
-    def generate_profile_assessment(self, input_summary: dict) -> dict:
+    def generate_profile_assessment(self, input_summary: dict, *, repair_reason: str | None = None) -> dict:
         if not self.api_key:
             raise AIProviderUnavailable("Gemini API key is not configured.")
 
@@ -42,6 +42,17 @@ class GeminiProfileAssessmentClient:
                 "Do not write or rewrite essays.",
             ],
         }
+        if repair_reason:
+            # A single repair retry (PROTOCOL-008 PART 3): the previous
+            # response failed schema validation, so tell the model exactly
+            # why and ask for a corrected reply. `repair_reason` only ever
+            # contains a schema field/value description (see
+            # `AssessmentValidationError` call sites) -- never raw profile
+            # text -- so it is safe to echo back into the prompt.
+            prompt["repair_instructions"] = (
+                "Your previous response was rejected for this reason: "
+                f"{repair_reason}. Return corrected JSON that strictly matches response_schema."
+            )
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self.model_name}:generateContent?key={self.api_key}"

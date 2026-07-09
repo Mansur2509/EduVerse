@@ -2,6 +2,8 @@ import type {
   ApplicationReadiness,
   ProfileAssessmentEnvelope,
   ProfileCompletion,
+  ProfileRecommendationsResponse,
+  ProfileStrategy,
   StudentProfileDetails,
   UpdateStudentProfileInput
 } from "@/entities/profile";
@@ -50,6 +52,21 @@ export function runProfileAssessmentRequest() {
   return apiRequest<ProfileAssessmentEnvelope>("/assessment/run/", {
     base: "profile",
     method: "POST"
+  });
+}
+
+// PROTOCOL-008 PART 7: gap-based recommendations and the time-bucketed
+// action plan, both read-only and built purely from the cached assessment --
+// never trigger an AI call on render.
+export function getProfileRecommendationsRequest() {
+  return apiRequest<ProfileRecommendationsResponse>("/recommendations/me/", {
+    base: "api"
+  });
+}
+
+export function getProfileStrategyRequest() {
+  return apiRequest<ProfileStrategy>("/strategy/me/", {
+    base: "api"
   });
 }
 

@@ -27,13 +27,19 @@ class FakeProfileAssessmentClient:
     provider_name = "fake"
     model_name = "fake-profile-model"
 
-    def __init__(self, output):
+    def __init__(self, output, *, repair_output=None):
         self.output = output
+        self.repair_output = repair_output
         self.calls = 0
+        self.repair_reasons: list[str] = []
 
-    def generate_profile_assessment(self, input_summary):
+    def generate_profile_assessment(self, input_summary, *, repair_reason=None):
         self.calls += 1
         self.last_input_summary = input_summary
+        if repair_reason is not None:
+            self.repair_reasons.append(repair_reason)
+            if self.repair_output is not None:
+                return self.repair_output
         return self.output
 
 
@@ -44,7 +50,7 @@ class FakeFailingProfileAssessmentClient:
     def __init__(self, error: AIProviderError):
         self.error = error
 
-    def generate_profile_assessment(self, input_summary):
+    def generate_profile_assessment(self, input_summary, *, repair_reason=None):
         raise self.error
 
 
@@ -153,6 +159,27 @@ class ProfileAssessmentServiceTests(APITestCase):
         self.assertEqual(client.calls, 1)
         self.assertEqual(AIProfileAssessment.objects.filter(user=self.user).count(), 1)
 
+    def test_stored_assessment_caches_benchmark_deterministic_and_readiness_data(self):
+        client = FakeProfileAssessmentClient(valid_ai_output())
+
+        result = run_profile_assessment(self.user, client=client)
+
+        assessment = result.assessment
+        self.assertIn(
+            assessment.benchmark_source,
+            [choice.value for choice in AIProfileAssessment.BenchmarkSource],
+        )
+        self.assertIsInstance(assessment.benchmark_scores, dict)
+        self.assertIsInstance(assessment.benchmark_academic, dict)
+        self.assertIn("score_gaps", assessment.deterministic_scores)
+        self.assertIn("missing_evidence", assessment.deterministic_scores)
+        self.assertIn("sections", assessment.readiness_scores)
+        self.assertEqual(len(assessment.readiness_scores["sections"]), 6)
+        self.assertTrue(1 <= assessment.overall_readiness_score <= 5)
+        self.assertEqual(assessment.status, AIProfileAssessment.Status.OK)
+        self.assertIsNotNone(assessment.next_allowed_refresh_at)
+        self.assertGreater(assessment.next_allowed_refresh_at, timezone.now())
+
     def test_changed_profile_within_same_day_hits_daily_limit(self):
         client = FakeProfileAssessmentClient(valid_ai_output())
         run_profile_assessment(self.user, client=client)
@@ -189,14 +216,32 @@ class ProfileAssessmentServiceTests(APITestCase):
         self.assertIsNone(result.assessment)
         self.assertFalse(result.ai_available)
 
-    def test_invalid_ai_json_is_rejected_without_creating_record(self):
-        result = run_profile_assessment(
-            self.user,
-            client=FakeProfileAssessmentClient({"overall_profile_score": 50}),
+    def test_invalid_ai_json_retries_once_then_falls_back_to_deterministic_scores(self):
+        client = FakeProfileAssessmentClient({"overall_profile_score": 50})
+
+        result = run_profile_assessment(self.user, client=client)
+
+        self.assertEqual(result.reason, "fallback_used")
+        self.assertEqual(client.calls, 2)
+        self.assertEqual(len(client.repair_reasons), 1)
+        self.assertIn("category_scores", client.repair_reasons[0])
+        assessment = AIProfileAssessment.objects.get(user=self.user)
+        self.assertEqual(assessment.status, AIProfileAssessment.Status.FALLBACK_USED)
+        for category in PROFILE_ASSESSMENT_CATEGORIES:
+            self.assertTrue(1 <= getattr(assessment, category) <= 10)
+
+    def test_repair_retry_success_avoids_fallback(self):
+        client = FakeProfileAssessmentClient(
+            {"overall_profile_score": 50},
+            repair_output=valid_ai_output(),
         )
 
-        self.assertEqual(result.reason, "validation_failed")
-        self.assertEqual(AIProfileAssessment.objects.filter(user=self.user).count(), 0)
+        result = run_profile_assessment(self.user, client=client)
+
+        self.assertEqual(result.reason, "no_previous_assessment")
+        self.assertEqual(client.calls, 2)
+        assessment = AIProfileAssessment.objects.get(user=self.user)
+        self.assertEqual(assessment.status, AIProfileAssessment.Status.OK)
 
     def test_out_of_range_scores_are_rejected(self):
         output = valid_ai_output(category_scores={"activities_score": 11})
@@ -309,9 +354,11 @@ class ProfileAssessmentServiceTests(APITestCase):
         with self.assertLogs("services.profile_assessment_service.services", level="WARNING") as captured:
             result = run_profile_assessment(self.user, client=client)
 
-        self.assertEqual(result.reason, "validation_failed")
+        self.assertEqual(result.reason, "fallback_used")
         log_line = "\n".join(captured.output)
         self.assertIn("feature=profile_assessment", log_line)
+        self.assertIn("attempt=1", log_line)
+        self.assertIn("attempt=2", log_line)
         self.assertNotIn("Tashkent", log_line)
 
     def test_successful_assessment_logs_call_summary_without_profile_text(self):
@@ -417,3 +464,99 @@ class ProfileAssessmentApiTests(APITestCase):
         self.assertEqual(response.data["reason"], "no_previous_assessment")
         self.assertEqual(AIProfileAssessment.objects.get().user, self.user)
         self.assertNotIn("internal_keywords", response.data["assessment"])
+
+
+@override_settings(
+    AI_PROFILE_ASSESSMENT_ENABLED=True,
+    GEMINI_API_KEY="test-key",
+    AI_PROFILE_ASSESSMENT_DAILY_LIMIT=1,
+)
+class ProtocolEightApiEndpointsTests(APITestCase):
+    """PROTOCOL-008 PART 7's additive `/api/v1/` endpoints."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="v1-student",
+            email="v1-student@test.com",
+            password="testpass123",
+            role=User.Role.STUDENT,
+        )
+        ensure_profile_records(self.user)
+        self.client.force_authenticate(self.user)
+
+    def test_v1_me_endpoint_mirrors_legacy_latest_endpoint(self):
+        response = self.client.get("/api/v1/profile-assessment/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["assessment"])
+        self.assertEqual(response.data["reason"], "no_previous_assessment")
+
+    def test_v1_refresh_endpoint_creates_an_assessment(self):
+        from unittest.mock import patch
+
+        client = FakeProfileAssessmentClient(valid_ai_output())
+        with patch(
+            "services.profile_assessment_service.services.get_profile_assessment_client",
+            return_value=client,
+        ):
+            response = self.client.post("/api/v1/profile-assessment/refresh/")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(AIProfileAssessment.objects.get().user, self.user)
+
+    def test_recommendations_endpoint_reports_needs_assessment_when_no_cache(self):
+        response = self.client.get("/api/v1/recommendations/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["recommendations"], [])
+        self.assertTrue(response.data["needs_assessment"])
+
+    def test_recommendations_endpoint_never_calls_ai(self):
+        from unittest.mock import patch
+
+        with patch(
+            "services.profile_assessment_service.views.get_latest_valid_assessment",
+            return_value=None,
+        ) as mocked_lookup, patch(
+            "services.profile_assessment_service.services.get_profile_assessment_client",
+            side_effect=AssertionError("must not call AI on render"),
+        ):
+            response = self.client.get("/api/v1/recommendations/me/")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_lookup.assert_called_once()
+
+    def test_recommendations_endpoint_uses_cached_assessment_once_available(self):
+        from unittest.mock import patch
+
+        client = FakeProfileAssessmentClient(valid_ai_output(category_scores={"activities_score": 2}))
+        with patch(
+            "services.profile_assessment_service.services.get_profile_assessment_client",
+            return_value=client,
+        ):
+            self.client.post("/api/v1/profile-assessment/refresh/")
+
+        response = self.client.get("/api/v1/recommendations/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["needs_assessment"])
+        self.assertIsInstance(response.data["recommendations"], list)
+
+    def test_strategy_endpoint_works_before_any_assessment_exists(self):
+        response = self.client.get("/api/v1/strategy/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["needs_assessment"])
+        self.assertFalse(response.data["has_tracked_applications"])
+        self.assertIn("university_list_strategy", response.data)
+
+    def test_strategy_endpoint_never_calls_ai(self):
+        from unittest.mock import patch
+
+        with patch(
+            "services.profile_assessment_service.services.get_profile_assessment_client",
+            side_effect=AssertionError("must not call AI on render"),
+        ):
+            response = self.client.get("/api/v1/strategy/me/")
+
+        self.assertEqual(response.status_code, 200)
