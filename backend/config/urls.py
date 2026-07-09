@@ -15,6 +15,7 @@ from services.profile_assessment_service.views import (
     ProfileStrategyView,
     RunProfileAssessmentView,
 )
+from services.roadmap_service.views import GenerateRoadmapView, RoadmapPlanView, RoadmapTaskViewSet
 from services.subscription_service.views import SubscriptionViewSet
 from services.university_service.views import UniversityViewSet
 from services.user_profile_service.views import ProfileViewSet
@@ -27,6 +28,7 @@ router.register("exam-dates", OfficialExamDateViewSet, basename="exam-date")
 router.register("questions", QuestionViewSet, basename="question")
 router.register("profiles", ProfileViewSet, basename="profile")
 router.register("subscriptions", SubscriptionViewSet, basename="subscription")
+router.register("roadmaps/tasks", RoadmapTaskViewSet, basename="roadmap-task-v1")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -61,6 +63,10 @@ urlpatterns = [
     ),
     path("api/v1/recommendations/me/", ProfileRecommendationsView.as_view(), name="recommendations-me"),
     path("api/v1/strategy/me/", ProfileStrategyView.as_view(), name="strategy-me"),
+    # Additive `/api/v1/roadmaps/*` paths reusing the same views as the
+    # existing `/api/roadmap/` routes above -- the old paths are untouched.
+    path("api/v1/roadmaps/me/", RoadmapPlanView.as_view(), name="roadmaps-me"),
+    path("api/v1/roadmaps/generate/", GenerateRoadmapView.as_view(), name="roadmaps-generate"),
     path("api/v1/", include(router.urls)),
     path("api-auth/", include("rest_framework.urls")),
 ]

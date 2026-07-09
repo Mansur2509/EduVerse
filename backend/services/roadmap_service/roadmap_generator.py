@@ -19,6 +19,8 @@ from services.event_service.models import EventRegistration
 from services.event_service.services import ACTIVE_REGISTRATION_STATUSES
 from services.exam_content_service.models import OfficialExamDate
 from services.exam_content_service.official_links import official_exam_link
+from services.profile_assessment_service.recommendations import compute_profile_recommendations
+from services.profile_assessment_service.services import get_latest_valid_assessment
 from services.university_service.deadline_normalization import (
     normalize_university_deadline,
 )
@@ -30,6 +32,7 @@ from services.user_profile_service.models import (
     Honor,
     Olympiad,
     PortfolioProject,
+    Recommender,
     ResearchProject,
 )
 from services.user_profile_service.services import ensure_profile_records
@@ -218,6 +221,7 @@ class RoadmapBuilder:
             warnings.append("no_shortlisted_universities")
 
         self._profile_gaps(profile, targets)
+        self._assessment_gaps()
         self._exam_gaps(profile, preferences, targets)
         self._university_deadlines(targets)
         self._scholarships(profile, targets)
@@ -316,6 +320,71 @@ class RoadmapBuilder:
                 linked_profile_section="essays",
                 generated_reason=f"{universities_needing_essays[0].name} has published essay requirements and you have no essay drafts yet.",
                 evidence_note=universities_needing_essays[0].essay_requirements[:280],
+            )
+
+        if shortlisted and not Recommender.objects.filter(user=self.user).exists():
+            self.add(
+                "profile_gap:recommendation_letters",
+                title="Line up your recommendation letters",
+                description="Identify teachers or mentors and request recommendation letters early.",
+                category=Category.RECOMMENDATIONS,
+                priority=Priority.HIGH,
+                estimated_effort=RoadmapTask.EstimatedEffort.SHORT,
+                source_type=SourceType.PROFILE_GAP,
+                linked_profile_section="recommenders",
+                generated_reason="You have shortlisted or tracked universities but no recommenders recorded yet.",
+                evidence_note="No Recommender records found in your profile.",
+            )
+
+    # Only the academic_readiness dimension is handled here. sat/ielts
+    # (testing_readiness) gaps are intentionally left to _exam_gaps, which
+    # already compares against the student's own shortlisted universities
+    # with more specific, more actionable evidence; surfacing both would
+    # produce two near-duplicate "improve your score" tasks for the same gap.
+    _ASSESSMENT_GAP_COPY = {
+        "gpa_below_benchmark": (
+            "Strengthen your GPA",
+            "Your GPA is below the benchmark for students admitted to your target universities.",
+        ),
+        "profile_evidence_gap": (
+            "Add more evidence to your profile",
+            "Your profile has less supporting evidence on file than typical admitted students in your target group.",
+        ),
+        "subject_passion_gap": (
+            "Show deeper engagement with your subject",
+            "Your profile shows less depth of subject-specific engagement than typical admitted students in your target group.",
+        ),
+        "curiosity_gap": (
+            "Demonstrate intellectual curiosity",
+            "Your profile shows fewer signs of independent intellectual curiosity than typical admitted students in your target group.",
+        ),
+    }
+
+    def _assessment_gaps(self) -> None:
+        assessment = get_latest_valid_assessment(self.user)
+        if assessment is None:
+            return
+
+        for recommendation in compute_profile_recommendations(assessment):
+            if recommendation["linked_dimension"] != "academic_readiness":
+                continue
+            title_key = recommendation["title"]
+            copy = self._ASSESSMENT_GAP_COPY.get(title_key)
+            if copy is None:
+                continue
+            display_title, description = copy
+            evidence = recommendation.get("evidence_from_profile") or {}
+            self.add(
+                f"assessment_gap:{title_key}",
+                title=display_title,
+                description=description,
+                category=Category.PROFILE,
+                priority=recommendation["priority"],
+                estimated_effort=RoadmapTask.EstimatedEffort.MEDIUM,
+                source_type=SourceType.CACHED_ASSESSMENT,
+                linked_score_dimension=recommendation["linked_dimension"],
+                generated_reason=f"Your cached profile assessment flagged '{title_key}' against your benchmark group.",
+                evidence_note=", ".join(f"{key}: {value}" for key, value in evidence.items() if value is not None),
             )
 
     def _exam_gaps(self, profile, preferences, target_universities):

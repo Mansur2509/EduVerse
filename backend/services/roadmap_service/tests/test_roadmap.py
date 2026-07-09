@@ -8,6 +8,11 @@ from rest_framework.test import APITestCase
 
 from services.application_service.models import ApplicationTrackerItem
 from services.exam_content_service.models import OfficialExamDate
+from services.profile_assessment_service.models import AIProfileAssessment
+from services.profile_assessment_service.services import (
+    PROFILE_ASSESSMENT_CATEGORIES,
+    compute_profile_snapshot_hash,
+)
 from services.roadmap_service.models import RoadmapPlan, RoadmapTask
 from services.roadmap_service.roadmap_generator import generate_roadmap
 from services.university_service.models import (
@@ -15,6 +20,7 @@ from services.university_service.models import (
     University,
     UniversityFieldVerification,
 )
+from services.user_profile_service.models import Recommender
 from services.user_profile_service.services import ensure_profile_records
 
 User = get_user_model()
@@ -36,6 +42,22 @@ def create_university(slug, **overrides):
 
 def graduation_year_for_cycle_date(value: date) -> int:
     return value.year + 1 if value.month >= 8 else value.year
+
+
+def make_assessment(user, *, deterministic_scores=None, readiness_scores=None):
+    """Snapshot hash is computed from the user's *current* profile state so
+    `get_latest_valid_assessment` (which re-derives and compares this hash)
+    treats the fixture as valid -- create this only after all profile setup.
+    """
+    return AIProfileAssessment.objects.create(
+        user=user,
+        profile_snapshot_hash=compute_profile_snapshot_hash(user),
+        overall_profile_score=50,
+        expires_at=timezone.now() + timedelta(days=1),
+        deterministic_scores=deterministic_scores or {},
+        readiness_scores=readiness_scores or {},
+        **{category: 5 for category in PROFILE_ASSESSMENT_CATEGORIES},
+    )
 
 
 class RoadmapGenerationTests(APITestCase):
@@ -372,6 +394,95 @@ class RoadmapGenerationTests(APITestCase):
         task.save()
 
         self.assertTrue(RoadmapTask.objects.filter(pk=task.pk).exists())
+
+    def test_recommendation_letters_task_created_when_targets_exist(self):
+        university = create_university("recommenders-university")
+        SavedUniversity.objects.create(user=self.user, university=university)
+
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+
+        self.assertIn("profile_gap:recommendation_letters", task_keys)
+        task = plan.tasks.get(dedup_key="profile_gap:recommendation_letters")
+        self.assertEqual(task.category, RoadmapTask.Category.RECOMMENDATIONS)
+        self.assertEqual(task.estimated_effort, RoadmapTask.EstimatedEffort.SHORT)
+
+    def test_recommendation_letters_task_absent_without_targets(self):
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+
+        self.assertNotIn("profile_gap:recommendation_letters", task_keys)
+
+    def test_recommendation_letters_task_absent_when_recommender_exists(self):
+        university = create_university("recommenders-university-2")
+        SavedUniversity.objects.create(user=self.user, university=university)
+        Recommender.objects.create(user=self.user, name="Ms. Rivera")
+
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+
+        self.assertNotIn("profile_gap:recommendation_letters", task_keys)
+
+    def test_assessment_gap_creates_task_from_cached_gpa_benchmark(self):
+        make_assessment(
+            self.user,
+            deterministic_scores={"gpa": {"student": 3.0, "benchmark": 3.6, "status": "below_benchmark"}},
+        )
+
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+
+        self.assertIn("assessment_gap:gpa_below_benchmark", task_keys)
+        task = plan.tasks.get(dedup_key="assessment_gap:gpa_below_benchmark")
+        self.assertEqual(task.source_type, RoadmapTask.SourceType.CACHED_ASSESSMENT)
+        self.assertEqual(task.linked_score_dimension, "academic_readiness")
+        self.assertEqual(task.priority, RoadmapTask.Priority.MEDIUM)
+        self.assertEqual(task.category, RoadmapTask.Category.PROFILE)
+
+    def test_assessment_gap_absent_without_any_assessment(self):
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+
+        self.assertFalse(any(key.startswith("assessment_gap:") for key in task_keys))
+
+    def test_assessment_gap_skips_testing_readiness_dimension(self):
+        # sat/ielts benchmark gaps are intentionally left to _exam_gaps so the
+        # roadmap never shows two near-duplicate "improve your score" tasks.
+        make_assessment(
+            self.user,
+            deterministic_scores={
+                "sat": {
+                    "student": 1200,
+                    "benchmark_p25": 1300,
+                    "benchmark_p75": 1500,
+                    "benchmark_average": 1400,
+                    "status": "below_benchmark",
+                }
+            },
+        )
+
+        plan, _ = generate_roadmap(self.user)
+        task_keys = set(plan.tasks.values_list("dedup_key", flat=True))
+
+        self.assertFalse(any(key.startswith("assessment_gap:") for key in task_keys))
+
+    def test_assessment_gap_not_duplicated_on_regeneration(self):
+        make_assessment(
+            self.user,
+            deterministic_scores={"gpa": {"student": 3.0, "benchmark": 3.6, "status": "below_benchmark"}},
+        )
+
+        generate_roadmap(self.user)
+        first_count = RoadmapTask.objects.filter(
+            user=self.user, dedup_key="assessment_gap:gpa_below_benchmark"
+        ).count()
+        generate_roadmap(self.user)
+        second_count = RoadmapTask.objects.filter(
+            user=self.user, dedup_key="assessment_gap:gpa_below_benchmark"
+        ).count()
+
+        self.assertEqual(first_count, 1)
+        self.assertEqual(second_count, 1)
 
 
 class RoadmapApiTests(APITestCase):

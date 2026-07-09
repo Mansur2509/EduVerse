@@ -5,6 +5,7 @@ from pathlib import Path
 import dj_database_url
 
 from config.database_guard import validate_production_database
+from config.deploy_guard import validate_deploy_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -117,6 +118,15 @@ AUTH_USER_MODEL = "auth_service.User"
 CORS_ALLOWED_ORIGINS = csv_env("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 CSRF_TRUSTED_ORIGINS = csv_env("CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
 CORS_ALLOW_CREDENTIALS = True
+
+# Fail loudly (ImproperlyConfigured) on a malformed ALLOWED_HOSTS/CORS/CSRF
+# value in production -- see config/deploy_guard.py for the rationale.
+validate_deploy_config(
+    debug=DEBUG,
+    allowed_hosts=ALLOWED_HOSTS,
+    cors_allowed_origins=CORS_ALLOWED_ORIGINS,
+    csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,
+)
 
 SECURE_COOKIES = os.getenv("DJANGO_SECURE_COOKIES", "false").lower() == "true"
 SESSION_COOKIE_HTTPONLY = True

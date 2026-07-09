@@ -24,9 +24,12 @@ export type RoadmapSourceType =
   | "essay_status"
   | "exam_plan"
   | "planning_window"
-  | "event";
+  | "event"
+  | "cached_assessment";
 
 export type RoadmapTaskKind = "manual" | "generated";
+
+export type RoadmapEstimatedEffort = "short" | "medium" | "long";
 
 export type RoadmapTask = {
   id: number;
@@ -47,6 +50,8 @@ export type RoadmapTask = {
   linked_event_title: string | null;
   linked_event_slug: string | null;
   linked_profile_section: string;
+  linked_score_dimension: string;
+  estimated_effort: RoadmapEstimatedEffort;
   generated_reason: string;
   evidence_note: string;
   source_url: string;

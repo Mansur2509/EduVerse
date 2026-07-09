@@ -63,6 +63,12 @@ class RoadmapTask(models.Model):
         EXAM_PLAN = "exam_plan", "Exam plan"
         PLANNING_WINDOW = "planning_window", "Planning window"
         EVENT = "event", "Event"
+        CACHED_ASSESSMENT = "cached_assessment", "Cached profile assessment"
+
+    class EstimatedEffort(models.TextChoices):
+        SHORT = "short", "Short"
+        MEDIUM = "medium", "Medium"
+        LONG = "long", "Long"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="roadmap_tasks"
@@ -111,6 +117,14 @@ class RoadmapTask(models.Model):
         related_name="roadmap_tasks",
     )
     linked_profile_section = models.CharField(max_length=60, blank=True)
+    # One of the 12 profile_assessment_service signal names (activities,
+    # research_experience, portfolio, ...) when this task traces back to a
+    # specific benchmark-gap dimension from the cached AIProfileAssessment.
+    # Blank for tasks generated from other sources (deadlines, exam plans).
+    linked_score_dimension = models.CharField(max_length=40, blank=True)
+    estimated_effort = models.CharField(
+        max_length=10, choices=EstimatedEffort.choices, default=EstimatedEffort.MEDIUM
+    )
 
     generated_reason = models.TextField(blank=True)
     evidence_note = models.TextField(blank=True)

@@ -77,6 +77,9 @@ export function RoadmapTaskCard({
           {t(`roadmap.priority.${task.priority}` as TranslationKey)}
           <HelpTooltip label={t("help.roadmapPriority")} />
         </span>
+        <span className="rounded-sm border bg-surface px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          {t(`roadmap.effort.${task.estimated_effort}` as TranslationKey)}
+        </span>
         {task.status === "completed" ? (
           <span className="rounded-sm border border-success/35 bg-success/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-success">
             {t("roadmap.status.completed")}
