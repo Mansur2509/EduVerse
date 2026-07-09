@@ -50,3 +50,9 @@ qa-artifacts/
 
 # Generated XLSX import reports (the dataset workbook itself is committed)
 **/import_report_*.json
+
+# University data import audit/manual-review artifacts (local-only, never exposed publicly)
+**/import_audit_*.csv
+**/manual_review_*.csv
+backend/import_data/
+outputs/
