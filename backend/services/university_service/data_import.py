@@ -24,6 +24,16 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.db import transaction
 
+from .import_schema import (
+    ALIGNMENT_ALIGNED,
+    ALIGNMENT_SHIFTED_ROW_UNREPAIRABLE,
+    boilerplate_signature,
+    detect_repeated_boilerplate_values,
+    has_banned_phrase,
+    has_repeated_sentence,
+    validate_and_repair_row_alignment,
+    wrong_university_prefix,
+)
 from .models import (
     University,
     UniversityDataImportBatch,
@@ -337,7 +347,10 @@ class AuditEntry:
     source_row_number: int
     row_number: int
     university_name: str
+    raw_name: str
+    normalized_name: str
     country: str
+    row_alignment_status: str
     matched_university_id: int | None
     action: str
     field_name: str
@@ -361,6 +374,12 @@ class ManualReviewEntry:
     existing_value: str
     new_cleaned_value: str
     reason: str
+    raw_first_5_cells: str = ""
+    extracted_possible_name: str = ""
+    detected_country: str = ""
+    detected_city: str = ""
+    possible_reason: str = ""
+    suggested_action: str = ""
 
 
 @dataclass
@@ -424,7 +443,12 @@ class ImportSummary:
             self.commentary_cells += 1
         elif entry.status == "skipped_generic_country_average":
             self.generic_country_average_cells += 1
-        elif entry.status in {"skipped_wrong_field_type", "skipped_uncertain"}:
+        elif entry.status in {
+            "skipped_boilerplate_suspected",
+            "skipped_wrong_field_type",
+            "skipped_wrong_university_prefix",
+            "skipped_uncertain",
+        }:
             self.invalid_cells += 1
 
     def add_manual_review(self, entry: ManualReviewEntry) -> None:
@@ -508,6 +532,16 @@ def _base_skip_cell(raw_value, field_name: str) -> CleanedCell | None:
             "generic country/conversion commentary, not university-specific data",
             "high",
         )
+    if has_banned_phrase(raw):
+        return CleanedCell(raw, None, "skipped_placeholder", "banned placeholder/template phrase", "high")
+    if has_repeated_sentence(raw):
+        return CleanedCell(
+            raw,
+            None,
+            "skipped_boilerplate_suspected",
+            "repeated sentence or duplicated text chunk",
+            "high",
+        )
     if _matches_any(raw, PLACEHOLDER_PATTERNS):
         if field_name in {"Official Website", "Admissions URL", "Admissions Website"}:
             if URL_RE.search(raw):
@@ -584,6 +618,27 @@ def clean_raw_cell(value, field_name: str, university_context: dict | None = Non
     base_skip = _base_skip_cell(raw, field_name)
     if base_skip:
         return base_skip
+    expected_name = clean(context.get("name"))
+    if expected_name and field_name not in {"Name", "Country", "City"}:
+        conflicting_prefix = wrong_university_prefix(raw, expected_name)
+        if conflicting_prefix:
+            return CleanedCell(
+                raw,
+                None,
+                "skipped_wrong_university_prefix",
+                f"field starts with another university name: {conflicting_prefix}",
+                "high",
+            )
+    repeated_signatures = context.get("boilerplate_signatures") or {}
+    signature = boilerplate_signature(raw)
+    if signature and signature in repeated_signatures.get(field_name, set()):
+        return CleanedCell(
+            raw,
+            None,
+            "skipped_boilerplate_suspected",
+            "same generic text repeated across many universities",
+            "medium",
+        )
 
     if field_name in PUBLIC_TEXT_FIELD_MAP and PUBLIC_TEXT_FIELD_MAP[field_name] in URL_FIELDS:
         cell = _clean_url(raw)
@@ -606,7 +661,7 @@ def clean_raw_cell(value, field_name: str, university_context: dict | None = Non
     elif field_name == "Last Verified Date":
         cell = _clean_date(raw)
     elif field_name in SIGNAL_SCORE_FIELD_MAP:
-        cell = _clean_int(raw, field_name, minimum=0, maximum=10)
+        cell = _clean_int(raw, field_name, minimum=1, maximum=10)
     else:
         cell = _clean_specific_text(raw)
     return _apply_ai_strictness(cell, field_name, context)
@@ -1240,7 +1295,10 @@ def _build_fields(row: dict, row_number: int, context: dict, summary: ImportSumm
                 source_row_number=source_row_number,
                 row_number=row_number,
                 university_name=context["name"],
+                raw_name=context.get("raw_name", context["name"]),
+                normalized_name=context.get("normalized_name", normalize_text(context["name"])),
                 country=context["country"],
+                row_alignment_status=context.get("row_alignment_status", ALIGNMENT_ALIGNED),
                 matched_university_id=None,
                 action=action,
                 field_name=column,
@@ -1529,13 +1587,11 @@ def _process_row(
     update_existing: bool,
     force_reprocess: bool,
     source_file_name: str,
+    boilerplate_signatures: dict[str, set[str]],
     summary: ImportSummary,
 ) -> None:
     source_sheet_name = clean(row.get(SOURCE_SHEET_FIELD)) or CSV_SOURCE_SHEET_NAME
     source_row_number = int(row.get(SOURCE_ROW_FIELD) or row_number)
-    name = clean(row.get("Name"))
-    country = clean(row.get("Country"))
-    city = clean(row.get("City"))
     row_hash = _row_hash(row)
 
     if not any(
@@ -1555,6 +1611,70 @@ def _process_row(
             )
         )
         return
+
+    alignment = validate_and_repair_row_alignment(row)
+    if alignment.unrepairable:
+        summary.skipped_errors += 1
+        summary.add_manual_review(
+            ManualReviewEntry(
+                source_sheet_name=source_sheet_name,
+                source_row_number=source_row_number,
+                row_number=row_number,
+                raw_name=alignment.raw_name,
+                raw_country=clean(row.get("Country")),
+                possible_matches="",
+                conflict_fields="__row_alignment__",
+                raw_value=" | ".join(alignment.raw_first_5_cells),
+                existing_value="",
+                new_cleaned_value=alignment.extracted_possible_name,
+                reason=ALIGNMENT_SHIFTED_ROW_UNREPAIRABLE,
+                raw_first_5_cells=" | ".join(alignment.raw_first_5_cells),
+                extracted_possible_name=alignment.extracted_possible_name,
+                detected_country=alignment.detected_country,
+                detected_city=alignment.detected_city,
+                possible_reason=alignment.reason,
+                suggested_action="manual_review_before_import",
+            )
+        )
+        summary.rows.append(
+            RowResult(
+                row_number,
+                alignment.extracted_possible_name or alignment.raw_name or "(unknown)",
+                "manual_review",
+                source_sheet_name=source_sheet_name,
+                source_row_number=source_row_number,
+                row_hash=_row_hash(row),
+                errors=[alignment.reason],
+            )
+        )
+        return
+    if alignment.repaired:
+        row = alignment.row
+        summary.add_cell_audit(
+            AuditEntry(
+                source_sheet_name=source_sheet_name,
+                source_row_number=source_row_number,
+                row_number=row_number,
+                university_name=clean(row.get("Name")),
+                raw_name=alignment.raw_name,
+                normalized_name=alignment.normalized_name,
+                country=clean(row.get("Country")),
+                row_alignment_status=alignment.status,
+                matched_university_id=None,
+                action="repair",
+                field_name="__row_alignment__",
+                raw_value=" | ".join(alignment.raw_first_5_cells),
+                cleaned_value=clean(row.get("Name")),
+                status=alignment.status,
+                reason=alignment.reason,
+                confidence=alignment.confidence,
+            )
+        )
+
+    name = clean(row.get("Name"))
+    country = clean(row.get("Country"))
+    city = clean(row.get("City"))
+    row_hash = _row_hash(row)
     if not name or not country:
         summary.missing_required += 1
         summary.skipped_errors += 1
@@ -1611,6 +1731,10 @@ def _process_row(
     context = {
         "name": name,
         "country": country,
+        "raw_name": alignment.raw_name,
+        "normalized_name": alignment.normalized_name,
+        "row_alignment_status": alignment.status,
+        "boilerplate_signatures": boilerplate_signatures,
         "source_sheet_name": source_sheet_name,
         "source_row_number": source_row_number,
     }
@@ -1732,7 +1856,8 @@ def _process_row(
     for entry in summary.audit_entries:
         if entry.row_number == row_number and entry.source_sheet_name == source_sheet_name:
             entry.matched_university_id = university.id
-            entry.action = action
+            if entry.field_name != "__row_alignment__":
+                entry.action = action
     if batch is not None:
         UniversityDataImportRowLog.objects.create(
             batch=batch,
@@ -1796,6 +1921,7 @@ def import_universities_data(
     summary.skipped_sheets = sum(1 for action in summary.sheet_actions if action.get("action", "").startswith("skipped"))
     existing_exact, existing_domains, existing_universities = _build_existing_indexes()
     seen_keys: set[tuple[str, str, str]] = set()
+    boilerplate_signatures = detect_repeated_boilerplate_values(rows)
     batch: UniversityDataImportBatch | None = None
 
     def run() -> None:
@@ -1819,6 +1945,7 @@ def import_universities_data(
                     update_existing=update_existing and not missing_only,
                     force_reprocess=force_reprocess,
                     source_file_name=source_file_name,
+                    boilerplate_signatures=boilerplate_signatures,
                     summary=summary,
                 )
             except Exception as error:  # noqa: BLE001 - row-level isolation
@@ -1861,8 +1988,11 @@ def write_audit_csv(summary: ImportSummary, path: str) -> None:
         "source_sheet_name",
         "source_row_number",
         "row_number",
+        "raw_name",
+        "normalized_name",
         "university_name",
         "country",
+        "row_alignment_status",
         "matched_university_id",
         "action",
         "field_name",
@@ -1892,6 +2022,12 @@ def write_manual_review_csv(summary: ImportSummary, path: str) -> None:
         "existing_value",
         "new_cleaned_value",
         "reason",
+        "raw_first_5_cells",
+        "extracted_possible_name",
+        "detected_country",
+        "detected_city",
+        "possible_reason",
+        "suggested_action",
     ]
     with open(path, "w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)

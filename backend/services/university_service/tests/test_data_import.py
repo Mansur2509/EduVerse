@@ -17,6 +17,13 @@ from services.university_service.data_import import (
     parse_score_0_10,
     split_majors,
 )
+from services.university_service.import_schema import (
+    ALIGNMENT_ALIGNED,
+    ALIGNMENT_REPAIRED_SHIFTED_MISSING_NAME,
+    ALIGNMENT_SHIFTED_ROW_UNREPAIRABLE,
+    UNIVERSITY_IMPORT_SCHEMA,
+    validate_and_repair_row_alignment,
+)
 from services.university_service.models import (
     University,
     UniversityDataImportBatch,
@@ -211,6 +218,59 @@ class ParsingHelperTests(TestCase):
         key_b = normalized_university_key("Massachusetts Institute of Technology", "usa")
         self.assertEqual(key_a, key_b)
 
+    def test_schema_contains_every_full_workbook_column(self):
+        self.assertEqual(set(UNIVERSITY_IMPORT_SCHEMA), set(FULL_HEADERS))
+        self.assertEqual(UNIVERSITY_IMPORT_SCHEMA["Name"].type, "string")
+        self.assertEqual(UNIVERSITY_IMPORT_SCHEMA["Official Website"].type, "url")
+        self.assertEqual(UNIVERSITY_IMPORT_SCHEMA["Profile Evidence Score"].type, "system_score")
+
+    def test_good_mit_style_row_is_aligned(self):
+        row = sample_row(
+            Name="Massachusetts Institute of Technology (MIT)",
+            Country="USA",
+            City="Cambridge, MA",
+            **{"Official Website": "https://www.mit.edu/"},
+        )
+        result = validate_and_repair_row_alignment(row)
+        self.assertEqual(result.status, ALIGNMENT_ALIGNED)
+        self.assertEqual(result.row["Name"], "Massachusetts Institute of Technology (MIT)")
+
+    def test_high_confidence_shifted_row_is_repaired(self):
+        shifted = sample_row(
+            Name="Norway",
+            Country="Trondheim",
+            City="https://www.ntnu.edu/",
+            **{
+                "Official Website": "https://www.ntnu.edu/studies/",
+                "Admissions URL": "https://www.ntnu.edu/studies/admissions/",
+                "Majors": "Norwegian University of Science and Technology (NTNU): Engineering; Computer Science",
+                "What They Look For": "Norwegian University of Science and Technology (NTNU): documented research readiness.",
+                "Preferred Student Profile": "Norwegian University of Science and Technology (NTNU): strong STEM preparation.",
+                "Who They Seek": "Norwegian University of Science and Technology (NTNU): applicants with technical curiosity.",
+                "Institutional Values": "Norwegian University of Science and Technology (NTNU): innovation and public impact.",
+            },
+        )
+        result = validate_and_repair_row_alignment(shifted)
+        self.assertEqual(result.status, ALIGNMENT_REPAIRED_SHIFTED_MISSING_NAME)
+        self.assertEqual(result.row["Name"], "Norwegian University of Science and Technology (NTNU)")
+        self.assertEqual(result.row["Country"], "Norway")
+        self.assertEqual(result.row["City"], "Trondheim")
+        self.assertEqual(result.row["Official Website"], "https://www.ntnu.edu/")
+
+    def test_low_confidence_shifted_row_is_manual_review_only(self):
+        shifted = sample_row(
+            Name="Norway",
+            Country="Trondheim",
+            City="https://www.ntnu.edu/",
+            **{"Official Website": "https://www.ntnu.edu/studies/"},
+        )
+        result = validate_and_repair_row_alignment(shifted)
+        self.assertEqual(result.status, ALIGNMENT_SHIFTED_ROW_UNREPAIRABLE)
+
+    def test_name_cannot_be_a_country(self):
+        result = validate_and_repair_row_alignment(sample_row(Name="Norway", Country="Trondheim"))
+        self.assertEqual(result.status, ALIGNMENT_SHIFTED_ROW_UNREPAIRABLE)
+
 
 class ImportUniversitiesDataTests(TestCase):
     def tearDown(self):
@@ -370,6 +430,102 @@ class ImportUniversitiesDataTests(TestCase):
         import_universities_data(path, commit=True)
         university = University.objects.get(name="Sample University")
         self.assertEqual(university.admissions_url, "https://mitadmissions.org/apply/")
+
+    def test_shifted_row_with_high_confidence_name_is_repaired_before_import(self):
+        shifted = sample_row(
+            Name="Norway",
+            Country="Trondheim",
+            City="https://www.ntnu.edu/",
+            **{
+                "Official Website": "https://www.ntnu.edu/studies/",
+                "Admissions URL": "https://www.ntnu.edu/studies/admissions/",
+                "Majors": "Norwegian University of Science and Technology (NTNU): Engineering; Computer Science",
+                "What They Look For": "Norwegian University of Science and Technology (NTNU): documented research readiness.",
+                "Preferred Student Profile": "Norwegian University of Science and Technology (NTNU): strong STEM preparation.",
+                "Who They Seek": "Norwegian University of Science and Technology (NTNU): applicants with technical curiosity.",
+                "Institutional Values": "Norwegian University of Science and Technology (NTNU): innovation and public impact.",
+            },
+        )
+        path = self._write([shifted])
+        summary = import_universities_data(path, commit=True)
+        self.assertEqual(summary.created, 1)
+        university = University.objects.get(name="Norwegian University of Science and Technology (NTNU)")
+        self.assertEqual(university.country, "Norway")
+        self.assertEqual(university.city, "Trondheim")
+        self.assertEqual(university.official_website, "https://www.ntnu.edu/")
+        repair_audits = [entry for entry in summary.audit_entries if entry.field_name == "__row_alignment__"]
+        self.assertEqual(len(repair_audits), 1)
+        self.assertEqual(repair_audits[0].status, ALIGNMENT_REPAIRED_SHIFTED_MISSING_NAME)
+
+    def test_shifted_row_without_confident_name_goes_to_manual_review(self):
+        shifted = sample_row(
+            Name="Norway",
+            Country="Trondheim",
+            City="https://www.ntnu.edu/",
+            **{"Official Website": "https://www.ntnu.edu/studies/"},
+        )
+        path = self._write([shifted])
+        summary = import_universities_data(path, commit=True)
+        self.assertEqual(summary.created, 0)
+        self.assertEqual(University.objects.count(), 0)
+        self.assertEqual(summary.manual_review_entries[0].reason, ALIGNMENT_SHIFTED_ROW_UNREPAIRABLE)
+        self.assertEqual(summary.manual_review_entries[0].detected_country, "Norway")
+        self.assertIn("https://www.ntnu.edu/", summary.manual_review_entries[0].raw_first_5_cells)
+
+    def test_wrong_university_prefix_is_skipped_not_imported(self):
+        path = self._write(
+            [
+                sample_row(
+                    **{
+                        "What They Look For": (
+                            "Other University: applicants with unrelated profile evidence."
+                        )
+                    }
+                )
+            ]
+        )
+        summary = import_universities_data(path, commit=True)
+        guidance = UniversityGuidanceContext.objects.get(university__name="Sample University")
+        self.assertEqual(guidance.what_they_look_for, "")
+        statuses = {entry.status for entry in summary.audit_entries}
+        self.assertIn("skipped_wrong_university_prefix", statuses)
+
+    def test_repeated_boilerplate_across_many_rows_is_skipped(self):
+        repeated = (
+            "Students document academic curiosity with classroom work, outreach, "
+            "reflection, and measurable outcomes."
+        )
+        rows = [
+            sample_row(
+                Name=f"Boilerplate University {index}",
+                Country=f"Testland {index}",
+                **{"What They Look For": f"Boilerplate University {index}: {repeated}"},
+            )
+            for index in range(50)
+        ]
+        path = self._write(rows)
+        summary = import_universities_data(path, commit=True)
+        self.assertEqual(summary.created, 50)
+        self.assertGreaterEqual(
+            sum(
+                1
+                for entry in summary.audit_entries
+                if entry.status == "skipped_boilerplate_suspected"
+            ),
+            50,
+        )
+        self.assertFalse(
+            UniversityGuidanceContext.objects.exclude(what_they_look_for="").exists()
+        )
+
+    def test_score_fields_accept_only_integer_scores(self):
+        accepted = clean_raw_cell("8", "Profile Evidence Score")
+        rejected_zero = clean_raw_cell("0", "Profile Evidence Score")
+        rejected_prose = clean_raw_cell("High evidence score", "Profile Evidence Score")
+        self.assertTrue(accepted.importable)
+        self.assertEqual(accepted.cleaned_value, 8)
+        self.assertFalse(rejected_zero.importable)
+        self.assertFalse(rejected_prose.importable)
 
     def test_audit_and_manual_review_csv_outputs_are_written(self):
         University.objects.create(

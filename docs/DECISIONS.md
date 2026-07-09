@@ -441,3 +441,14 @@ Large real datasets may arrive as workbooks containing data, source links, ranki
 Source sheet and source row are part of the operator audit surface and committed row log. Row fingerprints include normalized row contents, normalized university identity, sheet name, and source row number, so rerunning the same workbook row is idempotent while repeated universities across different sheets can safely merge missing information into one university record. Conflicting values continue to go to manual review instead of overwriting existing good data.
 
 For environments where Render Shell is unavailable, `.github/workflows/university-import.yml` provides a `workflow_dispatch`-only operations path. It accepts `dry_run` or explicit `commit`, optional sheet selection and limit inputs, runs migrations first, uses `DATABASE_URL` only from GitHub Actions Secrets, and uploads audit/manual-review CSV artifacts. The workflow must never become automatic on push.
+
+## ADR-044: University workbook schema contract and shifted-row repair
+
+- **Status:** Accepted
+- **Date:** 2026-07-08
+
+Expanded university workbooks can fail in a way that ordinary cell cleaning cannot catch: a missing first-cell university name shifts `Country`, `City`, and URLs left while the row still contains enough non-empty data to look importable. UniWay therefore treats workbook shape as a first-class contract, not only a set of loose headers.
+
+`backend/services/university_service/import_schema.py` defines the canonical 72 columns, expected types, visibility, validators, reject patterns, and repair policy. The CLI importer validates identity alignment before matching/upsert. Rows where `Name` looks like a country, `Country` looks like a city, and `City` is a URL are classified as `shifted_left_missing_name`. They are repaired only when at least 5 later cells repeat the same university-name prefix and the website domain plausibly matches the extracted identity, including known acronyms in parenthetical names. Otherwise the row is manual-review only and no university is created.
+
+The audit CSV now records `raw_name`, `normalized_name`, and `row_alignment_status`; the manual-review CSV includes the raw first 5 cells, extracted possible name, detected country/city, possible reason, and suggested action. This keeps operators from silently importing bad rows and gives workbook repair a concrete checklist without exposing audit/manual-review/system fields through public APIs.
