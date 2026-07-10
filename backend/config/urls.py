@@ -73,6 +73,7 @@ urlpatterns = [
     path("api/v1/roadmaps/generate/", GenerateRoadmapView.as_view(), name="roadmaps-generate"),
     path("api/v1/analytics/", include("services.activity_service.urls")),
     path("api/v1/admin/analytics/", include("services.activity_service.admin_urls")),
+    path("api/v1/notifications/", include("services.notification_service.urls")),
     path("api/v1/", include(router.urls)),
     path("api-auth/", include("rest_framework.urls")),
 ]

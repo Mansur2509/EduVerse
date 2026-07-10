@@ -5,6 +5,7 @@ import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAuth } from "@/features/auth/model/auth-context";
+import { NotificationBell } from "@/features/notifications";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { LanguageSwitcher } from "@/shared/ui/language-switcher";
@@ -150,6 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <LogOut aria-hidden className="size-4" />
               {t("navigation.logout")}
             </button>
+            <NotificationBell />
             <div
               aria-label={t("shell.userAvatar")}
               className="grid size-9 place-items-center rounded-sm border border-primary/25 bg-primary/10 text-sm font-bold text-primary-hover"

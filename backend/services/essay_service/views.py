@@ -7,6 +7,8 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from services.activity_service.models import AnalyticsEvent
 from services.activity_service.services import track_event
+from services.notification_service.models import Notification
+from services.notification_service.services import create_notification
 
 from .ai_scoring import score_essay as run_essay_scoring
 from .feedback_engine import generate_feedback
@@ -147,6 +149,17 @@ class EssayWorkspaceViewSet(viewsets.ModelViewSet):
             entity_id=essay.id,
             metadata={"reason": result["reason"]},
         )
+        if result["reason"] == "scored" and report is not None:
+            create_notification(
+                user=request.user,
+                notification_type=Notification.NotificationType.ESSAY_REVIEW_COMPLETED,
+                title=f'Essay review ready for "{essay.title}"',
+                message=f"Overall essay readiness: {report.overall_essay_readiness}/10.",
+                action_url="/essays",
+                related_entity_type="essay",
+                related_entity_id=essay.id,
+                dedup_key=f"essay_review_completed:{report.id}",
+            )
         return Response(
             {
                 "reason": result["reason"],

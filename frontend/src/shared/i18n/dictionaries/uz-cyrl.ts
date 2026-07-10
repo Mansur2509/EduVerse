@@ -2301,5 +2301,43 @@ export const uzCyrl = {
   "adminAnalytics.featureUsage.title": "Функциялардан фойдаланиш",
   "adminAnalytics.featureUsage.empty": "Ҳали функциялардан фойдаланиш қайд этилмаган.",
   "adminAnalytics.activity.title": "Кунлик фаолият",
-  "adminAnalytics.activity.empty": "Ҳали фаолият қайд этилмаган."
+  "adminAnalytics.activity.empty": "Ҳали фаолият қайд этилмаган.",
+
+  "notifications.bell.ariaLabel": "Билдиришномалар",
+  "notifications.bell.title": "Билдиришномалар",
+  "notifications.bell.markAllRead": "Барчасини ўқилган деб белгилаш",
+  "notifications.bell.loading": "Билдиришномалар юкланмоқда…",
+  "notifications.bell.empty": "Барча билдиришномалар ўқилган.",
+  "notifications.bell.viewAll": "Барча билдиришномаларни кўриш",
+
+  "notifications.page.eyebrow": "Доим хабардор бўлинг",
+  "notifications.page.title": "Билдиришномалар.",
+  "notifications.page.description": "Муддатлар, имтиҳон саналари, режа вазифалари, иншо текшируви натижалари ва тадбир янгиланишлари шу ерда пайдо бўлади.",
+  "notifications.page.markAllRead": "Барчасини ўқилган деб белгилаш",
+  "notifications.page.loading": "Билдиришномалар юкланмоқда…",
+  "notifications.page.loadError": "Билдиришномаларингизни юклаб бўлмади.",
+  "notifications.page.empty": "Ҳозирча бу ерда ҳеч нарса йўқ.",
+  "notifications.page.open": "Очиш",
+  "notifications.page.markRead": "Ўқилган деб белгилаш",
+  "notifications.page.archive": "Архивлаш",
+
+  "notifications.statusFilter.all": "Барчаси",
+  "notifications.statusFilter.unread": "Ўқилмаган",
+  "notifications.statusFilter.read": "Ўқилган",
+  "notifications.statusFilter.archived": "Архивланган",
+
+  "notifications.priority.low": "Паст",
+  "notifications.priority.normal": "Оддий",
+  "notifications.priority.high": "Юқори",
+  "notifications.priority.urgent": "Шошилинч",
+
+  "notifications.preferences.title": "Билдиришнома созламалари",
+  "notifications.preferences.loading": "Созламалар юкланмоқда…",
+  "notifications.preferences.deadlines": "Ариза муддатлари",
+  "notifications.preferences.exams": "Имтиҳон саналари",
+  "notifications.preferences.roadmap": "Режа вазифалари",
+  "notifications.preferences.recommendationsEssays": "Етишмаётган тавсиялар ва иншолар",
+  "notifications.preferences.essayReviews": "Иншо текшируви натижалари",
+  "notifications.preferences.events": "Тадбирларга рўйхатдан ўтиш ва эслатмалар",
+  "notifications.preferences.organizerEvents": "Ташкилотчи тадбирларини тасдиқлаш"
 } satisfies TranslationDictionary;

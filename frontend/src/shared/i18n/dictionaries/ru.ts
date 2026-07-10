@@ -2301,5 +2301,43 @@ export const ru = {
   "adminAnalytics.featureUsage.title": "Использование функций",
   "adminAnalytics.featureUsage.empty": "Использование функций пока не зафиксировано.",
   "adminAnalytics.activity.title": "Активность по дням",
-  "adminAnalytics.activity.empty": "Активность пока не зафиксирована."
+  "adminAnalytics.activity.empty": "Активность пока не зафиксирована.",
+
+  "notifications.bell.ariaLabel": "Уведомления",
+  "notifications.bell.title": "Уведомления",
+  "notifications.bell.markAllRead": "Отметить всё как прочитанное",
+  "notifications.bell.loading": "Загрузка уведомлений…",
+  "notifications.bell.empty": "Все уведомления прочитаны.",
+  "notifications.bell.viewAll": "Все уведомления",
+
+  "notifications.page.eyebrow": "Будьте в курсе",
+  "notifications.page.title": "Уведомления.",
+  "notifications.page.description": "Дедлайны, даты экзаменов, задачи плана, результаты проверки эссе и обновления по событиям появляются здесь по мере необходимости.",
+  "notifications.page.markAllRead": "Отметить всё как прочитанное",
+  "notifications.page.loading": "Загрузка уведомлений…",
+  "notifications.page.loadError": "Не удалось загрузить ваши уведомления.",
+  "notifications.page.empty": "Пока здесь пусто.",
+  "notifications.page.open": "Открыть",
+  "notifications.page.markRead": "Отметить прочитанным",
+  "notifications.page.archive": "В архив",
+
+  "notifications.statusFilter.all": "Все",
+  "notifications.statusFilter.unread": "Непрочитанные",
+  "notifications.statusFilter.read": "Прочитанные",
+  "notifications.statusFilter.archived": "В архиве",
+
+  "notifications.priority.low": "Низкий",
+  "notifications.priority.normal": "Обычный",
+  "notifications.priority.high": "Высокий",
+  "notifications.priority.urgent": "Срочный",
+
+  "notifications.preferences.title": "Настройки уведомлений",
+  "notifications.preferences.loading": "Загрузка настроек…",
+  "notifications.preferences.deadlines": "Дедлайны заявок",
+  "notifications.preferences.exams": "Даты экзаменов",
+  "notifications.preferences.roadmap": "Задачи плана",
+  "notifications.preferences.recommendationsEssays": "Недостающие рекомендации и эссе",
+  "notifications.preferences.essayReviews": "Результаты проверки эссе",
+  "notifications.preferences.events": "Регистрации на события и напоминания",
+  "notifications.preferences.organizerEvents": "Одобрения событий организатора"
 } satisfies TranslationDictionary;

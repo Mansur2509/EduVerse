@@ -2301,5 +2301,43 @@ export const uzLatn = {
   "adminAnalytics.featureUsage.title": "Funksiyalardan foydalanish",
   "adminAnalytics.featureUsage.empty": "Hali funksiyalardan foydalanish qayd etilmagan.",
   "adminAnalytics.activity.title": "Kunlik faoliyat",
-  "adminAnalytics.activity.empty": "Hali faoliyat qayd etilmagan."
+  "adminAnalytics.activity.empty": "Hali faoliyat qayd etilmagan.",
+
+  "notifications.bell.ariaLabel": "Bildirishnomalar",
+  "notifications.bell.title": "Bildirishnomalar",
+  "notifications.bell.markAllRead": "Barchasini o’qilgan deb belgilash",
+  "notifications.bell.loading": "Bildirishnomalar yuklanmoqda…",
+  "notifications.bell.empty": "Barcha bildirishnomalar o’qilgan.",
+  "notifications.bell.viewAll": "Barcha bildirishnomalarni ko’rish",
+
+  "notifications.page.eyebrow": "Doim xabardor bo’ling",
+  "notifications.page.title": "Bildirishnomalar.",
+  "notifications.page.description": "Muddatlar, imtihon sanalari, reja vazifalari, insho tekshiruv natijalari va tadbir yangilanishlari shu yerda paydo bo’ladi.",
+  "notifications.page.markAllRead": "Barchasini o’qilgan deb belgilash",
+  "notifications.page.loading": "Bildirishnomalar yuklanmoqda…",
+  "notifications.page.loadError": "Bildirishnomalaringizni yuklab bo’lmadi.",
+  "notifications.page.empty": "Hozircha bu yerda hech narsa yo’q.",
+  "notifications.page.open": "Ochish",
+  "notifications.page.markRead": "O’qilgan deb belgilash",
+  "notifications.page.archive": "Arxivlash",
+
+  "notifications.statusFilter.all": "Barchasi",
+  "notifications.statusFilter.unread": "O’qilmagan",
+  "notifications.statusFilter.read": "O’qilgan",
+  "notifications.statusFilter.archived": "Arxivlangan",
+
+  "notifications.priority.low": "Past",
+  "notifications.priority.normal": "Oddiy",
+  "notifications.priority.high": "Yuqori",
+  "notifications.priority.urgent": "Shoshilinch",
+
+  "notifications.preferences.title": "Bildirishnoma sozlamalari",
+  "notifications.preferences.loading": "Sozlamalar yuklanmoqda…",
+  "notifications.preferences.deadlines": "Ariza muddatlari",
+  "notifications.preferences.exams": "Imtihon sanalari",
+  "notifications.preferences.roadmap": "Reja vazifalari",
+  "notifications.preferences.recommendationsEssays": "Yetishmayotgan tavsiyalar va insholar",
+  "notifications.preferences.essayReviews": "Insho tekshiruvi natijalari",
+  "notifications.preferences.events": "Tadbirlarga ro’yxatdan o’tish va eslatmalar",
+  "notifications.preferences.organizerEvents": "Tashkilotchi tadbirlarini tasdiqlash"
 } satisfies TranslationDictionary;

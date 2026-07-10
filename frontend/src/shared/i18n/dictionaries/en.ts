@@ -2303,5 +2303,43 @@ export const en = {
   "adminAnalytics.featureUsage.title": "Feature usage",
   "adminAnalytics.featureUsage.empty": "No feature usage recorded yet.",
   "adminAnalytics.activity.title": "Daily activity",
-  "adminAnalytics.activity.empty": "No activity recorded yet."
+  "adminAnalytics.activity.empty": "No activity recorded yet.",
+
+  "notifications.bell.ariaLabel": "Notifications",
+  "notifications.bell.title": "Notifications",
+  "notifications.bell.markAllRead": "Mark all read",
+  "notifications.bell.loading": "Loading notifications…",
+  "notifications.bell.empty": "You're all caught up.",
+  "notifications.bell.viewAll": "View all notifications",
+
+  "notifications.page.eyebrow": "Stay on track",
+  "notifications.page.title": "Notifications.",
+  "notifications.page.description": "Deadlines, exam dates, roadmap tasks, essay reviews, and event updates land here as they come up.",
+  "notifications.page.markAllRead": "Mark all as read",
+  "notifications.page.loading": "Loading notifications…",
+  "notifications.page.loadError": "We could not load your notifications.",
+  "notifications.page.empty": "Nothing here yet.",
+  "notifications.page.open": "Open",
+  "notifications.page.markRead": "Mark read",
+  "notifications.page.archive": "Archive",
+
+  "notifications.statusFilter.all": "All",
+  "notifications.statusFilter.unread": "Unread",
+  "notifications.statusFilter.read": "Read",
+  "notifications.statusFilter.archived": "Archived",
+
+  "notifications.priority.low": "Low",
+  "notifications.priority.normal": "Normal",
+  "notifications.priority.high": "High",
+  "notifications.priority.urgent": "Urgent",
+
+  "notifications.preferences.title": "Notification preferences",
+  "notifications.preferences.loading": "Loading preferences…",
+  "notifications.preferences.deadlines": "Application deadlines",
+  "notifications.preferences.exams": "Exam dates",
+  "notifications.preferences.roadmap": "Roadmap tasks",
+  "notifications.preferences.recommendationsEssays": "Missing recommendations and essays",
+  "notifications.preferences.essayReviews": "Essay review results",
+  "notifications.preferences.events": "Event registrations and reminders",
+  "notifications.preferences.organizerEvents": "Organizer event approvals"
 } as const;

@@ -13,6 +13,8 @@ from django.utils.dateparse import parse_date
 from django.utils.text import slugify
 from rest_framework import serializers
 
+from services.notification_service.models import Notification
+from services.notification_service.services import create_notification
 from services.user_profile_service.services import ensure_profile_records
 
 from .models import (
@@ -434,6 +436,17 @@ def approve_event(*, event: Event, actor) -> Event:
         actor=actor,
         notification_type=EventNotification.NotificationType.EVENT_APPROVED,
     )
+    if locked_event.organizer_id:
+        create_notification(
+            user=locked_event.organizer,
+            notification_type=Notification.NotificationType.ORGANIZER_EVENT_APPROVED,
+            title=f'"{locked_event.title}" was approved',
+            message=f'"{locked_event.title}" is now published and open for registration.',
+            action_url=f"/organizer/events/{locked_event.slug}",
+            related_entity_type="event",
+            related_entity_id=locked_event.id,
+            dedup_key=f"organizer_event_approved:{locked_event.id}",
+        )
     return locked_event
 
 
@@ -469,6 +482,17 @@ def reject_event(*, event: Event, actor, reason: str) -> Event:
         notification_type=EventNotification.NotificationType.EVENT_REJECTED,
         payload={"reason": reason},
     )
+    if locked_event.organizer_id:
+        create_notification(
+            user=locked_event.organizer,
+            notification_type=Notification.NotificationType.ORGANIZER_EVENT_REJECTED,
+            title=f'"{locked_event.title}" was rejected',
+            message=reason,
+            action_url=f"/organizer/events/{locked_event.slug}",
+            related_entity_type="event",
+            related_entity_id=locked_event.id,
+            dedup_key=f"organizer_event_rejected:{locked_event.id}:{timezone.now().isoformat()}",
+        )
     return locked_event
 
 
@@ -623,6 +647,16 @@ def register_for_event(*, event: Event, user, answers=None) -> tuple[EventRegist
             registration=cancelled_registration,
             notification_type=EventNotification.NotificationType.REGISTRATION_CONFIRMED,
         )
+        create_notification(
+            user=user,
+            notification_type=Notification.NotificationType.EVENT_REGISTRATION_CONFIRMED,
+            title=f'Registration confirmed for "{locked_event.title}"',
+            message=f"You're registered for {locked_event.title} on {locked_event.starts_at:%B %d, %Y}.",
+            action_url=f"/events/{locked_event.slug}",
+            related_entity_type="event",
+            related_entity_id=locked_event.id,
+            dedup_key=f"event_registration_confirmed:{cancelled_registration.id}",
+        )
         return cancelled_registration, False
 
     registration = EventRegistration.objects.create(
@@ -641,6 +675,16 @@ def register_for_event(*, event: Event, user, answers=None) -> tuple[EventRegist
         recipient=user,
         registration=registration,
         notification_type=EventNotification.NotificationType.REGISTRATION_CONFIRMED,
+    )
+    create_notification(
+        user=user,
+        notification_type=Notification.NotificationType.EVENT_REGISTRATION_CONFIRMED,
+        title=f'Registration confirmed for "{locked_event.title}"',
+        message=f"You're registered for {locked_event.title} on {locked_event.starts_at.isoformat()}.",
+        action_url=f"/events/{locked_event.slug}",
+        related_entity_type="event",
+        related_entity_id=locked_event.id,
+        dedup_key=f"event_registration_confirmed:{registration.id}",
     )
     if locked_event.organizer_id:
         create_event_notification(
