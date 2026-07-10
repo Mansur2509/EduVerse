@@ -604,6 +604,13 @@ class AdminUniversityModerationActionView(GenericAPIView):
             resolved_by=request.user if is_terminal else None,
             resolved_at=timezone.now() if is_terminal else None,
         )
+        track_event(
+            user=request.user,
+            event_type=AnalyticsEvent.EventType.ADMIN_MODERATION_ACTION,
+            entity_type="university",
+            entity_id=university.id,
+            metadata={"status": data["status"]},
+        )
         return Response(
             UniversityModerationRecordSerializer(record).data, status=status.HTTP_201_CREATED
         )

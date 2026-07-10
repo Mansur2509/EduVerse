@@ -27,6 +27,9 @@ class AnalyticsEvent(models.Model):
         ESSAY_REVIEW_REQUESTED = "essay_review_requested", "Essay review requested"
         EVENT_REGISTERED = "event_registered", "Event registered"
         ORGANIZER_EVENT_CREATED = "organizer_event_created", "Organizer event created"
+        NOTIFICATION_READ = "notification_read", "Notification read"
+        NOTIFICATION_ARCHIVED = "notification_archived", "Notification archived"
+        ADMIN_MODERATION_ACTION = "admin_moderation_action", "Admin moderation action"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

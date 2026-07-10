@@ -3,6 +3,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from services.activity_service.models import AnalyticsEvent
+from services.activity_service.services import track_event
+
 from .models import Notification
 from .serializers import (
     NotificationPreferenceSerializer,
@@ -37,6 +40,17 @@ class NotificationStatusUpdateView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         notification.status = serializer.validated_data["status"]
         notification.save(update_fields=["status"])
+        event_type = (
+            AnalyticsEvent.EventType.NOTIFICATION_ARCHIVED
+            if notification.status == Notification.Status.ARCHIVED
+            else AnalyticsEvent.EventType.NOTIFICATION_READ
+        )
+        track_event(
+            user=request.user,
+            event_type=event_type,
+            entity_type="notification",
+            entity_id=notification.id,
+        )
         return Response(NotificationSerializer(notification).data)
 
 

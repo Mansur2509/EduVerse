@@ -2339,5 +2339,9 @@ export const ru = {
   "notifications.preferences.recommendationsEssays": "Недостающие рекомендации и эссе",
   "notifications.preferences.essayReviews": "Результаты проверки эссе",
   "notifications.preferences.events": "Регистрации на события и напоминания",
-  "notifications.preferences.organizerEvents": "Одобрения событий организатора"
+  "notifications.preferences.organizerEvents": "Одобрения событий организатора",
+
+  "analytics.eventType.notification_read": "Уведомление прочитано",
+  "analytics.eventType.notification_archived": "Уведомление отправлено в архив",
+  "analytics.eventType.admin_moderation_action": "Действие модерации администратора"
 } satisfies TranslationDictionary;

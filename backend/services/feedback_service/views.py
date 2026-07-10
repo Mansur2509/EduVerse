@@ -3,6 +3,8 @@ from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from common.permissions import IsAdminRole
+from services.activity_service.models import AnalyticsEvent
+from services.activity_service.services import track_event
 
 from .models import FeedbackReport, UserReport
 from .serializers import (
@@ -75,6 +77,13 @@ class AdminUserReportDetailView(generics.RetrieveUpdateAPIView):
         new_status = serializer.validated_data.get("status")
         terminal_statuses = {UserReport.Status.RESOLVED, UserReport.Status.DISMISSED}
         if new_status in terminal_statuses and self.get_object().status not in terminal_statuses:
-            serializer.save(resolved_at=timezone.now())
+            report = serializer.save(resolved_at=timezone.now())
         else:
-            serializer.save()
+            report = serializer.save()
+        track_event(
+            user=self.request.user,
+            event_type=AnalyticsEvent.EventType.ADMIN_MODERATION_ACTION,
+            entity_type="report",
+            entity_id=report.id,
+            metadata={"status": report.status},
+        )

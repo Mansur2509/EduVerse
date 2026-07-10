@@ -2341,5 +2341,9 @@ export const en = {
   "notifications.preferences.recommendationsEssays": "Missing recommendations and essays",
   "notifications.preferences.essayReviews": "Essay review results",
   "notifications.preferences.events": "Event registrations and reminders",
-  "notifications.preferences.organizerEvents": "Organizer event approvals"
+  "notifications.preferences.organizerEvents": "Organizer event approvals",
+
+  "analytics.eventType.notification_read": "Notification read",
+  "analytics.eventType.notification_archived": "Notification archived",
+  "analytics.eventType.admin_moderation_action": "Admin moderation action"
 } as const;

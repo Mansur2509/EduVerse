@@ -2339,5 +2339,9 @@ export const uzCyrl = {
   "notifications.preferences.recommendationsEssays": "Етишмаётган тавсиялар ва иншолар",
   "notifications.preferences.essayReviews": "Иншо текшируви натижалари",
   "notifications.preferences.events": "Тадбирларга рўйхатдан ўтиш ва эслатмалар",
-  "notifications.preferences.organizerEvents": "Ташкилотчи тадбирларини тасдиқлаш"
+  "notifications.preferences.organizerEvents": "Ташкилотчи тадбирларини тасдиқлаш",
+
+  "analytics.eventType.notification_read": "Билдиришнома ўқилди",
+  "analytics.eventType.notification_archived": "Билдиришнома архивланди",
+  "analytics.eventType.admin_moderation_action": "Администратор модерация амали"
 } satisfies TranslationDictionary;

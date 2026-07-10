@@ -2339,5 +2339,9 @@ export const uzLatn = {
   "notifications.preferences.recommendationsEssays": "Yetishmayotgan tavsiyalar va insholar",
   "notifications.preferences.essayReviews": "Insho tekshiruvi natijalari",
   "notifications.preferences.events": "Tadbirlarga ro’yxatdan o’tish va eslatmalar",
-  "notifications.preferences.organizerEvents": "Tashkilotchi tadbirlarini tasdiqlash"
+  "notifications.preferences.organizerEvents": "Tashkilotchi tadbirlarini tasdiqlash",
+
+  "analytics.eventType.notification_read": "Bildirishnoma o’qildi",
+  "analytics.eventType.notification_archived": "Bildirishnoma arxivlandi",
+  "analytics.eventType.admin_moderation_action": "Administrator moderatsiya amali"
 } satisfies TranslationDictionary;

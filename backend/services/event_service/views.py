@@ -735,4 +735,11 @@ class AdminOrganizerModerationActionView(generics.GenericAPIView):
                 "reviewed_at": timezone.now(),
             },
         )
+        track_event(
+            user=request.user,
+            event_type=AnalyticsEvent.EventType.ADMIN_MODERATION_ACTION,
+            entity_type="organizer",
+            entity_id=organizer.id,
+            metadata={"status": data["status"]},
+        )
         return Response(OrganizerModerationSerializer(organizer).data)
