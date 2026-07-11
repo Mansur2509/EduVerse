@@ -418,6 +418,7 @@ export type UniversityDeterministicFit = {
       | "below_benchmark"
       | "unknown";
     confidence: "low" | "medium" | "high";
+    benchmark_note: string;
     curriculum_type: string;
     curriculum_note:
       | "curriculum_type_unknown"

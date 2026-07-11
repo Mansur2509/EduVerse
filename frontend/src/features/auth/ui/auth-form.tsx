@@ -19,10 +19,10 @@ type AuthFormProps = {
   showModeLink?: boolean;
 };
 
-const DEMO_PASSWORD = "UniWay-Demo-842!";
+const DEMO_PASSWORD = "EduVerse-Demo-842!";
 const DEMO_ACCOUNTS = [
   {
-    email: "student.demo@uniway.local",
+    email: "student.demo@eduverse.local",
     labelKey: "auth.demo.student",
     role: "student"
   }

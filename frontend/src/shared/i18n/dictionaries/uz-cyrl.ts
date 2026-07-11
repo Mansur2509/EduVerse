@@ -1547,7 +1547,7 @@ export const uzCyrl = {
   "universities.requirements.help.addSat": "Жорий SAT балингизни бу мезон билан таққослаш учун қўшинг.",
   "universities.requirements.help.addIelts": "IELTS балингизни бу инглиз тили чегараси билан таққослаш учун қўшинг.",
   "universities.requirements.help.notVerified": "Университет қиймати ҳали тасдиқланмаган, шунинг учун UniWay ҳолатни тахмин қилмайди.",
-  "universities.requirements.help.gpaNotEnoughData": "Хом GPA мавжуд, лекин UniWay уни 4.0 шкаласида ишончли нормаллаштира олмайди.",
+  "universities.requirements.help.gpaNotEnoughData": "GPA ёки университет GPA мезони шкаласи ишончли таққослаш учун етарлича тасдиқланмаган.",
   "universities.requirements.help.gpaConverted": "GPA фақат таққослаш учун асл шкаладан ўтказилган.",
   "universities.requirements.help.satBelow": "SAT балингиз бу мезондан тахминан {{gap}} балл паст. Бу, айниқса танловли дастурларда, академик fitга таъсир қилади.",
   "universities.requirements.help.satOnTrack": "SAT балингиз бу таққослаш мезонига тенг ёки ундан юқори.",

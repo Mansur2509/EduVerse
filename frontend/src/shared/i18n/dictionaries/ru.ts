@@ -1547,7 +1547,7 @@ export const ru = {
   "universities.requirements.help.addSat": "Добавьте текущий SAT, чтобы сравнить его с этим ориентиром.",
   "universities.requirements.help.addIelts": "Добавьте IELTS, чтобы сравнить его с этим языковым порогом.",
   "universities.requirements.help.notVerified": "Значение университета пока не подтверждено, поэтому UniWay не делает вывод о статусе.",
-  "universities.requirements.help.gpaNotEnoughData": "Ваш исходный GPA указан, но UniWay не может уверенно нормализовать его для сравнения по шкале 4.0.",
+  "universities.requirements.help.gpaNotEnoughData": "Ваш GPA или шкала GPA университета недостаточно подтверждены для уверенного сравнения.",
   "universities.requirements.help.gpaConverted": "Ваш GPA переведён из исходной шкалы только для сравнения.",
   "universities.requirements.help.satBelow": "Ваш SAT примерно на {{gap}} баллов ниже этого ориентира. Это влияет на academic fit, особенно для селективных программ.",
   "universities.requirements.help.satOnTrack": "Ваш SAT соответствует ориентиру для этого сравнения или выше него.",

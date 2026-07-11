@@ -1005,6 +1005,84 @@ class FitAnalysisTests(APITestCase):
         self.assertNotIn("gpa_below_average", fit["risks"])
         self.assertNotIn("gpa_above_average", fit["strengths"])
 
+    def test_weighted_gpa_with_unknown_scale_does_not_normalize_above_100(self):
+        self.profile.gpa = "4.90"
+        self.profile.gpa_scale = "5.00"
+        self.profile.save()
+        university = create_university(
+            "mit-style-weighted-gpa-university",
+            acceptance_rate="8.00",
+            gpa_average="4.17",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertEqual(fit["academic_fit"]["status"], "unknown")
+        self.assertEqual(fit["academic_fit"]["confidence"], "low")
+        self.assertIsNone(fit["academic_fit"]["normalized_benchmark_percent"])
+        self.assertIn("scale is unrecorded", fit["academic_fit"]["benchmark_note"])
+        self.assertNotIn("gpa_below_average", fit["risks"])
+        self.assertNotIn("gpa_above_average", fit["strengths"])
+
+    def test_five_point_gpa_meets_ninety_percent_benchmark_with_declared_scale(self):
+        self.profile.gpa = "4.75"
+        self.profile.gpa_scale = "5.00"
+        self.profile.save()
+        university = create_university(
+            "ninety-percent-fit-university",
+            acceptance_rate="45.00",
+            gpa_average="90.00",
+            gpa_average_scale="100.00",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn(fit["academic_fit"]["status"], {"above_benchmark", "meets_benchmark"})
+        self.assertEqual(fit["academic_fit"]["normalized_student_gpa_percent"], 95.0)
+        self.assertEqual(fit["academic_fit"]["normalized_benchmark_percent"], 90.0)
+        self.assertLessEqual(fit["academic_fit"]["normalized_benchmark_percent"], 100.0)
+        self.assertNotIn("gpa_below_average", fit["risks"])
+
+    def test_high_five_point_gpa_above_eighty_eight_percent_declared_scale(self):
+        # Spec example: 4.9/5.0 (98%) vs an explicit 88/100 benchmark.
+        self.profile.gpa = "4.90"
+        self.profile.gpa_scale = "5.00"
+        self.profile.save()
+        university = create_university(
+            "eighty-eight-percent-fit-university-a",
+            acceptance_rate="45.00",
+            gpa_average="88.00",
+            gpa_average_scale="100.00",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn(fit["academic_fit"]["status"], {"above_benchmark", "meets_benchmark"})
+        self.assertEqual(fit["academic_fit"]["normalized_student_gpa_percent"], 98.0)
+        self.assertEqual(fit["academic_fit"]["normalized_benchmark_percent"], 88.0)
+        self.assertLessEqual(fit["academic_fit"]["normalized_benchmark_percent"], 100.0)
+        self.assertNotIn("gpa_below_average", fit["risks"])
+
+    def test_four_point_gpa_above_eighty_eight_percent_declared_scale(self):
+        # Spec example: 3.8/4.0 (95%) vs an explicit 88/100 benchmark.
+        self.profile.gpa = "3.80"
+        self.profile.gpa_scale = "4.00"
+        self.profile.save()
+        university = create_university(
+            "eighty-eight-percent-fit-university-b",
+            acceptance_rate="45.00",
+            gpa_average="88.00",
+            gpa_average_scale="100.00",
+        )
+
+        fit = calculate_university_fit(self.profile, university)
+
+        self.assertIn(fit["academic_fit"]["status"], {"above_benchmark", "meets_benchmark"})
+        self.assertEqual(fit["academic_fit"]["normalized_student_gpa_percent"], 95.0)
+        self.assertEqual(fit["academic_fit"]["normalized_benchmark_percent"], 88.0)
+        self.assertLessEqual(fit["academic_fit"]["normalized_benchmark_percent"], 100.0)
+        self.assertNotIn("gpa_below_average", fit["risks"])
+
     def test_fit_get_uses_cached_qualitative_scores_without_ai_call(self):
         from services.profile_assessment_service.models import AIProfileAssessment
 

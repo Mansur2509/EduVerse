@@ -1440,7 +1440,7 @@ export const en = {
   "universities.requirements.help.addSat": "Add your current SAT score to compare it with this benchmark.",
   "universities.requirements.help.addIelts": "Add your IELTS score to compare it with this English-language threshold.",
   "universities.requirements.help.notVerified": "This university value is not verified yet, so UniWay does not infer a status.",
-  "universities.requirements.help.gpaNotEnoughData": "Your raw GPA is present, but UniWay cannot normalize it confidently for a 4.0-scale comparison.",
+  "universities.requirements.help.gpaNotEnoughData": "Your GPA or the university GPA benchmark scale is not verified enough for a confident comparison.",
   "universities.requirements.help.gpaConverted": "Your GPA is converted from its original scale for comparison only.",
   "universities.requirements.help.satBelow": "Your SAT is about {{gap}} points below this benchmark. This affects academic fit, especially for selective programs.",
   "universities.requirements.help.satOnTrack": "Your SAT meets or exceeds the benchmark used for this comparison.",

@@ -24,12 +24,11 @@ from services.user_profile_service.academic_normalization import (
     AcademicNormalizationResult,
 )
 
-# Below this, an unlabeled gpa_average is assumed to already be on a 4.0
-# scale -- matches the known 72-column importer's clamp (0-4.50) covering the
-# overwhelming majority of existing data. Above it, the scale is genuinely
-# unknown and must not be guessed: comparing an unlabeled "88" against a
-# 4.0-scale student GPA is exactly the bug this module exists to fix.
-_UNLABELED_FOUR_POINT_CEILING = Decimal("4.5")
+# Only values at or below 4.0 can be conservatively treated as already being
+# on a 4.0 scale when no explicit scale is recorded. Weighted GPAs such as
+# 4.17 with a null scale are ambiguous and must not become impossible
+# percentages like 104.25%.
+_UNLABELED_FOUR_POINT_CEILING = Decimal("4.0")
 
 BENCHMARK_STATUS_MEETS = "meets_benchmark"
 BENCHMARK_STATUS_ABOVE = "above_benchmark"
@@ -133,6 +132,7 @@ def compare_academic_benchmark(
             "normalized_benchmark_percent": _as_float(benchmark_percent),
             "status": BENCHMARK_STATUS_UNKNOWN,
             "confidence": CONFIDENCE_LOW,
+            "benchmark_note": university.note,
         }
 
     diff = student_percent - benchmark_percent
@@ -150,6 +150,7 @@ def compare_academic_benchmark(
         "normalized_benchmark_percent": _as_float(benchmark_percent),
         "status": status,
         "confidence": _weaker_confidence(student.confidence, university.confidence),
+        "benchmark_note": university.note,
     }
 
 

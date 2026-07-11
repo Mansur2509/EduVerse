@@ -1547,7 +1547,7 @@ export const uzLatn = {
   "universities.requirements.help.addSat": "Joriy SAT balingizni bu mezon bilan taqqoslash uchun qo'shing.",
   "universities.requirements.help.addIelts": "IELTS balingizni bu ingliz tili chegarasi bilan taqqoslash uchun qo'shing.",
   "universities.requirements.help.notVerified": "Universitet qiymati hali tasdiqlanmagan, shuning uchun UniWay holatni taxmin qilmaydi.",
-  "universities.requirements.help.gpaNotEnoughData": "Xom GPA mavjud, lekin UniWay uni 4.0 shkalasida ishonchli normallashtira olmaydi.",
+  "universities.requirements.help.gpaNotEnoughData": "GPA yoki universitet GPA mezoni shkalasi ishonchli taqqoslash uchun yetarlicha tasdiqlanmagan.",
   "universities.requirements.help.gpaConverted": "GPA faqat taqqoslash uchun asl shkaladan o'tkazilgan.",
   "universities.requirements.help.satBelow": "SAT balingiz bu mezondan taxminan {{gap}} ball past. Bu, ayniqsa tanlovli dasturlarda, akademik fitga ta'sir qiladi.",
   "universities.requirements.help.satOnTrack": "SAT balingiz bu taqqoslash mezoniga teng yoki undan yuqori.",
