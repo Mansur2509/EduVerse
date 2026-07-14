@@ -28,7 +28,7 @@ function AcademicBrand() {
     <section className="flex min-h-[18rem] flex-col justify-between border-b border-white/15 bg-navy px-6 py-8 text-navy-foreground lg:min-h-screen lg:border-b-0 lg:border-r lg:px-12 lg:py-12">
       <div className="flex items-center gap-3">
         <span className="grid size-11 place-items-center rounded-sm border border-white/25 bg-primary font-serif text-2xl font-bold">
-          E
+          U
         </span>
         <div>
           <p className="font-serif text-2xl font-semibold tracking-tight">UniWay</p>
@@ -90,7 +90,7 @@ function FullScreenStatus({
     <main className="grid min-h-screen place-items-center bg-background px-6">
       <div className="w-full max-w-lg border border-border bg-card p-8 text-center shadow-card">
         <span className="mx-auto grid size-12 place-items-center rounded-sm bg-navy font-serif text-2xl font-bold text-navy-foreground">
-          E
+          U
         </span>
         <h1 className="mt-5 font-serif text-2xl font-semibold">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>

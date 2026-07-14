@@ -13,6 +13,7 @@ import {
 } from "@/features/notifications";
 import { useI18n } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/date-time";
+import { AppIcon } from "@/shared/ui/icon";
 
 const DROPDOWN_ITEM_LIMIT = 8;
 
@@ -99,12 +100,15 @@ export function NotificationBell() {
   return (
     <div className="relative" ref={containerRef}>
       <button
+        aria-controls="notification-bell-panel"
+        aria-expanded={isOpen}
         aria-label={t("notifications.bell.ariaLabel")}
-        className="relative grid size-9 place-items-center rounded-sm border text-muted-foreground transition-colors hover:border-primary/35 hover:text-foreground"
+        className="relative grid size-10 place-items-center rounded-sm border text-muted-foreground transition-colors hover:border-primary/35 hover:text-foreground"
         onClick={toggleOpen}
+        title={t("notifications.bell.ariaLabel")}
         type="button"
       >
-        <Bell aria-hidden className="size-4" />
+        <AppIcon icon={Bell} />
         {unreadCount > 0 ? (
           <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-danger text-[0.6rem] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -113,7 +117,10 @@ export function NotificationBell() {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-full z-40 mt-2 w-80 max-w-[90vw] rounded-sm border bg-card shadow-card">
+        <div
+          className="absolute right-0 top-full z-40 mt-2 w-80 max-w-[90vw] rounded-sm border bg-card shadow-card"
+          id="notification-bell-panel"
+        >
           <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
               {t("notifications.bell.title")}

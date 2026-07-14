@@ -1,6 +1,18 @@
 "use client";
 
 import {
+  Award,
+  Dumbbell,
+  FilePenLine,
+  FlaskConical,
+  FolderKanban,
+  HeartHandshake,
+  Medal,
+  MessagesSquare,
+  Users,
+  type LucideIcon
+} from "lucide-react";
+import {
   type FormEvent,
   type ReactNode,
   useCallback,
@@ -73,6 +85,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
+import { AppIcon } from "@/shared/ui/icon";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 type ProfileFormState = {
@@ -825,16 +838,52 @@ export function ProfileScreen() {
     id: string;
     title: TranslationKey;
     count: number;
+    icon: LucideIcon;
   }> = [
-    { id: "profile-section-activities", title: "profile.sections.activities", count: activities.length },
-    { id: "profile-section-honors", title: "profile.sections.honors", count: honors.length },
-    { id: "profile-section-olympiads", title: "profile.sections.olympiads", count: olympiads.length },
-    { id: "profile-section-sports", title: "profile.sections.sports", count: sports.length },
-    { id: "profile-section-research", title: "profile.sections.research", count: research.length },
-    { id: "profile-section-volunteering", title: "profile.sections.volunteering", count: volunteering.length },
-    { id: "profile-section-recommenders", title: "profile.sections.recommenders", count: recommenders.length },
-    { id: "profile-section-essays", title: "profile.sections.essays", count: essays.length },
-    { id: "profile-section-portfolio", title: "profile.sections.portfolio", count: portfolio.length }
+    {
+      id: "profile-section-activities",
+      title: "profile.sections.activities",
+      count: activities.length,
+      icon: Users
+    },
+    { id: "profile-section-honors", title: "profile.sections.honors", count: honors.length, icon: Award },
+    {
+      id: "profile-section-olympiads",
+      title: "profile.sections.olympiads",
+      count: olympiads.length,
+      icon: Medal
+    },
+    { id: "profile-section-sports", title: "profile.sections.sports", count: sports.length, icon: Dumbbell },
+    {
+      id: "profile-section-research",
+      title: "profile.sections.research",
+      count: research.length,
+      icon: FlaskConical
+    },
+    {
+      id: "profile-section-volunteering",
+      title: "profile.sections.volunteering",
+      count: volunteering.length,
+      icon: HeartHandshake
+    },
+    {
+      id: "profile-section-recommenders",
+      title: "profile.sections.recommenders",
+      count: recommenders.length,
+      icon: MessagesSquare
+    },
+    {
+      id: "profile-section-essays",
+      title: "profile.sections.essays",
+      count: essays.length,
+      icon: FilePenLine
+    },
+    {
+      id: "profile-section-portfolio",
+      title: "profile.sections.portfolio",
+      count: portfolio.length,
+      icon: FolderKanban
+    }
   ];
 
   const sectionStatusLabel = (count: number) =>
@@ -914,7 +963,10 @@ export function ProfileScreen() {
               href={`#${section.id}`}
               key={section.id}
             >
-              <span className="font-semibold">{t(section.title)}</span>
+              <span className="flex min-w-0 items-center gap-2 font-semibold">
+                <AppIcon className="text-muted-foreground" icon={section.icon} />
+                <span className="truncate">{t(section.title)}</span>
+              </span>
               <span className="flex shrink-0 items-center gap-1.5">
                 <span className="text-muted-foreground">
                   {t("profile.navigation.itemCount", { count: section.count })}

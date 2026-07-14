@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, History, ShieldCheck, XCircle } from "lucide-react";
+import { Archive, ExternalLink, History, ShieldCheck, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -247,6 +247,7 @@ export function EventModerationScreen() {
                       type="button"
                       variant="ghost"
                     >
+                      <Archive aria-hidden className="mr-2 size-4" />
                       {t("moderation.archive")}
                     </Button>
                     <Button

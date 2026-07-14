@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/shared/lib/cn";
+
+import { AppIcon } from "./icon";
 
 type SectionTab = {
   href: string;
   label: string;
+  icon?: LucideIcon;
 };
 
 export function SectionTabs({ ariaLabel, items }: { ariaLabel: string; items: SectionTab[] }) {
@@ -20,7 +24,7 @@ export function SectionTabs({ ariaLabel, items }: { ariaLabel: string; items: Se
         return (
           <Link
             className={cn(
-              "inline-flex min-h-9 items-center rounded-sm border px-3 text-xs font-semibold transition-colors duration-fast ease-academic",
+              "inline-flex min-h-9 items-center gap-2 rounded-sm border px-3 text-xs font-semibold transition-colors duration-fast ease-academic",
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
                 : "bg-surface text-muted-foreground hover:border-navy/35 hover:text-foreground"
@@ -28,6 +32,7 @@ export function SectionTabs({ ariaLabel, items }: { ariaLabel: string; items: Se
             href={item.href}
             key={item.href}
           >
+            {item.icon ? <AppIcon icon={item.icon} size="xs" /> : null}
             {item.label}
           </Link>
         );

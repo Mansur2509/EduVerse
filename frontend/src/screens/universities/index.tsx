@@ -1,6 +1,6 @@
 "use client";
 
-import { Scale, Search, Star } from "lucide-react";
+import { GraduationCap, Scale, Search, Sparkles, Star, Target, Waypoints } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
@@ -240,9 +240,18 @@ export function UniversitiesScreen() {
       <SectionTabs
         ariaLabel={t("universities.tabs.ariaLabel")}
         items={[
-          { href: "/universities", label: t("universities.tabs.browse") },
-          { href: "/recommendations", label: t("universities.tabs.recommendations") },
-          { href: "/strategy", label: t("universities.tabs.strategy") }
+          { href: "/universities", icon: GraduationCap, label: t("universities.tabs.browse") },
+          {
+            href: "/recommendations",
+            icon: Sparkles,
+            label: t("universities.tabs.recommendations")
+          },
+          { href: "/strategy", icon: Waypoints, label: t("universities.tabs.strategy") },
+          {
+            href: "/prospective-universities",
+            icon: Target,
+            label: t("universities.tabs.prospective")
+          }
         ]}
       />
 

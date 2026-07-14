@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { DoorOpen, Save, X } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
+import { AppIcon } from "@/shared/ui/icon";
 
 export function UnsavedChangesDialog({
   open,
@@ -58,6 +60,7 @@ export function UnsavedChangesDialog({
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button disabled={isSaving} onClick={onStay} type="button" variant="ghost">
+            <AppIcon className="mr-2" icon={X} />
             {stayLabel}
           </Button>
           <Button
@@ -66,9 +69,11 @@ export function UnsavedChangesDialog({
             type="button"
             variant="secondary"
           >
+            <AppIcon className="mr-2" icon={DoorOpen} />
             {leaveWithoutSavingLabel}
           </Button>
           <Button disabled={isSaving} onClick={() => void handleSaveAndLeave()} type="button">
+            <AppIcon className="mr-2" icon={Save} />
             {saveAndLeaveLabel}
           </Button>
         </div>

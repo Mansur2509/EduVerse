@@ -2,13 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  CircleAlert,
+  Eye,
+  EyeOff,
+  LoaderCircle,
+  LockKeyhole,
+  LogIn,
+  Mail,
+  UserPlus,
+  UserRound
+} from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 
 import { ApiError, getApiErrorMessage } from "@/shared/api/client";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { GoogleIcon } from "@/shared/ui/google-icon";
+import { AppIcon } from "@/shared/ui/icon";
+import { IconButton } from "@/shared/ui/icon-button";
 
 import { useAuth } from "../model/auth-context";
 import { getGoogleOAuthStartUrl } from "../api/auth-api";
@@ -42,7 +57,13 @@ export function AuthForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [oauthNotice, setOauthNotice] = useState<{
+    message: string;
+    tone: "info" | "warning" | "error";
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingDemoRole, setPendingDemoRole] = useState<string | null>(null);
   const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
@@ -51,22 +72,28 @@ export function AuthForm({
   useEffect(() => {
     setPassword("");
     setPasswordConfirm("");
+    setShowPassword(false);
+    setShowPasswordConfirm(false);
     setError(null);
+    setOauthNotice(null);
   }, [mode]);
 
   useEffect(() => {
     const oauthStatus = new URLSearchParams(window.location.search).get("oauth");
-    const messageKeyByStatus: Record<string, TranslationKey> = {
-      cancelled: "auth.google.cancelled",
-      unavailable: "auth.google.unavailable",
-      invalid: "auth.google.invalid",
-      conflict: "auth.google.conflict",
-      blocked: "auth.google.blocked",
-      failed: "auth.google.failed"
+    const messageByStatus: Record<
+      string,
+      { key: TranslationKey; tone: "info" | "warning" | "error" }
+    > = {
+      cancelled: { key: "auth.google.cancelled", tone: "info" },
+      unavailable: { key: "auth.google.unavailable", tone: "warning" },
+      invalid: { key: "auth.google.invalid", tone: "error" },
+      conflict: { key: "auth.google.conflict", tone: "error" },
+      blocked: { key: "auth.google.blocked", tone: "error" },
+      failed: { key: "auth.google.failed", tone: "error" }
     };
-    const key = oauthStatus ? messageKeyByStatus[oauthStatus] : undefined;
-    if (key) {
-      setError(t(key));
+    const notice = oauthStatus ? messageByStatus[oauthStatus] : undefined;
+    if (notice) {
+      setOauthNotice({ message: t(notice.key), tone: notice.tone });
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [t]);
@@ -113,6 +140,7 @@ export function AuthForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setOauthNotice(null);
 
     // Validate form before submission
     if (!email) {
@@ -165,6 +193,7 @@ export function AuthForm({
     setPassword(DEMO_PASSWORD);
     setPasswordConfirm("");
     setError(null);
+    setOauthNotice(null);
     setPendingDemoRole(account.role);
     setIsSubmitting(true);
 
@@ -182,6 +211,7 @@ export function AuthForm({
   function handleGoogleLogin() {
     if (isSubmitting || isGoogleRedirecting) return;
     setError(null);
+    setOauthNotice(null);
     setIsGoogleRedirecting(true);
     try {
       window.location.assign(getGoogleOAuthStartUrl());
@@ -208,82 +238,130 @@ export function AuthForm({
         </p>
       ) : null}
 
+      {oauthNotice ? (
+        <div
+          className={cn(
+            "mt-5 flex items-start gap-2 rounded-sm border p-3 text-sm",
+            oauthNotice.tone === "info" && "border-accent/35 bg-accent/10 text-foreground",
+            oauthNotice.tone === "warning" && "border-warning/35 bg-warning/10 text-warning",
+            oauthNotice.tone === "error" && "border-danger/35 bg-danger/10 text-danger"
+          )}
+          role={oauthNotice.tone === "error" ? "alert" : "status"}
+        >
+          <AppIcon className="mt-0.5" icon={CircleAlert} />
+          <span>{oauthNotice.message}</span>
+        </div>
+      ) : null}
+
       <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
         {isRegister ? (
           <label className="block text-sm font-semibold">
             {t("auth.fullName")}
-            <input
-              autoComplete="name"
-              className={fieldClassName}
-              maxLength={180}
-              onChange={(event) => setFullName(event.target.value)}
-              required
-              type="text"
-              value={fullName}
-            />
+            <span className="relative block">
+              <AppIcon className="absolute bottom-3 left-3 text-muted-foreground" icon={UserRound} />
+              <input
+                autoComplete="name"
+                className={cn(fieldClassName, "pl-10")}
+                maxLength={180}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+                type="text"
+                value={fullName}
+              />
+            </span>
           </label>
         ) : null}
 
         <label className="block text-sm font-semibold">
           {t("auth.email")}
-          <input
-            autoComplete="email"
-            className={fieldClassName}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            type="email"
-            value={email}
-          />
+          <span className="relative block">
+            <AppIcon className="absolute bottom-3 left-3 text-muted-foreground" icon={Mail} />
+            <input
+              autoComplete="email"
+              className={cn(fieldClassName, "pl-10")}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              type="email"
+              value={email}
+            />
+          </span>
         </label>
 
-        <label className="block text-sm font-semibold">
-          {t("auth.password")}
-          <input
-            autoComplete={isRegister ? "new-password" : "current-password"}
-            className={fieldClassName}
-            minLength={8}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            type="password"
-            value={password}
-          />
+        <div>
+          <label className="block text-sm font-semibold" htmlFor="auth-password">
+            {t("auth.password")}
+          </label>
+          <span className="relative block">
+            <AppIcon className="absolute bottom-3 left-3 text-muted-foreground" icon={LockKeyhole} />
+            <input
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              className={cn(fieldClassName, "pl-10 pr-11")}
+              id="auth-password"
+              minLength={8}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              type={showPassword ? "text" : "password"}
+              value={password}
+            />
+            <IconButton
+              className="absolute bottom-0 right-0 size-10 min-h-10"
+              label={t(showPassword ? "auth.hidePassword" : "auth.showPassword")}
+              onClick={() => setShowPassword((current) => !current)}
+            >
+              <AppIcon icon={showPassword ? EyeOff : Eye} />
+            </IconButton>
+          </span>
           {isRegister ? (
             <span className="mt-1.5 block text-xs font-normal leading-5 text-muted-foreground">
               {t("auth.passwordHelp")}
             </span>
           ) : null}
-        </label>
+        </div>
 
         {isRegister ? (
-          <label className="block text-sm font-semibold">
-            {t("auth.confirmPassword")}
-            <input
-              autoComplete="new-password"
-              className={fieldClassName}
-              minLength={8}
-              onChange={(event) => setPasswordConfirm(event.target.value)}
-              required
-              type="password"
-              value={passwordConfirm}
-            />
-          </label>
+          <div>
+            <label className="block text-sm font-semibold" htmlFor="auth-password-confirm">
+              {t("auth.confirmPassword")}
+            </label>
+            <span className="relative block">
+              <AppIcon className="absolute bottom-3 left-3 text-muted-foreground" icon={LockKeyhole} />
+              <input
+                autoComplete="new-password"
+                className={cn(fieldClassName, "pl-10 pr-11")}
+                id="auth-password-confirm"
+                minLength={8}
+                onChange={(event) => setPasswordConfirm(event.target.value)}
+                required
+                type={showPasswordConfirm ? "text" : "password"}
+                value={passwordConfirm}
+              />
+              <IconButton
+                className="absolute bottom-0 right-0 size-10 min-h-10"
+                label={t(showPasswordConfirm ? "auth.hidePassword" : "auth.showPassword")}
+                onClick={() => setShowPasswordConfirm((current) => !current)}
+              >
+                <AppIcon icon={showPasswordConfirm ? EyeOff : Eye} />
+              </IconButton>
+            </span>
+          </div>
         ) : null}
 
         {error ? (
           <p
-            className="rounded-sm border border-danger/35 bg-danger/10 p-3 text-sm text-danger"
+            className="flex items-start gap-2 rounded-sm border border-danger/35 bg-danger/10 p-3 text-sm text-danger"
             role="alert"
           >
-            {error}
+            <AppIcon className="mt-0.5" icon={CircleAlert} />
+            <span>{error}</span>
           </p>
         ) : null}
 
         <Button className="w-full" disabled={isSubmitting} type="submit">
-          {isSubmitting
-            ? t("auth.pleaseWait")
-            : isRegister
-              ? t("auth.createAccount")
-              : t("auth.signIn")}
+          <AppIcon
+            className={cn("mr-2", isSubmitting && "animate-spin motion-reduce:animate-none")}
+            icon={isSubmitting ? LoaderCircle : isRegister ? UserPlus : LogIn}
+          />
+          {isSubmitting ? t("auth.pleaseWait") : isRegister ? t("auth.createAccount") : t("auth.signIn")}
         </Button>
       </form>
 
@@ -296,13 +374,19 @@ export function AuthForm({
       </div>
 
       <Button
+        aria-label={t("auth.google.continue")}
         className="w-full"
         disabled={isSubmitting || isGoogleRedirecting}
         onClick={handleGoogleLogin}
         type="button"
         variant="secondary"
       >
-        {isGoogleRedirecting ? t("auth.google.redirecting") : t("auth.google.continue")}
+        {isGoogleRedirecting ? (
+          <AppIcon className="mr-2 animate-spin motion-reduce:animate-none" icon={LoaderCircle} />
+        ) : (
+          <GoogleIcon className="mr-2" />
+        )}
+        <span>{isGoogleRedirecting ? t("auth.google.redirecting") : t("auth.google.continue")}</span>
       </Button>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">
         {t("auth.google.securityNote")}
@@ -325,6 +409,13 @@ export function AuthForm({
               type="button"
               variant="secondary"
             >
+              <AppIcon
+                className={cn(
+                  "mr-2",
+                  pendingDemoRole === account.role && "animate-spin motion-reduce:animate-none"
+                )}
+                icon={pendingDemoRole === account.role ? LoaderCircle : UserRound}
+              />
               {pendingDemoRole === account.role ? t("auth.pleaseWait") : t(account.labelKey)}
             </Button>
           ))}

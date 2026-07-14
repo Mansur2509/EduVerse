@@ -1,9 +1,12 @@
 "use client";
 
+import { LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
+
 import { useI18n } from "@/shared/i18n";
 
 import { Button } from "./button";
 import { Card } from "./card";
+import { AppIcon } from "./icon";
 
 /**
  * Generic "something failed, here's a retry button" state (PERFORMANCE-011
@@ -29,7 +32,8 @@ export function RetryNotice({
   const { t } = useI18n();
   const content = (
     <>
-      <p className="text-sm text-muted-foreground" role="alert">
+      <p className="flex items-start gap-2 text-sm text-muted-foreground" role="alert">
+        <AppIcon className="mt-0.5 text-danger" icon={TriangleAlert} />
         {message ?? t("common.somethingWentWrong")}
       </p>
       <Button
@@ -40,6 +44,10 @@ export function RetryNotice({
         type="button"
         variant="secondary"
       >
+        <AppIcon
+          className={isRetrying ? "mr-2 animate-spin motion-reduce:animate-none" : "mr-2"}
+          icon={isRetrying ? LoaderCircle : RefreshCw}
+        />
         {isRetrying ? t("common.retrying") : t("common.retry")}
       </Button>
     </>

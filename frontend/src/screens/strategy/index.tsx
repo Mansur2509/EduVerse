@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GraduationCap, Sparkles, Target, Waypoints } from "lucide-react";
 
 import type { RecommendationCategory } from "@/entities/recommendation";
 import type { ApplicationStrategyResponse, StrategySchool } from "@/entities/strategy";
@@ -136,9 +137,18 @@ export function StrategyScreen() {
       <SectionTabs
         ariaLabel={t("universities.tabs.ariaLabel")}
         items={[
-          { href: "/universities", label: t("universities.tabs.browse") },
-          { href: "/recommendations", label: t("universities.tabs.recommendations") },
-          { href: "/strategy", label: t("universities.tabs.strategy") }
+          { href: "/universities", icon: GraduationCap, label: t("universities.tabs.browse") },
+          {
+            href: "/recommendations",
+            icon: Sparkles,
+            label: t("universities.tabs.recommendations")
+          },
+          { href: "/strategy", icon: Waypoints, label: t("universities.tabs.strategy") },
+          {
+            href: "/prospective-universities",
+            icon: Target,
+            label: t("universities.tabs.prospective")
+          }
         ]}
       />
 

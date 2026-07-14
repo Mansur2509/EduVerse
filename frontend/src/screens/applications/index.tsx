@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Plus } from "lucide-react";
+import { ClipboardList, ExternalLink, Plus, Route, Target } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -85,6 +85,7 @@ const ROUND_OPTIONS = [
   "early_decision",
   "early_action",
   "restrictive_early_action",
+  "single_choice_early_action",
   "regular_decision",
   "rolling",
   "scholarship",
@@ -465,8 +466,13 @@ export function ApplicationsScreen() {
       <SectionTabs
         ariaLabel={t("applications.tabs.ariaLabel")}
         items={[
-          { href: "/applications", label: t("applications.tabs.mine") },
-          { href: "/strategy", label: t("applications.tabs.strategy") }
+          { href: "/applications", icon: ClipboardList, label: t("applications.tabs.mine") },
+          {
+            href: "/prospective-universities",
+            icon: Target,
+            label: t("applications.tabs.targets")
+          },
+          { href: "/strategy", icon: Route, label: t("applications.tabs.strategy") }
         ]}
       />
 

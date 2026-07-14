@@ -1,9 +1,12 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
+
 import { useI18n } from "@/shared/i18n";
 import { useSlowLoad } from "@/shared/lib/use-slow-load";
 
 import { Card } from "./card";
+import { AppIcon } from "./icon";
 
 /**
  * Standard loading card. While mounted (i.e. while the caller is loading) it
@@ -17,7 +20,10 @@ export function LoadingNotice({ message }: { message: string }) {
 
   return (
     <Card>
-      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+        <AppIcon className="animate-spin motion-reduce:animate-none" icon={LoaderCircle} />
+        {message}
+      </p>
       {isSlow ? (
         <p className="mt-2 text-xs leading-5 text-muted-foreground" role="status">
           {t("common.wakingUp")}

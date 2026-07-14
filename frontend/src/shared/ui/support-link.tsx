@@ -10,6 +10,8 @@ import { cn } from "@/shared/lib/cn";
 
 import { Button } from "./button";
 import { fieldClassName } from "./field";
+import { AppIcon } from "./icon";
+import { IconButton } from "./icon-button";
 
 export const SUPPORT_URL = "https://t.me/Otvet_mne_uje_nakonec";
 const FEEDBACK_STORAGE_KEY = "uniway.feedback.local.v1";
@@ -133,7 +135,7 @@ export function SupportLink({ className }: { className?: string }) {
         onClick={openDialog}
         type="button"
       >
-        <MessageCircle aria-hidden className="size-4" />
+        <AppIcon icon={MessageCircle} />
         <span className="hidden sm:inline">{t("support.link")}</span>
       </button>
 
@@ -157,14 +159,13 @@ export function SupportLink({ className }: { className?: string }) {
                   {t("support.requiredLegend")}
                 </p>
               </div>
-              <button
-                aria-label={t("support.close")}
-                className="rounded-sm p-1 text-muted-foreground hover:bg-elevated hover:text-foreground"
+              <IconButton
+                className="size-10 min-h-10"
+                label={t("support.close")}
                 onClick={closeDialog}
-                type="button"
               >
-                <X aria-hidden className="size-4" />
-              </button>
+                <AppIcon icon={X} />
+              </IconButton>
             </div>
 
             <form className="mt-4 space-y-3" onSubmit={handleSubmit}>

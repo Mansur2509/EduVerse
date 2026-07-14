@@ -8,6 +8,8 @@ import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
+import { AppIcon } from "@/shared/ui/icon";
+import { IconButton } from "@/shared/ui/icon-button";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 
 export type ProfileItemField = {
@@ -198,21 +200,22 @@ export function ProfileItemSection<T extends { id: number }>({
             >
               <div className="min-w-0 flex-1">{itemDisplay(item)}</div>
               <div className="flex shrink-0 gap-1">
-                <button
+                <Button
+                  className="min-h-10"
                   onClick={() => handleEdit(item)}
-                  className="rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-elevated hover:text-foreground"
+                  size="sm"
                   type="button"
+                  variant="ghost"
                 >
                   {t("profile.sections.edit")}
-                </button>
-                <button
-                  aria-label={t("profile.sections.delete")}
+                </Button>
+                <IconButton
+                  className="size-10 min-h-10 text-danger hover:bg-danger/10 hover:text-danger"
+                  label={t("profile.sections.delete")}
                   onClick={() => setDeleteConfirm(item.id)}
-                  className="rounded px-2 py-1 text-xs font-medium text-danger hover:bg-danger/10"
-                  type="button"
                 >
-                  <Trash2 aria-hidden className="size-3" />
-                </button>
+                  <AppIcon icon={Trash2} />
+                </IconButton>
               </div>
             </div>
           ))}

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useI18n } from "@/shared/i18n";
 import { cn } from "@/shared/lib/cn";
 import type { NavigationItem } from "@/shared/types/navigation";
+import { AppIcon } from "@/shared/ui/icon";
 
 export function NavLink({
   item,
@@ -43,7 +44,7 @@ export function NavLink({
       )}
       href={item.href}
     >
-      <Icon aria-hidden className="size-4 shrink-0" />
+      <AppIcon icon={Icon} />
       <span>{t(item.labelKey)}</span>
     </Link>
   );

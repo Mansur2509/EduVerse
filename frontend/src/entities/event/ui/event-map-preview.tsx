@@ -45,7 +45,7 @@ export function EventMapPreview({ events }: { events: EventDetails[] }) {
           {mappedEvents.slice(0, 18).map(({ event, left, top }) => (
             <Link
               aria-label={event.title}
-              className="group absolute z-10 -translate-x-1/2 -translate-y-1/2"
+              className="group absolute z-10 grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
               href={`/events/${event.slug}`}
               key={event.id}
               style={{ left: `${left}%`, top: `${top}%` }}
