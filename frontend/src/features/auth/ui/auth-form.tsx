@@ -26,7 +26,7 @@ import { AppIcon } from "@/shared/ui/icon";
 import { IconButton } from "@/shared/ui/icon-button";
 
 import { useAuth } from "../model/auth-context";
-import { getGoogleOAuthStartUrl } from "../api/auth-api";
+import { getAuthConfigRequest, getGoogleOAuthStartUrl } from "../api/auth-api";
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -67,7 +67,25 @@ export function AuthForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingDemoRole, setPendingDemoRole] = useState<string | null>(null);
   const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
+  const [isGoogleOAuthEnabled, setIsGoogleOAuthEnabled] = useState(false);
   const isRegister = mode === "register";
+
+  useEffect(() => {
+    let cancelled = false;
+    getAuthConfigRequest()
+      .then((config) => {
+        if (!cancelled) {
+          setIsGoogleOAuthEnabled(config.google_oauth_enabled);
+        }
+      })
+      .catch(() => {
+        // Fail closed: treat an unreachable config endpoint the same as
+        // "not configured" rather than showing a button that cannot work.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setPassword("");
@@ -374,9 +392,10 @@ export function AuthForm({
       </div>
 
       <Button
+        aria-describedby={isGoogleOAuthEnabled ? undefined : "google-oauth-unavailable-note"}
         aria-label={t("auth.google.continue")}
         className="w-full"
-        disabled={isSubmitting || isGoogleRedirecting}
+        disabled={!isGoogleOAuthEnabled || isSubmitting || isGoogleRedirecting}
         onClick={handleGoogleLogin}
         type="button"
         variant="secondary"
@@ -388,8 +407,8 @@ export function AuthForm({
         )}
         <span>{isGoogleRedirecting ? t("auth.google.redirecting") : t("auth.google.continue")}</span>
       </Button>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">
-        {t("auth.google.securityNote")}
+      <p className="mt-2 text-xs leading-5 text-muted-foreground" id="google-oauth-unavailable-note">
+        {isGoogleOAuthEnabled ? t("auth.google.securityNote") : t("auth.google.unavailable")}
       </p>
 
       <div className="mt-5 border-t pt-5">

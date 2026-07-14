@@ -280,3 +280,18 @@ class GoogleOAuthDisabledTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_302_FOUND)
         self.assertEqual(response["Location"], "https://frontend.test/login?oauth=unavailable")
         self.assertNotIn("attacker.example", response["Location"])
+
+    def test_config_endpoint_reports_disabled_without_requiring_auth(self):
+        response = self.client.get("/api/auth/config/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"google_oauth_enabled": False})
+
+
+@override_settings(**OAUTH_SETTINGS)
+class GoogleOAuthConfigEnabledTests(APITestCase):
+    def test_config_endpoint_reports_enabled(self):
+        response = self.client.get("/api/auth/config/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"google_oauth_enabled": True})

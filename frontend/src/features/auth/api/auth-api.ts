@@ -49,3 +49,10 @@ export function updateCurrentUserRequest(input: UpdateCurrentUserInput) {
 export function getGoogleOAuthStartUrl() {
   return `${env.authApiBaseUrl}/google/start/`;
 }
+
+export function getAuthConfigRequest() {
+  return apiRequest<{ google_oauth_enabled: boolean }>("/config/", {
+    base: "auth",
+    auth: false
+  });
+}

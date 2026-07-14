@@ -90,6 +90,14 @@ class LogoutView(APIView):
         return response
 
 
+class AuthConfigView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        return Response({"google_oauth_enabled": settings.GOOGLE_OAUTH_ENABLED})
+
+
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
