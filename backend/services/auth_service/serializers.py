@@ -54,6 +54,7 @@ class CurrentUserSerializer(serializers.Serializer):
     email = serializers.EmailField(read_only=True)
     full_name = serializers.CharField(required=False, allow_blank=True, max_length=180)
     role = serializers.CharField(read_only=True)
+    google_linked = serializers.BooleanField(read_only=True)
     profile = ProfileBasicSerializer(required=False)
     subscription = SubscriptionBasicSerializer(read_only=True)
 
@@ -70,6 +71,7 @@ class CurrentUserSerializer(serializers.Serializer):
             "email": instance.email,
             "full_name": profile.full_name,
             "role": instance.role,
+            "google_linked": instance.social_identities.filter(provider="google").exists(),
             "profile": ProfileBasicSerializer(profile).data,
             "subscription": SubscriptionBasicSerializer(subscription).data,
         }

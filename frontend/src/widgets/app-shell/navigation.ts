@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   BookOpenCheck,
   CalendarDays,
   CalendarPlus,
@@ -13,6 +14,7 @@ import {
   LogIn,
   Map,
   MessageSquareWarning,
+  Settings,
   Tickets,
   UserCog,
   UserPlus,
@@ -42,7 +44,10 @@ export const primaryNavigation: NavigationItem[] = [
   { href: "/pricing", labelKey: "navigation.plans", icon: Shapes }
 ];
 
-export const authenticatedAccountNavigation: NavigationItem[] = [];
+export const authenticatedAccountNavigation: NavigationItem[] = [
+  { href: "/notifications", labelKey: "navigation.notifications", icon: Bell },
+  { href: "/settings", labelKey: "navigation.settings", icon: Settings }
+];
 
 export const organizerNavigation: NavigationItem[] = [
   {

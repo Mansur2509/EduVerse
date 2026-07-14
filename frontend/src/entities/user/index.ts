@@ -22,6 +22,7 @@ export type CurrentUser = {
   email: string;
   full_name: string;
   role: UserRole;
+  google_linked: boolean;
   profile: UserProfile;
   subscription: UserSubscription;
 };

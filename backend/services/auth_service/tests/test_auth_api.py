@@ -8,6 +8,7 @@ from rest_framework.test import APIClient, APITestCase
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from services.auth_service.models import SocialIdentity
 from services.subscription_service.models import Plan, Subscription
 from services.user_profile_service.models import StudentProfile, UserPreference
 
@@ -78,6 +79,23 @@ class AuthApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["profile"]["scholarship_need"], "unsure")
         self.assertEqual(response.data["subscription"]["tier"], Plan.FREE)
+        self.assertFalse(response.data["google_linked"])
+
+    def test_me_reports_google_linked_when_a_social_identity_exists(self):
+        register_response = self.register()
+        user = User.objects.get(email=self.register_payload["email"])
+        SocialIdentity.objects.create(
+            user=user,
+            provider=SocialIdentity.Provider.GOOGLE,
+            subject="google-subject-id",
+            email_at_link=user.email,
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {register_response.data['access']}")
+
+        response = self.client.get(reverse("auth:me"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["google_linked"])
 
     def test_me_patch_updates_only_profile_fields(self):
         register_response = self.register()
