@@ -176,7 +176,7 @@ Classification:
 **Problem:** None of these are confirmed broken today (existing backend values all currently have matching translation keys), but nothing enforces that a new backend-emitted code ships with a matching key in all 4 locale dictionaries — the `t()` fallback degrades to printing the raw key rather than crashing (confirmed in `shared/i18n/provider.tsx:53-66`), so a future mismatch is a silent i18n leak, not a crash.
 **Severity:** Low today, worth a process fix.
 **Fix required:** Either constrain these backend fields to typed enums matching the pattern already used for `FitStrengthCode`/`FitRiskCode`, or add a lint/test that all currently-possible backend values have matching keys in all locales.
-**Status:** Open, low priority relative to the Must-fix items above.
+**Status:** Fixed — `backend/common/tests/test_i18n_dynamic_key_coverage.py` derives the current value set for each dynamic-key family directly from source (AST-parses the real `.append(...)`/`flag(...)` call sites in `feedback_engine.py`, `roadmap_generator.py`, `major_matching.py`, `curriculum_rigor.py`; imports `OPTIONAL_EVIDENCE_WEIGHTS`/`RECOMMENDED_COURSEWORK_BY_CLUSTER`/confidence constants directly; regex-parses the `FitStrengthCode`/`FitRiskCode`/`FitMissingFieldCode` TS unions) and asserts every value has a matching key in all 4 locale dictionaries. 13/13 pass today (confirming no existing gap); a future backend code addition without a matching translation key now fails this test instead of silently degrading to a raw key at runtime.
 
 ### GAP-016 — `PlannedExamFields` shared-component claim is false for the Exams screen
 **Files:** `features/exams/ui/planned-exam-fields.tsx:37-40` (doc comment) vs `screens/exams/index.tsx` (does not import it)
