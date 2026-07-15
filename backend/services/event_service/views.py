@@ -138,6 +138,17 @@ class PublicEventDetailView(generics.RetrieveAPIView):
         context["include_event_registration_extras"] = True
         return context
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        track_event(
+            user=request.user,
+            event_type=AnalyticsEvent.EventType.EVENT_VIEWED,
+            entity_type="event",
+            entity_id=instance.id,
+        )
+        return Response(serializer.data)
+
 
 class EventRegistrationView(APIView):
     permission_classes = [IsAuthenticated]

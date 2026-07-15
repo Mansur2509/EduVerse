@@ -54,10 +54,15 @@ class CurrentProfileView(APIView):
 
     def patch(self, request):
         profile = self.get_profile(request, for_update=True)
+        is_still_onboarding = profile.onboarding_completed_at is None
         serializer = ProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         profile = serializer.save()
         track_event(user=request.user, event_type=AnalyticsEvent.EventType.PROFILE_UPDATED)
+        if is_still_onboarding and not AnalyticsEvent.objects.filter(
+            user=request.user, event_type=AnalyticsEvent.EventType.ONBOARDING_STARTED
+        ).exists():
+            track_event(user=request.user, event_type=AnalyticsEvent.EventType.ONBOARDING_STARTED)
         return Response(ProfileSerializer(profile).data)
 
 
@@ -88,6 +93,7 @@ class CompleteOnboardingView(APIView):
         if profile.onboarding_completed_at is None:
             profile.onboarding_completed_at = timezone.now()
             profile.save(update_fields=["onboarding_completed_at", "updated_at"])
+            track_event(user=request.user, event_type=AnalyticsEvent.EventType.ONBOARDING_COMPLETED)
         return Response(ProfileCompletionSerializer.for_profile(profile).data)
 
 

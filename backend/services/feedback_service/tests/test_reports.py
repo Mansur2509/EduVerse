@@ -86,10 +86,11 @@ class UserReportSubmissionTests(APITestCase):
 
     def test_submit_report_query_count_is_bounded(self):
         # Guards validate()'s target-existence + dedup checks (each a single
-        # .exists() call) against a future change adding a per-request N+1.
+        # .exists() call), the insert, and the analytics event write (POST-V1-021)
+        # against a future change adding a per-request N+1.
         university = create_university()
         self.client.force_authenticate(self.student)
-        with self.assertNumQueries(3):
+        with self.assertNumQueries(4):
             response = self.client.post(
                 CREATE_URL,
                 {

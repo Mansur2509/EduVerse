@@ -9,10 +9,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.demo_accounts import CANONICAL_STUDENT_DEMO_EMAIL
 from common.permissions import IsAdminRole
 from services.application_service.models import ApplicationTrackerItem
 from services.essay_service.models import AIEssayScoreReport
 from services.roadmap_service.models import RoadmapTask
+from services.user_profile_service.models import StudentProfile
 from services.user_profile_service.services import (
     calculate_profile_completion,
     get_profile_records_for_read,
@@ -91,48 +93,64 @@ class AdminAnalyticsSummaryView(APIView):
         since_7d = now - timedelta(days=7)
         since_30d = now - timedelta(days=30)
 
+        # Platform-wide aggregates must reflect real usage, not this
+        # project's own demo/QA traffic against the public canonical demo
+        # account -- exclude it everywhere a user is counted or attributed.
+        real_users = User.objects.exclude(email__iexact=CANONICAL_STUDENT_DEMO_EMAIL)
+        real_events = AnalyticsEvent.objects.exclude(
+            user__email__iexact=CANONICAL_STUDENT_DEMO_EMAIL
+        )
+
         active_7d = (
-            AnalyticsEvent.objects.filter(created_at__gte=since_7d, user__isnull=False)
+            real_events.filter(created_at__gte=since_7d, user__isnull=False)
             .values("user_id")
             .distinct()
             .count()
         )
         active_30d = (
-            AnalyticsEvent.objects.filter(created_at__gte=since_30d, user__isnull=False)
+            real_events.filter(created_at__gte=since_30d, user__isnull=False)
             .values("user_id")
             .distinct()
             .count()
         )
         retained = (
-            AnalyticsEvent.objects.filter(user__isnull=False)
+            real_events.filter(user__isnull=False)
             .values("user_id")
             .annotate(count=Count("id"))
             .filter(count__gte=2)
             .count()
         )
+        completed_onboarding = StudentProfile.objects.exclude(
+            user__email__iexact=CANONICAL_STUDENT_DEMO_EMAIL
+        ).filter(onboarding_completed_at__isnull=False).count()
+        total_real_users = real_users.count()
+        onboarding_completion_rate_percent = (
+            round(completed_onboarding / total_real_users * 100, 1) if total_real_users else 0.0
+        )
 
         data = {
-            "total_users": User.objects.count(),
-            "new_users_7d": User.objects.filter(date_joined__gte=since_7d).count(),
-            "new_users_30d": User.objects.filter(date_joined__gte=since_30d).count(),
+            "total_users": total_real_users,
+            "new_users_7d": real_users.filter(date_joined__gte=since_7d).count(),
+            "new_users_30d": real_users.filter(date_joined__gte=since_30d).count(),
             "active_users_7d": active_7d,
             "active_users_30d": active_30d,
-            "applications_created_total": AnalyticsEvent.objects.filter(
+            "onboarding_completion_rate_percent": onboarding_completion_rate_percent,
+            "applications_created_total": real_events.filter(
                 event_type=AnalyticsEvent.EventType.APPLICATION_CREATED
             ).count(),
-            "universities_shortlisted_total": AnalyticsEvent.objects.filter(
+            "universities_shortlisted_total": real_events.filter(
                 event_type=AnalyticsEvent.EventType.UNIVERSITY_SHORTLISTED
             ).count(),
-            "essay_reviews_requested_total": AnalyticsEvent.objects.filter(
+            "essay_reviews_requested_total": real_events.filter(
                 event_type=AnalyticsEvent.EventType.ESSAY_REVIEW_REQUESTED
             ).count(),
-            "roadmap_generations_total": AnalyticsEvent.objects.filter(
+            "roadmap_generations_total": real_events.filter(
                 event_type=AnalyticsEvent.EventType.ROADMAP_GENERATED
             ).count(),
-            "event_registrations_total": AnalyticsEvent.objects.filter(
+            "event_registrations_total": real_events.filter(
                 event_type=AnalyticsEvent.EventType.EVENT_REGISTERED
             ).count(),
-            "organizer_events_created_total": AnalyticsEvent.objects.filter(
+            "organizer_events_created_total": real_events.filter(
                 event_type=AnalyticsEvent.EventType.ORGANIZER_EVENT_CREATED
             ).count(),
             "retained_users_2plus_actions": retained,
@@ -151,7 +169,8 @@ class AdminAnalyticsFeatureUsageView(APIView):
 
     def _compute(self):
         counts = (
-            AnalyticsEvent.objects.values("event_type")
+            AnalyticsEvent.objects.exclude(user__email__iexact=CANONICAL_STUDENT_DEMO_EMAIL)
+            .values("event_type")
             .annotate(count=Count("id"))
             .order_by("-count")
         )
@@ -171,6 +190,7 @@ class AdminAnalyticsActivityView(APIView):
         since = timezone.now() - timedelta(days=30)
         rows = (
             AnalyticsEvent.objects.filter(created_at__gte=since)
+            .exclude(user__email__iexact=CANONICAL_STUDENT_DEMO_EMAIL)
             .annotate(day=TruncDate("created_at"))
             .values("day")
             .annotate(count=Count("id"))

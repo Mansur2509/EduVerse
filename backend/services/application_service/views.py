@@ -92,7 +92,11 @@ class ApplicationTrackerViewSet(viewsets.ModelViewSet):
             event_type=AnalyticsEvent.EventType.APPLICATION_CREATED,
             entity_type="application",
             entity_id=application.id,
-            metadata={"source": application.source, "fit_tier": application.fit_tier},
+            metadata={
+                "source": application.source,
+                "fit_tier": application.fit_tier,
+                "status": application.status,
+            },
         )
         invalidate_recommendation_caches(self.request.user)
 

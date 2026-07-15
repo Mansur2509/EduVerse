@@ -64,20 +64,30 @@ export function AdminAnalyticsScreen() {
     void load();
   }, [load]);
 
-  const summaryTiles: Array<[TranslationKey, number]> = summary
+  const summaryTiles: Array<[TranslationKey, string]> = summary
     ? [
-        ["adminAnalytics.metric.totalUsers", summary.total_users],
-        ["adminAnalytics.metric.newUsers7d", summary.new_users_7d],
-        ["adminAnalytics.metric.newUsers30d", summary.new_users_30d],
-        ["adminAnalytics.metric.activeUsers7d", summary.active_users_7d],
-        ["adminAnalytics.metric.activeUsers30d", summary.active_users_30d],
-        ["adminAnalytics.metric.retainedUsers", summary.retained_users_2plus_actions],
-        ["adminAnalytics.metric.applicationsCreated", summary.applications_created_total],
-        ["adminAnalytics.metric.universitiesShortlisted", summary.universities_shortlisted_total],
-        ["adminAnalytics.metric.essayReviewsRequested", summary.essay_reviews_requested_total],
-        ["adminAnalytics.metric.roadmapGenerations", summary.roadmap_generations_total],
-        ["adminAnalytics.metric.eventRegistrations", summary.event_registrations_total],
-        ["adminAnalytics.metric.organizerEventsCreated", summary.organizer_events_created_total]
+        ["adminAnalytics.metric.totalUsers", String(summary.total_users)],
+        ["adminAnalytics.metric.newUsers7d", String(summary.new_users_7d)],
+        ["adminAnalytics.metric.newUsers30d", String(summary.new_users_30d)],
+        ["adminAnalytics.metric.activeUsers7d", String(summary.active_users_7d)],
+        ["adminAnalytics.metric.activeUsers30d", String(summary.active_users_30d)],
+        ["adminAnalytics.metric.onboardingCompletionRate", `${summary.onboarding_completion_rate_percent}%`],
+        ["adminAnalytics.metric.retainedUsers", String(summary.retained_users_2plus_actions)],
+        ["adminAnalytics.metric.applicationsCreated", String(summary.applications_created_total)],
+        [
+          "adminAnalytics.metric.universitiesShortlisted",
+          String(summary.universities_shortlisted_total)
+        ],
+        [
+          "adminAnalytics.metric.essayReviewsRequested",
+          String(summary.essay_reviews_requested_total)
+        ],
+        ["adminAnalytics.metric.roadmapGenerations", String(summary.roadmap_generations_total)],
+        ["adminAnalytics.metric.eventRegistrations", String(summary.event_registrations_total)],
+        [
+          "adminAnalytics.metric.organizerEventsCreated",
+          String(summary.organizer_events_created_total)
+        ]
       ]
     : [];
 

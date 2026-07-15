@@ -62,7 +62,13 @@ class UserReportCreateView(generics.CreateAPIView):
     throttle_scope = "report_submit"
 
     def perform_create(self, serializer):
-        serializer.save(reporter=self.request.user)
+        report = serializer.save(reporter=self.request.user)
+        track_event(
+            user=self.request.user,
+            event_type=AnalyticsEvent.EventType.REPORT_SUBMITTED,
+            entity_type=report.target_type,
+            entity_id=report.target_id,
+        )
 
 
 class AdminUserReportListView(generics.ListAPIView):

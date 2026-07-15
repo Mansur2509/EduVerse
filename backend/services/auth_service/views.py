@@ -9,6 +9,10 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from common.demo_accounts import CANONICAL_STUDENT_DEMO_EMAIL
+from services.activity_service.models import AnalyticsEvent
+from services.activity_service.services import track_event
+
 from .cookies import clear_refresh_cookie, refresh_token_from_request, set_refresh_cookie
 from .google_oauth import (
     GoogleOAuthError,
@@ -43,6 +47,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        track_event(user=user, event_type=AnalyticsEvent.EventType.USER_REGISTERED)
         tokens = token_pair_for_user(user)
         response = Response(
             {
@@ -66,6 +71,8 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
+        if user.email.lower() == CANONICAL_STUDENT_DEMO_EMAIL.lower():
+            track_event(user=user, event_type=AnalyticsEvent.EventType.DEMO_LOGIN_USED)
         tokens = token_pair_for_user(user)
         response = Response(
             {

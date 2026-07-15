@@ -24,3 +24,4 @@ class AdminAnalyticsSummarySerializer(serializers.Serializer):
     event_registrations_total = serializers.IntegerField()
     organizer_events_created_total = serializers.IntegerField()
     retained_users_2plus_actions = serializers.IntegerField()
+    onboarding_completion_rate_percent = serializers.FloatField()

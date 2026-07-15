@@ -77,7 +77,13 @@ class EssayWorkspaceViewSet(viewsets.ModelViewSet):
         return super().get_throttles()
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        essay = serializer.save(user=self.request.user)
+        track_event(
+            user=self.request.user,
+            event_type=AnalyticsEvent.EventType.ESSAY_CREATED,
+            entity_type="essay",
+            entity_id=essay.id,
+        )
 
     @action(detail=True, methods=["get", "post"], url_path="feedback")
     def feedback(self, request, pk=None):
@@ -162,6 +168,12 @@ class EssayWorkspaceViewSet(viewsets.ModelViewSet):
             metadata={"reason": result["reason"]},
         )
         if result["reason"] == "scored" and report is not None:
+            track_event(
+                user=request.user,
+                event_type=AnalyticsEvent.EventType.ESSAY_REVIEW_COMPLETED,
+                entity_type="essay",
+                entity_id=essay.id,
+            )
             create_notification(
                 user=request.user,
                 notification_type=Notification.NotificationType.ESSAY_REVIEW_COMPLETED,

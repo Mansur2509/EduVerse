@@ -21,6 +21,7 @@ export type AdminAnalyticsSummary = {
   event_registrations_total: number;
   organizer_events_created_total: number;
   retained_users_2plus_actions: number;
+  onboarding_completion_rate_percent: number;
 };
 
 export type AdminFeatureUsage = Record<string, number>;
