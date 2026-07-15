@@ -208,13 +208,17 @@ export type AIEssayScoreReason =
   | "ai_unavailable"
   | "validation_failed"
   | "missing_essay_text"
-  | "essay_too_long";
+  | "essay_too_long"
+  | "review_already_running";
+
+export type AIEssayScoreErrorKind = "not_configured" | "rate_limited" | "provider_unavailable" | null;
 
 export type AIEssayScoreResponse = {
   reason: AIEssayScoreReason;
   cached: boolean;
   quota_remaining: number | null;
   next_available_at: string | null;
+  ai_error_kind: AIEssayScoreErrorKind;
   score: AIEssayScoreReport | null;
 };
 

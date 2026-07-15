@@ -7,7 +7,7 @@ import type {
   EssayWorkspace,
   EssayWorkspaceInput
 } from "@/entities/essay";
-import { ApiError, apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
+import { ApiError, ESSAY_REVIEW_TIMEOUT_MS, apiRequest, normalizePaginatedResponse } from "@/shared/api/client";
 
 type EssayListParams = {
   page?: number;
@@ -82,14 +82,27 @@ export function createEssayRevisionTaskRequest(
   });
 }
 
-export async function scoreEssayRequest(id: number): Promise<AIEssayScoreResponse> {
+export async function scoreEssayRequest(
+  id: number,
+  options: { signal?: AbortSignal } = {}
+): Promise<AIEssayScoreResponse> {
   try {
-    return await apiRequest<AIEssayScoreResponse>(`/${id}/score/`, { base: "essays", method: "POST" });
+    // A fresh AI review can take substantially longer than the global request
+    // timeout: the backend may run an initial Gemini call plus a retry, and if
+    // validation fails, a repair-prompt pass plus its own retry (see
+    // ESSAY_REVIEW_TIMEOUT_MS's doc comment for the full worst-case math). Use
+    // that dedicated, longer budget here instead of the platform default.
+    return await apiRequest<AIEssayScoreResponse>(`/${id}/score/`, {
+      base: "essays",
+      method: "POST",
+      timeoutMs: ESSAY_REVIEW_TIMEOUT_MS,
+      signal: options.signal
+    });
   } catch (error) {
     // The backend returns a structured, safe-to-render body (reason,
     // quota_remaining, next_available_at) even for expected non-2xx outcomes
-    // like quota_exceeded/ai_unavailable/validation_failed -- surface that
-    // instead of treating it as a generic request failure.
+    // like quota_exceeded/ai_unavailable/validation_failed/review_already_running
+    // -- surface that instead of treating it as a generic request failure.
     if (
       error instanceof ApiError &&
       error.data &&

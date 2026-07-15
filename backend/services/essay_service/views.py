@@ -40,6 +40,10 @@ AI_SCORE_REASON_STATUS = {
     "validation_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
     "missing_essay_text": status.HTTP_400_BAD_REQUEST,
     "essay_too_long": status.HTTP_400_BAD_REQUEST,
+    # A review is already running for this exact essay (another tab, a
+    # double-click, or a client retry after what looked like a timeout but
+    # hadn't actually finished) -- 409 Conflict, not a failure of this request.
+    "review_already_running": status.HTTP_409_CONFLICT,
 }
 
 
@@ -175,6 +179,7 @@ class EssayWorkspaceViewSet(viewsets.ModelViewSet):
                 "quota_remaining": result["quota_remaining"],
                 "next_available_at": result["next_available_at"],
                 "validation_code": result["validation_code"],
+                "ai_error_kind": result["ai_error_kind"],
                 "score": AIEssayScoreReportSerializer(report).data if report else None,
             },
             status=AI_SCORE_REASON_STATUS[result["reason"]],

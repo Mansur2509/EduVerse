@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 from services.ai_gateway_service.essay_scoring_client import GeminiEssayScoringClient
@@ -141,6 +142,28 @@ class ValidationCode:
     SUGGESTION_TOO_LONG = "suggestion_too_long"
     FORBIDDEN_OUTCOME_LANGUAGE = "forbidden_outcome_language"
     VERBATIM_ESSAY_REUSE = "verbatim_essay_reuse"
+
+
+class AiErrorKind:
+    """Stable, frontend-facing sub-classification of `reason == "ai_unavailable"`.
+
+    The `reason` string alone can't tell a permanently-unconfigured feature
+    apart from a transient provider hiccup; this lets the client show a
+    different (still generic, never-raw-provider-text) message for each
+    without the backend leaking the provider's actual error body."""
+
+    NOT_CONFIGURED = "not_configured"
+    RATE_LIMITED = "rate_limited"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+
+
+# A single essay review call chains up to 2 provider attempts (1 retry) for
+# the initial score, then up to 2 more for a validation-repair pass -- 4
+# provider calls at AI_ESSAY_TIMEOUT_SECONDS each in the worst case. The lock
+# window must safely outlast that so a slow-but-legitimate review is never
+# mistaken for a stuck one and unlocked out from under itself.
+REVIEW_LOCK_TIMEOUT_SECONDS = 180
+REVIEW_LOCK_KEY_PREFIX = "essay_review_lock:"
 
 
 def compute_essay_text_hash(essay_text: str) -> str:
@@ -707,31 +730,42 @@ def _log_provider_error(error: AIProviderError, *, model_name: str, essay_id: in
     )
 
 
+def _classify_provider_error(error: AIProviderError) -> str:
+    """Map a final (non-retried-further) provider error to a small, stable,
+    frontend-safe category. Never based on raw provider text -- only the
+    exception type and the numeric status code already captured on it."""
+    if isinstance(error, AIProviderUnavailable):
+        return AiErrorKind.NOT_CONFIGURED
+    if error.status_code == 429:
+        return AiErrorKind.RATE_LIMITED
+    return AiErrorKind.PROVIDER_UNAVAILABLE
+
+
 def _call_gemini_with_retry(
     client: GeminiEssayScoringClient, *, system_prompt: str, user_prompt: str, model_name: str, essay_id: int
-) -> dict | None:
+) -> tuple[dict | None, str | None]:
     """One provider call, with exactly one retry on a transient error (see
-    `_is_retryable_provider_error`). Returns the raw JSON dict, or None if the
-    provider is unavailable after the retry (or the first error wasn't
-    retryable at all).
+    `_is_retryable_provider_error`). Returns `(raw JSON dict, None)` on
+    success, or `(None, AiErrorKind)` if the provider is unavailable after
+    the retry (or the first error wasn't retryable at all).
     """
 
     try:
         return client.score_essay(
             system_prompt=system_prompt, user_prompt=user_prompt, response_schema=ESSAY_SCORE_RESPONSE_SCHEMA
-        )
+        ), None
     except AIProviderError as first_error:
         if not _is_retryable_provider_error(first_error):
             _log_provider_error(first_error, model_name=model_name, essay_id=essay_id, attempt="1_final")
-            return None
+            return None, _classify_provider_error(first_error)
         _log_provider_error(first_error, model_name=model_name, essay_id=essay_id, attempt="1_retrying")
         try:
             return client.score_essay(
                 system_prompt=system_prompt, user_prompt=user_prompt, response_schema=ESSAY_SCORE_RESPONSE_SCHEMA
-            )
+            ), None
         except AIProviderError as retry_error:
             _log_provider_error(retry_error, model_name=model_name, essay_id=essay_id, attempt="2_final")
-            return None
+            return None, _classify_provider_error(retry_error)
 
 
 def _build_repair_prompt(user_prompt: str, *, error: EssayScoringValidationError) -> str:
@@ -830,10 +864,11 @@ def score_essay(essay: EssayWorkspace, *, user) -> dict:
 
 def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
     """Returns a dict with `reason`, `cached`, `report` (model instance or
-    None), `quota_remaining`, and `next_available_at`. Never raises for
-    expected failure paths (missing text, quota, AI unavailable, invalid
-    output) -- those are all represented as a `reason` string so the view can
-    respond safely without leaking internals.
+    None), `quota_remaining`, `next_available_at`, `validation_code`, and
+    `ai_error_kind`. Never raises for expected failure paths (missing text,
+    quota, AI unavailable, invalid output, a review already running) --
+    those are all represented as a `reason` string so the view can respond
+    safely without leaking internals.
     """
 
     if essay.user_id != user.id:
@@ -848,6 +883,7 @@ def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
             "quota_remaining": None,
             "next_available_at": None,
             "validation_code": None,
+            "ai_error_kind": None,
         }
     if len(draft_text) > MAX_AI_ESSAY_CHARACTERS:
         return {
@@ -857,6 +893,7 @@ def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
             "quota_remaining": None,
             "next_available_at": None,
             "validation_code": None,
+            "ai_error_kind": None,
         }
 
     payload = build_scoring_payload(essay)
@@ -880,6 +917,7 @@ def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
             "quota_remaining": quota.remaining,
             "next_available_at": None,
             "validation_code": None,
+            "ai_error_kind": None,
         }
 
     if not settings.AI_ESSAY_SCORING_ENABLED:
@@ -890,6 +928,7 @@ def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
             "quota_remaining": None,
             "next_available_at": None,
             "validation_code": None,
+            "ai_error_kind": AiErrorKind.NOT_CONFIGURED,
         }
 
     quota = get_quota_status(user)
@@ -901,49 +940,40 @@ def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
             "quota_remaining": 0,
             "next_available_at": quota.next_available_at,
             "validation_code": None,
+            "ai_error_kind": None,
         }
 
-    client = GeminiEssayScoringClient()
-    user_prompt = build_user_prompt(payload)
-    raw_output = _call_gemini_with_retry(
-        client, system_prompt=ESSAY_SCORING_SYSTEM_PROMPT, user_prompt=user_prompt, model_name=model_name,
-        essay_id=essay.id,
-    )
-    if raw_output is None:
+    # A slow-but-legitimate review (up to ~4 provider calls, see
+    # REVIEW_LOCK_TIMEOUT_SECONDS) must not let a second click, a second tab,
+    # or a frontend retry-after-timeout start a duplicate call chain for the
+    # same essay -- that would double provider cost and quota for a request
+    # that may already be in flight. `cache.add` only succeeds if the key is
+    # not already held, so this doubles as an atomic single-holder lock. Note:
+    # this is a per-process LocMemCache lock unless CACHES is configured with
+    # a shared backend, so it only protects against concurrent requests
+    # handled by the same worker process -- adequate for this app's current
+    # single-worker Render deployment, not a substitute for a real distributed
+    # lock if that ever changes.
+    lock_key = f"{REVIEW_LOCK_KEY_PREFIX}{essay.id}"
+    if not cache.add(lock_key, True, timeout=REVIEW_LOCK_TIMEOUT_SECONDS):
         return {
-            "reason": "ai_unavailable",
+            "reason": "review_already_running",
             "cached": False,
             "report": None,
             "quota_remaining": quota.remaining,
             "next_available_at": None,
             "validation_code": None,
+            "ai_error_kind": None,
         }
 
     try:
-        normalized = validate_and_normalize_output(raw_output, payload=payload)
-    except EssayScoringValidationError as first_validation_error:
-        # `error` only ever names a schema field/key or an out-of-range number
-        # (see the _validate_* helpers above) -- never raw essay/profile text.
-        # Still truncated defensively since one branch echoes back whatever
-        # value Gemini put in an enum field. `error.code` is a small stable
-        # label safe to log and to return to the client for diagnosis.
-        logger.warning(
-            "Gemini schema validation error feature=essay_scoring model=%s essay_id=%s code=%s message=\"%s\" attempt=1",
-            model_name,
-            essay.id,
-            first_validation_error.code,
-            str(first_validation_error)[:300],
-        )
-        # Exactly one repair retry: re-prompt with the specific validation
-        # failure so the model can self-correct, instead of giving up on a
-        # single JSON-shape mistake the same way a provider-error retry
-        # already covers a single flaky network blip.
-        repair_prompt = _build_repair_prompt(user_prompt, error=first_validation_error)
-        repair_output = _call_gemini_with_retry(
-            client, system_prompt=ESSAY_SCORING_SYSTEM_PROMPT, user_prompt=repair_prompt, model_name=model_name,
+        client = GeminiEssayScoringClient()
+        user_prompt = build_user_prompt(payload)
+        raw_output, error_kind = _call_gemini_with_retry(
+            client, system_prompt=ESSAY_SCORING_SYSTEM_PROMPT, user_prompt=user_prompt, model_name=model_name,
             essay_id=essay.id,
         )
-        if repair_output is None:
+        if raw_output is None:
             return {
                 "reason": "ai_unavailable",
                 "cached": False,
@@ -951,82 +981,125 @@ def _score_essay_impl(essay: EssayWorkspace, *, user) -> dict:
                 "quota_remaining": quota.remaining,
                 "next_available_at": None,
                 "validation_code": None,
-            }
-        try:
-            normalized = validate_and_normalize_output(repair_output, payload=payload)
-            raw_output = repair_output  # persist the attempt that actually validated
-        except EssayScoringValidationError as second_validation_error:
-            logger.warning(
-                "Gemini schema validation error feature=essay_scoring model=%s essay_id=%s code=%s "
-                "message=\"%s\" attempt=2_final",
-                model_name,
-                essay.id,
-                second_validation_error.code,
-                str(second_validation_error)[:300],
-            )
-            return {
-                "reason": "validation_failed",
-                "cached": False,
-                "report": None,
-                "quota_remaining": quota.remaining,
-                "next_available_at": None,
-                "validation_code": second_validation_error.code,
+                "ai_error_kind": error_kind,
             }
 
-    # Guard against two near-simultaneous score requests for the same essay
-    # (e.g. a double-click) both reaching this point: if another request
-    # already wrote a report for this exact essay_text_hash/context_hash
-    # while this one was waiting on the provider call, reuse it instead of
-    # creating a second row and double-charging quota/UsageLog.
-    concurrent_report = (
-        AIEssayScoreReport.objects.filter(
-            essay=essay, essay_text_hash=essay_text_hash, context_hash=context_hash
+        try:
+            normalized = validate_and_normalize_output(raw_output, payload=payload)
+        except EssayScoringValidationError as first_validation_error:
+            # `error` only ever names a schema field/key or an out-of-range number
+            # (see the _validate_* helpers above) -- never raw essay/profile text.
+            # Still truncated defensively since one branch echoes back whatever
+            # value Gemini put in an enum field. `error.code` is a small stable
+            # label safe to log and to return to the client for diagnosis.
+            logger.warning(
+                "Gemini schema validation error feature=essay_scoring model=%s essay_id=%s code=%s message=\"%s\" attempt=1",
+                model_name,
+                essay.id,
+                first_validation_error.code,
+                str(first_validation_error)[:300],
+            )
+            # Exactly one repair retry: re-prompt with the specific validation
+            # failure so the model can self-correct, instead of giving up on a
+            # single JSON-shape mistake the same way a provider-error retry
+            # already covers a single flaky network blip.
+            repair_prompt = _build_repair_prompt(user_prompt, error=first_validation_error)
+            repair_output, repair_error_kind = _call_gemini_with_retry(
+                client, system_prompt=ESSAY_SCORING_SYSTEM_PROMPT, user_prompt=repair_prompt, model_name=model_name,
+                essay_id=essay.id,
+            )
+            if repair_output is None:
+                return {
+                    "reason": "ai_unavailable",
+                    "cached": False,
+                    "report": None,
+                    "quota_remaining": quota.remaining,
+                    "next_available_at": None,
+                    "validation_code": None,
+                    "ai_error_kind": repair_error_kind,
+                }
+            try:
+                normalized = validate_and_normalize_output(repair_output, payload=payload)
+                raw_output = repair_output  # persist the attempt that actually validated
+            except EssayScoringValidationError as second_validation_error:
+                logger.warning(
+                    "Gemini schema validation error feature=essay_scoring model=%s essay_id=%s code=%s "
+                    "message=\"%s\" attempt=2_final",
+                    model_name,
+                    essay.id,
+                    second_validation_error.code,
+                    str(second_validation_error)[:300],
+                )
+                return {
+                    "reason": "validation_failed",
+                    "cached": False,
+                    "report": None,
+                    "quota_remaining": quota.remaining,
+                    "next_available_at": None,
+                    "validation_code": second_validation_error.code,
+                    "ai_error_kind": None,
+                }
+
+        # Guard against two near-simultaneous score requests for the same essay
+        # (e.g. a double-click that raced in before the lock above was held, or
+        # a request already queued behind it) both reaching this point: if
+        # another request already wrote a report for this exact
+        # essay_text_hash/context_hash while this one was waiting on the
+        # provider call, reuse it instead of creating a second row and
+        # double-charging quota/UsageLog.
+        concurrent_report = (
+            AIEssayScoreReport.objects.filter(
+                essay=essay, essay_text_hash=essay_text_hash, context_hash=context_hash
+            )
+            .order_by("-created_at")
+            .first()
         )
-        .order_by("-created_at")
-        .first()
-    )
-    if concurrent_report is not None:
+        if concurrent_report is not None:
+            quota_after = get_quota_status(user)
+            return {
+                "reason": "cached",
+                "cached": True,
+                "report": concurrent_report,
+                "quota_remaining": quota_after.remaining,
+                "next_available_at": None,
+                "validation_code": None,
+                "ai_error_kind": None,
+            }
+
+        application = essay.application
+        university = essay.university or (application.university if application else None)
+        program = application.target_program if application else None
+
+        report = AIEssayScoreReport.objects.create(
+            user=user,
+            essay=essay,
+            application=application,
+            university=university,
+            program=program,
+            essay_text_hash=essay_text_hash,
+            context_hash=context_hash,
+            rubric_version=RUBRIC_VERSION,
+            model_provider="gemini",
+            model_name=model_name,
+            raw_output_json=raw_output,
+            **normalized,
+        )
+
+        UsageLog.objects.create(
+            user=user,
+            kind=UsageLog.Kind.ESSAY_REVIEW,
+            metadata={"model_name": model_name, "cached": False, "essay_id": essay.id},
+        )
+
         quota_after = get_quota_status(user)
         return {
-            "reason": "cached",
-            "cached": True,
-            "report": concurrent_report,
+            "reason": "scored",
+            "cached": False,
+            "report": report,
             "quota_remaining": quota_after.remaining,
             "next_available_at": None,
             "validation_code": None,
+            "ai_error_kind": None,
         }
-
-    application = essay.application
-    university = essay.university or (application.university if application else None)
-    program = application.target_program if application else None
-
-    report = AIEssayScoreReport.objects.create(
-        user=user,
-        essay=essay,
-        application=application,
-        university=university,
-        program=program,
-        essay_text_hash=essay_text_hash,
-        context_hash=context_hash,
-        rubric_version=RUBRIC_VERSION,
-        model_provider="gemini",
-        model_name=model_name,
-        raw_output_json=raw_output,
-        **normalized,
-    )
-
-    UsageLog.objects.create(
-        user=user,
-        kind=UsageLog.Kind.ESSAY_REVIEW,
-        metadata={"model_name": model_name, "cached": False, "essay_id": essay.id},
-    )
-
-    quota_after = get_quota_status(user)
-    return {
-        "reason": "scored",
-        "cached": False,
-        "report": report,
-        "quota_remaining": quota_after.remaining,
-        "next_available_at": None,
-        "validation_code": None,
-    }
+    finally:
+        cache.delete(lock_key)

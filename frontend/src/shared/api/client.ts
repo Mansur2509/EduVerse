@@ -20,6 +20,23 @@ export const REQUEST_TIMEOUT_MS = 20_000;
 // recoverable "offline" screen quickly rather than block every page load.
 export const SESSION_CHECK_TIMEOUT_MS = 12_000;
 
+// Essay AI review calls Gemini through up to two independent retry pairs (an
+// initial generation attempt + 1 retry, and, if validation fails, one repair
+// prompt + 1 retry), each bounded by the backend's own per-call
+// AI_ESSAY_TIMEOUT_SECONDS=30 ceiling -- a documented worst case of 4 * 30s =
+// 120s. The backend additionally holds a single-flight lock around that whole
+// sequence per essay (REVIEW_LOCK_TIMEOUT_SECONDS=180s, see ai_scoring.py), so
+// a client-side abort here can never race a second backend attempt into
+// duplicate work -- the lock, and the cached report once one exists, make a
+// retry after this timeout safe and idempotent. 90s comfortably covers the
+// common case (a real Gemini call typically returns in a few seconds, so 90s
+// is only exercised when a retry or repair pass actually runs) while still
+// failing closed well before the full 120-180s backend ceiling. In the rare
+// case that also runs long, the user sees a timeout and can retry; the retry
+// finds the still-running (or by-then-cached) result instead of starting a
+// second, duplicate review.
+export const ESSAY_REVIEW_TIMEOUT_MS = 90_000;
+
 // A failed first request is also what *triggers* the Render wake-up. So for
 // safe, idempotent GET reads we automatically retry once on a timeout/network
 // error after a short delay: by the retry, the container is usually booting or
@@ -61,11 +78,13 @@ type ApiOptions = Omit<RequestInit, "body"> & {
 // without ever reading `.message` (which only exists for logs/dev diagnostics
 // and is never guaranteed to be translated):
 //  - "timeout": the request was aborted after the configured timeout window.
+//  - "cancelled": a caller-supplied signal (e.g. unmount, or a newer request
+//    superseding this one) aborted the request deliberately -- not a timeout.
 //  - "network": fetch rejected before any response came back (offline, DNS,
 //    CORS-style failure, or the backend genuinely unreachable).
 //  - "http": a response came back with a non-2xx status.
 //  - "parse": a response came back but wasn't valid/expected JSON.
-export type ApiErrorCode = "timeout" | "network" | "http" | "parse";
+export type ApiErrorCode = "timeout" | "cancelled" | "network" | "http" | "parse";
 
 export class ApiError extends Error {
   constructor(
@@ -189,17 +208,24 @@ export async function withTimeout(
   timeoutMs: number
 ): Promise<Response> {
   const controller = new AbortController();
+  let callerAborted = false;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   // A caller-supplied signal (e.g. an unmount AbortController) must also be
   // able to cancel the request -- previously this function silently replaced
   // any `init.signal` with its own, so no screen could ever cancel an
   // in-flight request on unmount or on a newer request superseding an older
   // one (PERFORMANCE-012 PART 1). Both sources now abort the same internal
-  // controller, which is the one actually passed to `fetch`.
+  // controller, which is the one actually passed to `fetch`. `callerAborted`
+  // distinguishes *why* the abort happened, so callers can tell a deliberate
+  // cancellation (e.g. the user navigated away) from a genuine timeout.
   const callerSignal = init.signal;
-  const onCallerAbort = () => controller.abort();
+  const onCallerAbort = () => {
+    callerAborted = true;
+    controller.abort();
+  };
   if (callerSignal) {
     if (callerSignal.aborted) {
+      callerAborted = true;
       controller.abort();
     } else {
       callerSignal.addEventListener("abort", onCallerAbort);
@@ -208,10 +234,13 @@ export async function withTimeout(
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
-    // These two messages exist only for dev-console logs and as a last-resort
+    // These messages exist only for dev-console logs and as a last-resort
     // fallback; UI code must branch on `errorCode` and render a translated
     // string instead of ever displaying `.message` to the user.
     if (error instanceof DOMException && error.name === "AbortError") {
+      if (callerAborted) {
+        throw new ApiError("The request was cancelled.", 0, null, false, "cancelled");
+      }
       throw new ApiError(
         "The request took too long. The server may be waking up — please try again.",
         0,
