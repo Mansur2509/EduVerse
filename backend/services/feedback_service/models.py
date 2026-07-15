@@ -64,6 +64,7 @@ class UserReport(models.Model):
         EVENT = "event", "Event"
         ORGANIZER = "organizer", "Organizer"
         ESSAY_REVIEW = "essay_review", "Essay review"
+        MENTORSHIP_SESSION = "mentorship_session", "Mentorship session"
         OTHER = "other", "Other"
 
     class Status(models.TextChoices):

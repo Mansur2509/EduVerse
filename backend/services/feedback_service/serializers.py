@@ -93,6 +93,12 @@ class UserReportCreateSerializer(serializers.ModelSerializer):
             target_exists = user is not None and AIEssayScoreReport.objects.filter(
                 pk=target_id, user=user
             ).exists()
+        elif target_type == UserReport.TargetType.MENTORSHIP_SESSION:
+            from services.mentor_service.models import MentorshipSession
+
+            target_exists = user is not None and MentorshipSession.objects.filter(
+                pk=target_id, student=user
+            ).exists()
 
         if not target_exists:
             raise serializers.ValidationError({"target_id": "This item could not be found."})
