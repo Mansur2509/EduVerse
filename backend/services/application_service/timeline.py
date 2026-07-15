@@ -309,8 +309,12 @@ def _linked_essays(application, today: date, prefetched_essays=None) -> list[dic
 
     essays = prefetched_essays
     if essays is None:
+        # Matched by the `application` FK itself (not merely a shared
+        # university) so this list stays in sync with the essay <-> application
+        # link/unlink UI: unlinking an essay must make it disappear from here,
+        # which a university-only match could never reflect.
         essays = EssayWorkspace.objects.filter(
-            user=application.user, university=application.university
+            user=application.user, application=application
         ).order_by("status", "-updated_at")
     payload: list[dict] = []
     for essay in essays:

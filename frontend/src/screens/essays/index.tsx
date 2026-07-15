@@ -16,13 +16,16 @@ import {
   ESSAY_PRIORITIES,
   ESSAY_STATUSES,
   EssayCard,
+  type AIEssayScoreErrorKind,
   type AIEssayScoreReason,
   type AIEssayScoreReport,
   type EssayRevisionTask,
   type EssayWorkspace
 } from "@/entities/essay";
+import type { ApplicationTrackerItem } from "@/entities/application";
 import type { SuggestedItem } from "@/entities/suggestion";
 import type { SavedUniversityLite } from "@/entities/university";
+import { getApplicationsRequest } from "@/features/applications";
 import {
   createEssayRequest,
   createEssayRevisionTaskRequest,
@@ -37,6 +40,7 @@ import {
   updateEssayRevisionTaskRequest
 } from "@/features/essays";
 import { EssayForm, type EssayFormValues } from "@/features/essays/ui/essay-form";
+import { ReportButton } from "@/features/reports";
 import {
   addSuggestionToRoadmapRequest,
   dismissSuggestionRequest,
@@ -45,6 +49,7 @@ import {
   SuggestionPanel
 } from "@/features/suggestions";
 import { getShortlistRequest } from "@/features/universities";
+import { ApiError } from "@/shared/api/client";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
@@ -105,7 +110,17 @@ export function EssaysScreen() {
   const [shortlist, setShortlist] = useState<SavedUniversityLite[]>([]);
   const [isShortlistLoading, setIsShortlistLoading] = useState(false);
   const [shortlistLoadError, setShortlistLoadError] = useState(false);
-  const [shortlistRequested, setShortlistRequested] = useState(false);
+  // A ref, not state: the effect below both reads and flips this flag inside
+  // its own body. If it were state (and therefore a dependency of that same
+  // effect), setting it would change the dependency array, causing React to
+  // run the effect's cleanup (cancelling the fetch this exact call just
+  // started) before the fetch could ever resolve -- a ref sidesteps that
+  // self-cancelling loop since mutating it doesn't trigger a re-render/re-run.
+  const shortlistRequestedRef = useRef(false);
+  const [applications, setApplications] = useState<ApplicationTrackerItem[]>([]);
+  const [isApplicationsLoading, setIsApplicationsLoading] = useState(false);
+  const [applicationsLoadError, setApplicationsLoadError] = useState(false);
+  const applicationsRequestedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [filter, setFilter] = useState<string>("all");
@@ -124,8 +139,15 @@ export function EssaysScreen() {
     reason: AIEssayScoreReason;
     quotaRemaining: number | null;
     nextAvailableAt: string | null;
+    aiErrorKind: AIEssayScoreErrorKind;
   } | null>(null);
-  const [scoreRequestFailed, setScoreRequestFailed] = useState(false);
+  // Distinguishes AI_TIMEOUT / NETWORK_ERROR / UNKNOWN_RETRYABLE_ERROR for a
+  // raw request failure (no structured reason body from the backend) -- null
+  // means no such failure is currently showing.
+  const [scoreRequestFailureCode, setScoreRequestFailureCode] = useState<
+    "AI_TIMEOUT" | "NETWORK_ERROR" | "UNKNOWN_RETRYABLE_ERROR" | null
+  >(null);
+  const scoreRequestAbortRef = useRef<AbortController | null>(null);
   const [isScoreCardOpen, setIsScoreCardOpen] = useState(false);
   const [actionError, setActionError] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
@@ -178,9 +200,9 @@ export function EssaysScreen() {
   // modal, so it is fetched lazily the first time that modal opens (lite
   // payload: id/name/slug/country/city only, not the full university record).
   useEffect(() => {
-    if (!isFormOpen || shortlistRequested) return;
+    if (!isFormOpen || shortlistRequestedRef.current) return;
     let cancelled = false;
-    setShortlistRequested(true);
+    shortlistRequestedRef.current = true;
     setIsShortlistLoading(true);
     setShortlistLoadError(false);
     getShortlistRequest({ lite: true })
@@ -198,7 +220,35 @@ export function EssaysScreen() {
     return () => {
       cancelled = true;
     };
-  }, [isFormOpen, shortlistRequested]);
+  }, [isFormOpen]);
+
+  // Applications only feed the linkage dropdown inside the create/edit essay
+  // modal, so they are fetched lazily the first time that modal opens, exactly
+  // like the shortlist above. include_archived keeps a currently-linked but
+  // now-archived application selectable/visible rather than silently
+  // vanishing from the list.
+  useEffect(() => {
+    if (!isFormOpen || applicationsRequestedRef.current) return;
+    let cancelled = false;
+    applicationsRequestedRef.current = true;
+    setIsApplicationsLoading(true);
+    setApplicationsLoadError(false);
+    getApplicationsRequest({ include_archived: "true", page_size: 200 })
+      .then((response) => {
+        if (cancelled) return;
+        setApplications(response.results);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setApplicationsLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsApplicationsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFormOpen]);
 
   const selectedEssay = essays.find((essay) => essay.id === selectedEssayId) ?? null;
   const hasUnsavedDraftChanges = Boolean(
@@ -233,7 +283,7 @@ export function EssaysScreen() {
 
   useEffect(() => {
     setScoreNotice(null);
-    setScoreRequestFailed(false);
+    setScoreRequestFailureCode(null);
     if (!selectedEssayId) {
       setLatestScore(null);
       setIsScoreCardOpen(false);
@@ -265,6 +315,14 @@ export function EssaysScreen() {
       });
     return () => {
       cancelled = true;
+      // Switching essays (or unmounting) mid-review must not let a stale
+      // response for the essay we're leaving land on whatever is now
+      // selected -- abort it outright rather than merely ignoring the
+      // result, since scoreEssayRequest forwards this signal through to the
+      // fetch itself (client.ts classifies this as errorCode "cancelled",
+      // distinct from a genuine timeout).
+      scoreRequestAbortRef.current?.abort();
+      scoreRequestAbortRef.current = null;
     };
   }, [selectedEssayId]);
 
@@ -330,6 +388,7 @@ export function EssaysScreen() {
         title: values.title,
         essay_type: values.essay_type,
         university: values.university,
+        application: values.application,
         prompt_text: values.prompt_text,
         word_limit: values.word_limit ? Number(values.word_limit) : null,
         due_date: values.due_date || null,
@@ -401,8 +460,10 @@ export function EssaysScreen() {
     isScoringRef.current = true;
     setIsScoringEssay(true);
     setActionError(false);
-    setScoreRequestFailed(false);
+    setScoreRequestFailureCode(null);
     setScoreNotice(null);
+    const controller = new AbortController();
+    scoreRequestAbortRef.current = controller;
     try {
       if (draftText !== selectedEssay.draft_text) {
         try {
@@ -415,11 +476,12 @@ export function EssaysScreen() {
           return;
         }
       }
-      const response = await scoreEssayRequest(selectedEssay.id);
+      const response = await scoreEssayRequest(selectedEssay.id, { signal: controller.signal });
       setScoreNotice({
         reason: response.reason,
         quotaRemaining: response.quota_remaining,
-        nextAvailableAt: response.next_available_at
+        nextAvailableAt: response.next_available_at,
+        aiErrorKind: response.ai_error_kind
       });
       if (response.score) {
         setLatestScore(response.score);
@@ -434,13 +496,28 @@ export function EssaysScreen() {
           // Ignore private-mode/localStorage failures; the panel still works.
         }
       }
-    } catch {
-      // A raw request failure (network error, unexpected non-JSON 5xx from
-      // infra) rather than one of the backend's structured reasons. The
+    } catch (error) {
+      if (error instanceof ApiError && error.errorCode === "cancelled") {
+        // The essay was switched (or this screen unmounted) while the review
+        // was still in flight (AI_REVIEW_CANCELLED) -- nothing to show, since
+        // the user is no longer looking at this essay's card.
+        return;
+      }
+      // A raw request failure (network error, timeout, unexpected non-JSON 5xx
+      // from infra) rather than one of the backend's structured reasons. The
       // draft text itself is untouched and already saved above, so tell the
       // user specifically that only scoring failed.
-      setScoreRequestFailed(true);
+      setScoreRequestFailureCode(
+        error instanceof ApiError && error.errorCode === "timeout"
+          ? "AI_TIMEOUT"
+          : error instanceof ApiError && error.errorCode === "network"
+            ? "NETWORK_ERROR"
+            : "UNKNOWN_RETRYABLE_ERROR"
+      );
     } finally {
+      if (scoreRequestAbortRef.current === controller) {
+        scoreRequestAbortRef.current = null;
+      }
       isScoringRef.current = false;
       setIsScoringEssay(false);
     }
@@ -655,7 +732,10 @@ export function EssaysScreen() {
 
       {isFormOpen ? (
         <EssayForm
+          applications={applications}
+          applicationsLoadError={applicationsLoadError}
           essay={editingEssay}
+          isApplicationsLoading={isApplicationsLoading}
           isShortlistLoading={isShortlistLoading}
           isSubmitting={isSubmittingForm}
           onCancel={() => {
@@ -1090,10 +1170,14 @@ export function EssaysScreen() {
                   </Card>
                 ) : null}
 
-                {scoreRequestFailed ? (
+                {scoreRequestFailureCode ? (
                   <Card className="border-warning/35 bg-warning/10">
                     <p className="text-sm text-warning" role="alert">
-                      {t("essays.score.requestFailed")}
+                      {scoreRequestFailureCode === "AI_TIMEOUT"
+                        ? t("common.error.timeout")
+                        : scoreRequestFailureCode === "NETWORK_ERROR"
+                          ? t("common.error.network")
+                          : t("essays.score.requestFailed")}
                     </p>
                   </Card>
                 ) : null}
@@ -1107,13 +1191,17 @@ export function EssaysScreen() {
                               ? formatDate(scoreNotice.nextAvailableAt, locale)
                               : ""
                           })
-                        : scoreNotice.reason === "ai_unavailable"
-                          ? t("essays.score.unavailable")
-                          : scoreNotice.reason === "missing_essay_text"
-                            ? t("essays.score.missingText")
-                            : scoreNotice.reason === "essay_too_long"
-                              ? t("essays.score.tooLong")
-                            : t("essays.score.validationFailed")}
+                        : scoreNotice.reason === "review_already_running"
+                          ? t("essays.score.reviewAlreadyRunning")
+                          : scoreNotice.reason === "ai_unavailable"
+                            ? scoreNotice.aiErrorKind === "rate_limited"
+                              ? t("essays.score.rateLimited")
+                              : t("essays.score.unavailable")
+                            : scoreNotice.reason === "missing_essay_text"
+                              ? t("essays.score.missingText")
+                              : scoreNotice.reason === "essay_too_long"
+                                ? t("essays.score.tooLong")
+                                : t("essays.score.validationFailed")}
                     </p>
                   </Card>
                 ) : null}
@@ -1128,7 +1216,7 @@ export function EssaysScreen() {
                         <span className="rounded-sm border bg-card px-2 py-0.5 font-semibold">
                           {t("essays.score.overall", { score: latestScore.overall_essay_readiness })}
                         </span>
-                        {scoreRequestFailed ||
+                        {scoreRequestFailureCode ||
                         (scoreNotice &&
                           (scoreNotice.reason === "ai_unavailable" ||
                             scoreNotice.reason === "validation_failed"))
@@ -1151,7 +1239,7 @@ export function EssaysScreen() {
                       <div>
                         <h3 className="text-lg font-semibold">{t("essays.score.title")}</h3>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {scoreRequestFailed ||
+                          {scoreRequestFailureCode ||
                           (scoreNotice &&
                             (scoreNotice.reason === "ai_unavailable" ||
                               scoreNotice.reason === "validation_failed"))
@@ -1170,6 +1258,7 @@ export function EssaysScreen() {
                         <Badge className="text-xs">
                           {t(`essays.confidence.${latestScore.confidence}` as TranslationKey)}
                         </Badge>
+                        <ReportButton targetId={latestScore.id} targetType="essay_review" />
                       </div>
                     </div>
 

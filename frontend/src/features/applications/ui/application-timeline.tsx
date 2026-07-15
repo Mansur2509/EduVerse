@@ -13,12 +13,16 @@ import type {
   TimelineSuggestedDate,
   Urgency
 } from "@/entities/application";
+import type { EssayWorkspace } from "@/entities/essay";
 import { getApplicationTimelineRequest } from "@/features/applications";
+import { getEssaysRequest, updateEssayRequest } from "@/features/essays";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
+import { useSlowLoad } from "@/shared/lib/use-slow-load";
 import { Button } from "@/shared/ui/button";
 import { fieldClassName } from "@/shared/ui/field";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
+import { SkeletonText } from "@/shared/ui/skeleton";
 
 const DEFAULT_VISIBLE_EVENTS = 5;
 
@@ -267,7 +271,15 @@ function ExamRow({ exam }: { exam: TimelineExam }) {
   );
 }
 
-function EssayRow({ essay }: { essay: TimelineEssay }) {
+function EssayRow({
+  essay,
+  isUnlinking,
+  onUnlink
+}: {
+  essay: TimelineEssay;
+  isUnlinking: boolean;
+  onUnlink: (essayId: number) => void;
+}) {
   const { locale, t } = useI18n();
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-sm border bg-surface px-3 py-2 text-sm">
@@ -284,7 +296,18 @@ function EssayRow({ essay }: { essay: TimelineEssay }) {
             : t("applications.linkedEssays.wordCount", { count: essay.word_count })}
         </p>
       </div>
-      <span className="text-xs text-muted-foreground">{formatDate(essay.updated_at, locale)}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">{formatDate(essay.updated_at, locale)}</span>
+        <Button
+          disabled={isUnlinking}
+          onClick={() => onUnlink(essay.id)}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          {isUnlinking ? t("applications.linkedEssays.unlinking") : t("applications.linkedEssays.unlink")}
+        </Button>
+      </div>
     </li>
   );
 }
@@ -294,15 +317,28 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
   const [timeline, setTimeline] = useState<ApplicationTimeline | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const isSlow = useSlowLoad(isLoading);
+  const [retryToken, setRetryToken] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [zoom, setZoom] = useState<ZoomMode>("year");
   const [showCompleted, setShowCompleted] = useState(false);
+
+  const [unlinkingEssayId, setUnlinkingEssayId] = useState<number | null>(null);
+  const [essayActionError, setEssayActionError] = useState(false);
+  const [isEssayPickerOpen, setIsEssayPickerOpen] = useState(false);
+  const [candidateEssays, setCandidateEssays] = useState<EssayWorkspace[]>([]);
+  const [candidatesRequested, setCandidatesRequested] = useState(false);
+  const [isCandidatesLoading, setIsCandidatesLoading] = useState(false);
+  const [candidatesLoadError, setCandidatesLoadError] = useState(false);
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
+  const [isLinkingEssay, setIsLinkingEssay] = useState(false);
 
   useEffect(() => {
     let active = true;
     setIsLoading(true);
     setHasError(false);
     setExpanded(false);
+    setIsEssayPickerOpen(false);
     getApplicationTimelineRequest(applicationId)
       .then((data) => {
         if (active) setTimeline(data);
@@ -316,13 +352,115 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
     return () => {
       active = false;
     };
-  }, [applicationId]);
+  }, [applicationId, retryToken]);
+
+  async function handleUnlinkEssay(essayId: number) {
+    setEssayActionError(false);
+    setUnlinkingEssayId(essayId);
+    try {
+      await updateEssayRequest(essayId, { application: null });
+      setTimeline((prev) =>
+        prev
+          ? { ...prev, linked_essays: prev.linked_essays.filter((essay) => essay.id !== essayId) }
+          : prev
+      );
+    } catch {
+      setEssayActionError(true);
+    } finally {
+      setUnlinkingEssayId(null);
+    }
+  }
+
+  function handleOpenEssayPicker() {
+    setIsEssayPickerOpen(true);
+    if (candidatesRequested) return;
+    setCandidatesRequested(true);
+    setIsCandidatesLoading(true);
+    setCandidatesLoadError(false);
+    getEssaysRequest({ page_size: 200 })
+      .then((response) => setCandidateEssays(response.results))
+      .catch(() => setCandidatesLoadError(true))
+      .finally(() => setIsCandidatesLoading(false));
+  }
+
+  async function handleLinkEssay() {
+    if (!selectedCandidateId) return;
+    setEssayActionError(false);
+    setIsLinkingEssay(true);
+    try {
+      const linked = await updateEssayRequest(Number(selectedCandidateId), {
+        application: applicationId
+      });
+      setTimeline((prev) =>
+        prev
+          ? {
+              ...prev,
+              linked_essays: [
+                ...prev.linked_essays.filter((essay) => essay.id !== linked.id),
+                {
+                  id: linked.id,
+                  title: linked.title,
+                  essay_type: linked.essay_type,
+                  status: linked.status,
+                  word_limit: linked.word_limit,
+                  word_count: linked.word_count,
+                  updated_at: linked.updated_at,
+                  source_url: linked.source_url
+                }
+              ]
+            }
+          : prev
+      );
+      setSelectedCandidateId("");
+      setIsEssayPickerOpen(false);
+      // The essay may have moved from another application to this one, or
+      // been linked for the first time -- either way the candidate list is
+      // now stale (it still shows this essay as linkable). Force a fresh
+      // fetch next time the picker reopens rather than showing an outdated
+      // "already linked here" essay as still pickable.
+      setCandidatesRequested(false);
+    } catch {
+      setEssayActionError(true);
+    } finally {
+      setIsLinkingEssay(false);
+    }
+  }
+
+  const linkableEssays = candidateEssays.filter(
+    (essay) => essay.application !== applicationId
+  );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">{t("applications.timeline.loading")}</p>;
+    return (
+      <div>
+        <p className="text-sm text-muted-foreground" role="status">
+          {t("applications.timeline.loading")}
+        </p>
+        {isSlow ? (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground" role="status">
+            {t("common.wakingUp")}
+          </p>
+        ) : null}
+      </div>
+    );
   }
   if (hasError || !timeline) {
-    return <p className="text-sm text-danger">{t("applications.timeline.error")}</p>;
+    return (
+      <div>
+        <p className="text-sm text-danger" role="alert">
+          {t("applications.timeline.error")}
+        </p>
+        <Button
+          className="mt-3"
+          onClick={() => setRetryToken((value) => value + 1)}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          {t("common.retry")}
+        </Button>
+      </div>
+    );
   }
 
   const zoomedEvents = timeline.events.filter((event) => isWithinZoom(event.date, zoom));
@@ -442,13 +580,88 @@ export function ApplicationTimelinePanel({ applicationId }: { applicationId: num
           ) : (
             <ul className="mt-2 space-y-2">
               {timeline.linked_essays.map((essay) => (
-                <EssayRow essay={essay} key={essay.id} />
+                <EssayRow
+                  essay={essay}
+                  isUnlinking={unlinkingEssayId === essay.id}
+                  key={essay.id}
+                  onUnlink={(essayId) => void handleUnlinkEssay(essayId)}
+                />
               ))}
             </ul>
           )}
-          <Button asChild className="mt-2" size="sm" variant="ghost">
-            <Link href="/essays">{t("applications.linkedEssays.open")}</Link>
-          </Button>
+
+          {essayActionError ? (
+            <p className="mt-2 text-xs text-danger" role="alert">
+              {t("applications.states.actionError")}
+            </p>
+          ) : null}
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/essays">{t("applications.linkedEssays.open")}</Link>
+            </Button>
+            {!isEssayPickerOpen ? (
+              <Button onClick={handleOpenEssayPicker} size="sm" type="button" variant="ghost">
+                {t("applications.linkedEssays.linkExisting")}
+              </Button>
+            ) : null}
+          </div>
+
+          {isEssayPickerOpen ? (
+            <div className="mt-2 flex flex-wrap items-end gap-2">
+              <label className="block flex-1">
+                <span className="text-xs font-semibold">
+                  {t("applications.linkedEssays.selectEssayLabel")}
+                </span>
+                <select
+                  className={fieldClassName}
+                  onChange={(event) => setSelectedCandidateId(event.target.value)}
+                  value={selectedCandidateId}
+                >
+                  <option value="">{t("applications.linkedEssays.selectEssayPlaceholder")}</option>
+                  {linkableEssays.map((essay) => (
+                    <option key={essay.id} value={essay.id}>
+                      {essay.title}
+                      {essay.application_university_name
+                        ? ` (${t("applications.linkedEssays.linkedElsewhere", {
+                            university: essay.application_university_name
+                          })})`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                {candidatesLoadError ? (
+                  <p className="mt-1 text-xs text-warning" role="alert">
+                    {t("applications.linkedEssays.loadCandidatesError")}
+                  </p>
+                ) : isCandidatesLoading ? (
+                  <SkeletonText className="mt-1 w-1/2" />
+                ) : !isCandidatesLoading && linkableEssays.length === 0 ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("applications.linkedEssays.noCandidates")}
+                  </p>
+                ) : null}
+              </label>
+              <Button
+                disabled={!selectedCandidateId || isLinkingEssay}
+                onClick={() => void handleLinkEssay()}
+                size="sm"
+                type="button"
+              >
+                {isLinkingEssay
+                  ? t("applications.linkedEssays.linking")
+                  : t("applications.linkedEssays.link")}
+              </Button>
+              <Button
+                onClick={() => setIsEssayPickerOpen(false)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                {t("common.actions.cancel")}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div>

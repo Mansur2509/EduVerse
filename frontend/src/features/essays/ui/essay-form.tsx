@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import type { ApplicationTrackerItem } from "@/entities/application";
 import {
   ESSAY_PRIORITIES,
   ESSAY_TYPES,
@@ -21,6 +22,7 @@ export type EssayFormValues = {
   title: string;
   essay_type: EssayType;
   university: number | null;
+  application: number | null;
   prompt_text: string;
   word_limit: string;
   due_date: string;
@@ -34,6 +36,9 @@ export function EssayForm({
   shortlist,
   isShortlistLoading = false,
   shortlistLoadError = false,
+  applications,
+  isApplicationsLoading = false,
+  applicationsLoadError = false,
   onSubmit,
   onCancel,
   isSubmitting
@@ -42,6 +47,9 @@ export function EssayForm({
   shortlist: SavedUniversityLite[];
   isShortlistLoading?: boolean;
   shortlistLoadError?: boolean;
+  applications: ApplicationTrackerItem[];
+  isApplicationsLoading?: boolean;
+  applicationsLoadError?: boolean;
   onSubmit: (values: EssayFormValues) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -51,6 +59,7 @@ export function EssayForm({
     title: essay?.title ?? "",
     essay_type: essay?.essay_type ?? "common_app",
     university: essay?.university ?? null,
+    application: essay?.application ?? null,
     prompt_text: essay?.prompt_text ?? "",
     word_limit: essay?.word_limit ? String(essay.word_limit) : "",
     due_date: essay?.due_date ?? "",
@@ -151,6 +160,7 @@ export function EssayForm({
             <span className="text-xs font-semibold">{t("essays.form.university")}</span>
             <select
               className={fieldClassName}
+              disabled={Boolean(values.application)}
               onChange={(event) =>
                 setValues((current) => ({
                   ...current,
@@ -175,6 +185,47 @@ export function EssayForm({
             ) : null}
           </label>
         </div>
+        <label className="block">
+          <span className="text-xs font-semibold">{t("essays.form.application")}</span>
+          <select
+            className={fieldClassName}
+            onChange={(event) => {
+              const nextApplicationId = event.target.value ? Number(event.target.value) : null;
+              const matched = applications.find((item) => item.id === nextApplicationId);
+              setValues((current) => ({
+                ...current,
+                application: nextApplicationId,
+                // Mirrors the backend's own validate(): linking an application
+                // always forces the essay's university to match it, so the form
+                // should never let the two visibly disagree before saving.
+                university: matched ? matched.university : current.university
+              }));
+            }}
+            value={values.application ?? ""}
+          >
+            <option value="">{t("essays.form.noApplication")}</option>
+            {applications.map((application) => (
+              <option key={application.id} value={application.id}>
+                {application.university_name}
+                {" · "}
+                {t(`applications.round.${application.application_round}` as TranslationKey)}
+                {application.archived_at ? ` (${t("essays.form.applicationArchived")})` : ""}
+              </option>
+            ))}
+          </select>
+          {values.application ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("essays.form.universityDerivedFromApplication")}
+            </p>
+          ) : null}
+          {applicationsLoadError ? (
+            <p className="mt-1 text-xs text-warning" role="alert">
+              {t("essays.form.applicationsLoadError")}
+            </p>
+          ) : isApplicationsLoading ? (
+            <p className="mt-1 text-xs text-muted-foreground">{t("common.loading")}</p>
+          ) : null}
+        </label>
         <label className="block">
           <span className="text-xs font-semibold">{t("essays.form.prompt")}</span>
           <textarea

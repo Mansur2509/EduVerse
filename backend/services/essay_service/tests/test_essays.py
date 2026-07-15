@@ -633,6 +633,69 @@ class EssayWorkspaceApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["results"], [])
 
+    def test_link_essay_to_own_application_syncs_university(self):
+        university = create_university(slug="link-sync-university")
+        application = ApplicationTrackerItem.objects.create(user=self.user1, university=university)
+        essay = EssayWorkspace.objects.create(user=self.user1, title="Why this school")
+
+        self.client.force_authenticate(self.user1)
+        response = self.client.patch(
+            f"/api/essays/{essay.id}/", {"application": application.id}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        essay.refresh_from_db()
+        self.assertEqual(essay.application_id, application.id)
+        self.assertEqual(essay.university_id, university.id)
+
+    def test_link_essay_to_another_users_application_is_rejected(self):
+        university = create_university(slug="link-ownership-university")
+        other_application = ApplicationTrackerItem.objects.create(user=self.user2, university=university)
+        essay = EssayWorkspace.objects.create(user=self.user1, title="Not yours to link")
+
+        self.client.force_authenticate(self.user1)
+        response = self.client.patch(
+            f"/api/essays/{essay.id}/", {"application": other_application.id}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        essay.refresh_from_db()
+        self.assertIsNone(essay.application_id)
+
+    def test_unlink_essay_preserves_university(self):
+        university = create_university(slug="unlink-preserve-university")
+        application = ApplicationTrackerItem.objects.create(user=self.user1, university=university)
+        essay = EssayWorkspace.objects.create(
+            user=self.user1, title="Already linked", university=university, application=application
+        )
+
+        self.client.force_authenticate(self.user1)
+        response = self.client.patch(f"/api/essays/{essay.id}/", {"application": None}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        essay.refresh_from_db()
+        self.assertIsNone(essay.application_id)
+        self.assertEqual(essay.university_id, university.id)
+
+    def test_link_application_with_mismatched_university_is_rejected(self):
+        essay_university = create_university(slug="mismatch-essay-university")
+        application_university = create_university(slug="mismatch-application-university")
+        application = ApplicationTrackerItem.objects.create(
+            user=self.user1, university=application_university
+        )
+        essay = EssayWorkspace.objects.create(user=self.user1, title="Conflicting link")
+
+        self.client.force_authenticate(self.user1)
+        response = self.client.patch(
+            f"/api/essays/{essay.id}/",
+            {"application": application.id, "university": essay_university.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        essay.refresh_from_db()
+        self.assertIsNone(essay.application_id)
+
 
 @override_settings(
     AI_ESSAY_SCORING_ENABLED=True,
@@ -718,6 +781,7 @@ class AIEssayScoringTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(response.data["reason"], "ai_unavailable")
+        self.assertEqual(response.data["ai_error_kind"], "not_configured")
         self.assertIsNone(response.data["score"])
         self.assertFalse(AIEssayScoreReport.objects.exists())
 
@@ -993,6 +1057,7 @@ class AIEssayScoringTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(response.data["reason"], "ai_unavailable")
+        self.assertEqual(response.data["ai_error_kind"], "provider_unavailable")
         log_line = "\n".join(captured.output)
         self.assertIn("feature=essay_scoring", log_line)
         self.assertIn("status=404", log_line)
@@ -1105,7 +1170,60 @@ class AIEssayScoringTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(response.data["reason"], "ai_unavailable")
+        self.assertEqual(response.data["ai_error_kind"], "provider_unavailable")
         self.assertEqual(client.calls, 1)
+
+    def test_provider_rate_limit_is_classified_distinctly_and_not_retried(self):
+        essay = self._essay()
+        error = AIProviderError(
+            "Gemini essay scoring request failed.",
+            status_code=429,
+            error_body='{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED"}}',
+            cause_class="HTTPError",
+            provider_code=429,
+            provider_status="RESOURCE_EXHAUSTED",
+        )
+        client = FakeFlakyEssayScoringClient(error, fail_times=99)
+
+        response = self._score_with_client(essay, client)
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data["reason"], "ai_unavailable")
+        self.assertEqual(response.data["ai_error_kind"], "rate_limited")
+        # A provider rate-limit is a 4xx, not a transient 5xx/timeout -- never
+        # worth spending a second call on the identical request.
+        self.assertEqual(client.calls, 1)
+
+    def test_review_already_running_is_rejected_with_409_and_does_not_call_provider(self):
+        essay = self._essay()
+        cache.add(f"essay_review_lock:{essay.id}", True, timeout=180)
+        client = FakeEssayScoringClient()
+
+        response = self._score_with_client(essay, client)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["reason"], "review_already_running")
+        self.assertEqual(client.calls, 0)
+        self.assertFalse(AIEssayScoreReport.objects.exists())
+
+    def test_lock_is_released_after_a_completed_review_so_a_later_request_can_proceed(self):
+        essay = self._essay()
+        client = FakeEssayScoringClient()
+
+        first = self._score_with_client(essay, client)
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertIsNone(cache.get(f"essay_review_lock:{essay.id}"))
+
+    def test_lock_is_released_after_a_failed_review_so_a_later_request_can_proceed(self):
+        essay = self._essay()
+        error = AIProviderError("Gemini essay scoring request failed.", status_code=400)
+        client = FakeFailingEssayScoringClient(error)
+
+        first = self._score_with_client(essay, client)
+
+        self.assertEqual(first.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertIsNone(cache.get(f"essay_review_lock:{essay.id}"))
 
     def test_concurrent_scoring_reuses_winning_report_instead_of_duplicating(self):
         essay = self._essay()

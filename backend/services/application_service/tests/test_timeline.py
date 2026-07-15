@@ -170,6 +170,25 @@ class ApplicationTimelineApiTests(APITestCase):
 
     def test_linked_essays_appear(self):
         university = _create_university()
+        application = self._create_application(university)
+        EssayWorkspace.objects.create(
+            user=self.user,
+            university=university,
+            application=application,
+            title="Why this school",
+            essay_type=EssayWorkspace.EssayType.WHY_SCHOOL,
+            word_limit=650,
+            draft_text="one two three",
+        )
+        data = self._timeline(application)
+        self.assertEqual(len(data["linked_essays"]), 1)
+        self.assertEqual(data["linked_essays"][0]["word_count"], 3)
+
+    def test_essay_sharing_university_but_not_linked_to_application_is_excluded(self):
+        # A university-matched essay that was never explicitly linked (via the
+        # `application` FK) must not appear as "linked" -- otherwise the
+        # unlink action in the UI would have no visible effect.
+        university = _create_university()
         EssayWorkspace.objects.create(
             user=self.user,
             university=university,
@@ -180,8 +199,7 @@ class ApplicationTimelineApiTests(APITestCase):
         )
         application = self._create_application(university)
         data = self._timeline(application)
-        self.assertEqual(len(data["linked_essays"]), 1)
-        self.assertEqual(data["linked_essays"][0]["word_count"], 3)
+        self.assertEqual(data["linked_essays"], [])
 
     def test_linked_exams_report_sat_gap_severity(self):
         university = _create_university(sat_p75=1510)
