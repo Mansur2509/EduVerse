@@ -1,7 +1,9 @@
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import SimpleTestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
 
 from services.application_service.models import ApplicationTrackerItem
@@ -200,6 +202,44 @@ class ApplicationTimelineApiTests(APITestCase):
         application = self._create_application(university)
         data = self._timeline(application)
         self.assertEqual(data["linked_essays"], [])
+
+    def test_linked_essays_query_count_does_not_grow_with_essay_count(self):
+        # _linked_essays() is a single filtered queryset with word_count
+        # computed from an already-loaded field -- guards against a future
+        # change reintroducing a per-essay query.
+        university = _create_university()
+        application = self._create_application(university)
+        for index in range(2):
+            EssayWorkspace.objects.create(
+                user=self.user,
+                university=university,
+                application=application,
+                title=f"Essay {index}",
+                essay_type=EssayWorkspace.EssayType.WHY_SCHOOL,
+                draft_text="one two three",
+            )
+
+        with CaptureQueriesContext(connection) as few:
+            self._timeline(application)
+
+        for index in range(2, 8):
+            EssayWorkspace.objects.create(
+                user=self.user,
+                university=university,
+                application=application,
+                title=f"Essay {index}",
+                essay_type=EssayWorkspace.EssayType.WHY_SCHOOL,
+                draft_text="one two three",
+            )
+
+        with CaptureQueriesContext(connection) as many:
+            self._timeline(application)
+
+        self.assertEqual(
+            len(few),
+            len(many),
+            "Timeline query count grew with linked-essay count -- check for a new N+1.",
+        )
 
     def test_linked_exams_report_sat_gap_severity(self):
         university = _create_university(sat_p75=1510)

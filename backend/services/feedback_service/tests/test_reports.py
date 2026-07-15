@@ -84,6 +84,22 @@ class UserReportSubmissionTests(APITestCase):
         self.assertEqual(report.status, UserReport.Status.OPEN)
         self.assertEqual(report.target_id, university.id)
 
+    def test_submit_report_query_count_is_bounded(self):
+        # Guards validate()'s target-existence + dedup checks (each a single
+        # .exists() call) against a future change adding a per-request N+1.
+        university = create_university()
+        self.client.force_authenticate(self.student)
+        with self.assertNumQueries(3):
+            response = self.client.post(
+                CREATE_URL,
+                {
+                    "target_type": "university",
+                    "target_id": university.id,
+                    "reason": "Wrong deadline listed.",
+                },
+            )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
     def test_blank_reason_is_rejected(self):
         self.client.force_authenticate(self.student)
         response = self.client.post(
