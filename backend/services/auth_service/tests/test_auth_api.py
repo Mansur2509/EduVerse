@@ -106,6 +106,33 @@ class AuthApiTests(APITestCase):
         self.assertEqual(response.data["profile"]["scholarship_need"], "unsure")
         self.assertEqual(response.data["subscription"]["tier"], Plan.FREE)
         self.assertFalse(response.data["google_linked"])
+        self.assertFalse(response.data["product_tour_dismissed"])
+
+    def test_product_tour_dismissal_is_persisted_and_one_way(self):
+        register_response = self.register()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {register_response.data['access']}")
+
+        dismiss_response = self.client.patch(
+            reverse("auth:me"), {"product_tour_dismissed": True}, format="json"
+        )
+        self.assertEqual(dismiss_response.status_code, 200, dismiss_response.json())
+        self.assertTrue(dismiss_response.data["product_tour_dismissed"])
+
+        me_response = self.client.get(reverse("auth:me"))
+        self.assertTrue(me_response.data["product_tour_dismissed"])
+
+        user = User.objects.get(email=self.register_payload["email"])
+        first_dismissed_at = user.preferences.product_tour_dismissed_at
+        self.assertIsNotNone(first_dismissed_at)
+
+        # Sending false must not clear it -- dismissal is one-way.
+        second_response = self.client.patch(
+            reverse("auth:me"), {"product_tour_dismissed": False}, format="json"
+        )
+        self.assertEqual(second_response.status_code, 200)
+        self.assertTrue(second_response.data["product_tour_dismissed"])
+        user.refresh_from_db()
+        self.assertEqual(user.preferences.product_tour_dismissed_at, first_dismissed_at)
 
     def test_me_reports_google_linked_when_a_social_identity_exists(self):
         register_response = self.register()

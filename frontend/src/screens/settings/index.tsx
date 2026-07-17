@@ -1,6 +1,14 @@
 "use client";
 
-import { AlertTriangle, CircleUserRound, Eye, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  Compass,
+  CircleUserRound,
+  Eye,
+  LogOut,
+  RefreshCw,
+  ShieldCheck
+} from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import type { NotificationPreference } from "@/entities/notification";
@@ -10,6 +18,7 @@ import {
   updateNotificationPreferencesRequest
 } from "@/features/notifications";
 import { OrganizerApplicationCard } from "@/features/organizer-application";
+import { useProductTour } from "@/features/product-tour";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { fieldClassName } from "@/shared/ui/field";
 import { AppIcon } from "@/shared/ui/icon";
@@ -43,6 +52,7 @@ function SectionHeading({ title, description }: { title: string; description: st
 export function SettingsScreen() {
   const { t } = useI18n();
   const { user, updateUser, logout } = useAuth();
+  const { reopen: reopenProductTour } = useProductTour();
 
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [nameSaveState, setNameSaveState] = useState<"idle" | "saving" | "saved" | "error">(
@@ -117,6 +127,17 @@ export function SettingsScreen() {
           {t("settings.description")}
         </p>
       </div>
+
+      <Card className="p-4">
+        <SectionHeading
+          description={t("settings.productTour.description")}
+          title={t("settings.productTour.title")}
+        />
+        <Button onClick={reopenProductTour} size="sm" type="button" variant="secondary">
+          <AppIcon className="mr-2" icon={Compass} />
+          {t("settings.productTour.reopen")}
+        </Button>
+      </Card>
 
       <Card className="p-4">
         <SectionHeading

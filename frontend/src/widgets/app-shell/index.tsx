@@ -6,11 +6,14 @@ import type { ReactNode } from "react";
 
 import { useAuth } from "@/features/auth/model/auth-context";
 import { NotificationBell } from "@/features/notifications";
+import { ProductTourModal, ProductTourProvider } from "@/features/product-tour";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
+import { BrandMark } from "@/shared/ui/brand-mark";
 import { AppIcon } from "@/shared/ui/icon";
 import { LanguageSwitcher } from "@/shared/ui/language-switcher";
 import { SupportLink } from "@/shared/ui/support-link";
+import { ThemeToggleButton } from "@/shared/ui/theme-selector";
 
 import { NavLink } from "./nav-link";
 import {
@@ -53,12 +56,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const planKey = `plans.${user.subscription.tier}` as TranslationKey;
 
   return (
+    <ProductTourProvider>
     <div className="min-h-screen lg:fixed lg:inset-0 lg:flex lg:min-h-0 lg:overflow-hidden">
       <aside className="hidden h-dvh w-[16rem] shrink-0 flex-col border-r border-white/10 bg-navy px-3 py-5 text-navy-foreground lg:flex">
         <Link className="mb-6 flex shrink-0 items-center gap-3 px-2" href="/dashboard">
-          <span className="grid size-9 place-items-center rounded-sm border border-white/20 bg-primary font-serif text-lg font-bold text-primary-foreground">
-            U
-          </span>
+          <BrandMark className="size-9 shrink-0 overflow-hidden rounded-sm" />
           <span>
             <strong className="block font-serif text-lg">UniWay</strong>
             <span className="text-xs text-white/55">{t("shell.productSubtitle")}</span>
@@ -152,9 +154,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <AppIcon icon={LogOut} />
               {t("navigation.logout")}
             </button>
+            <ThemeToggleButton />
             <Link
               aria-label={t("navigation.settings")}
-              className="grid size-9 place-items-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+              className="grid size-9 place-items-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               href="/settings"
               title={t("navigation.settings")}
             >
@@ -192,6 +195,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NavLink compact inverse item={item} key={item.href} />
         ))}
       </nav>
+
+      <ProductTourModal />
     </div>
+    </ProductTourProvider>
   );
 }

@@ -25,6 +25,7 @@ export type CurrentUser = {
   google_linked: boolean;
   profile: UserProfile;
   subscription: UserSubscription;
+  product_tour_dismissed: boolean;
 };
 
 export type AuthResponse = {
@@ -46,4 +47,5 @@ export type RegisterInput = LoginInput & {
 export type UpdateCurrentUserInput = {
   full_name?: string;
   profile?: Partial<UserProfile>;
+  product_tour_dismissed?: boolean;
 };
