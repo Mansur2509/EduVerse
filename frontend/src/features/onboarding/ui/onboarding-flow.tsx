@@ -35,6 +35,7 @@ import {
 import { ApiError, getApiErrorMessage } from "@/shared/api/client";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { useUnsavedChangesGuard } from "@/shared/lib/use-unsaved-changes-guard";
+import { BrandMark } from "@/shared/ui/brand-mark";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { fieldClassName } from "@/shared/ui/field";
@@ -45,7 +46,50 @@ import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 import { AdmissionsProposals } from "./admissions-proposals";
 import { MajorAssessment } from "./major-assessment";
 
-const DRAFT_KEY = "uniway.onboarding.draft.v1";
+// v2: localStorage (not sessionStorage) so a draft survives a full browser
+// restart, wrapped with a timestamp so a very old, possibly-superseded draft
+// doesn't silently keep overriding fresher backend data forever.
+const DRAFT_KEY = "uniway.onboarding.draft.v2";
+const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const AUTOSAVE_DEBOUNCE_MS = 2000;
+
+type OnboardingDraft = {
+  savedAt: number;
+  form: OnboardingForm;
+};
+
+function readDraft(): OnboardingForm | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as OnboardingDraft;
+    if (!parsed?.form || Date.now() - parsed.savedAt > DRAFT_MAX_AGE_MS) return null;
+    return parsed.form;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(form: OnboardingForm) {
+  try {
+    window.localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ savedAt: Date.now(), form } satisfies OnboardingDraft)
+    );
+  } catch {
+    // Storage can fail (private browsing, quota) -- the draft is a
+    // best-effort local safety net, never the only copy of the data.
+  }
+}
+
+function clearDraft() {
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Ignore: nothing meaningful to recover from a storage failure here.
+  }
+}
+
 const stepSections: Array<OnboardingSection | null> = [
   "identity",
   "academic",
@@ -551,17 +595,31 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   const [officialDates, setOfficialDates] = useState<OfficialExamDate[]>([]);
   const officialDatesRequestedRef = useRef(false);
   const [officialDatesError, setOfficialDatesError] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "saving" | "saved" | "offline">("idle");
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
         const profile = await getProfileRequest();
-        const stored = window.sessionStorage.getItem(DRAFT_KEY);
+        const draft = readDraft();
         const backendForm = profileToForm(profile);
-        const nextForm = stored ? { ...backendForm, ...JSON.parse(stored) } : backendForm;
+        const nextForm = draft ? { ...backendForm, ...draft } : backendForm;
         setForm(nextForm);
+        // `savedForm` tracks what the backend actually has, not the merged
+        // draft -- so a restored draft correctly shows as "unsaved changes"
+        // until the debounced autosave (or an explicit Continue) syncs it.
         setSavedForm(backendForm);
         setSections(profile.onboarding_sections);
+        // Resume at the first not-yet-completed step rather than always
+        // restarting at step 0, so returning students don't have to click
+        // back through sections they already finished in a prior session.
+        const resumeIndex = stepSections.findIndex(
+          (section) => section !== null && !profile.onboarding_sections.includes(section)
+        );
+        if (resumeIndex >= 0) {
+          setStep(resumeIndex);
+        }
       } catch (loadError) {
         setError(localizedSaveError(loadError, t, t("onboarding.error.load")));
       } finally {
@@ -573,9 +631,37 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
 
   useEffect(() => {
     if (!isLoading) {
-      window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+      writeDraft(form);
     }
   }, [form, isLoading]);
+
+  // Debounced server-side autosave: syncs in-progress edits within a step
+  // (not just on step transitions) so a closed tab, dead connection, or a
+  // forced logout never loses more than a couple of seconds of typing --
+  // the local draft above is the fallback if this call itself fails.
+  useEffect(() => {
+    if (isLoading || isSaving) return;
+    if (JSON.stringify(form) === JSON.stringify(savedForm)) return;
+
+    autosaveTimerRef.current = setTimeout(() => {
+      void (async () => {
+        setSyncStatus("saving");
+        try {
+          await updateProfileRequest(formPayload(form, sections));
+          setSavedForm(form);
+          setSyncStatus("saved");
+        } catch {
+          // Never touch `form`/`savedForm` on failure -- the student's typed
+          // text must survive a dropped connection untouched.
+          setSyncStatus("offline");
+        }
+      })();
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [form, savedForm, sections, isLoading, isSaving]);
 
   useEffect(() => {
     if (step !== 2 || officialDatesRequestedRef.current) return;
@@ -638,6 +724,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   });
 
   async function saveCurrentStep(nextStep: number) {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     setIsSaving(true);
     setError(null);
     const section = stepSections[step];
@@ -650,10 +737,12 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
       }
       setSections(nextSections);
       setSavedForm(form);
+      setSyncStatus("saved");
       setStep(nextStep);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
     } catch (saveError) {
+      setSyncStatus("offline");
       setError(localizedSaveError(saveError, t, t("onboarding.error.save")));
       return false;
     } finally {
@@ -662,13 +751,16 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
   }
 
   async function saveOnboardingDraft() {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     setIsSaving(true);
     setError(null);
     try {
       await updateProfileRequest(formPayload(form, sections));
       setSavedForm(form);
+      setSyncStatus("saved");
       return true;
     } catch (saveError) {
+      setSyncStatus("offline");
       setError(localizedSaveError(saveError, t, t("onboarding.error.save")));
       return false;
     } finally {
@@ -690,7 +782,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
         return;
       }
       await completeOnboardingRequest();
-      window.sessionStorage.removeItem(DRAFT_KEY);
+      clearDraft();
       onCompleted?.();
     } catch (finishError) {
       setError(localizedSaveError(finishError, t, t("onboarding.error.finish")));
@@ -793,9 +885,7 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
       <header className="border-b border-white/10 bg-navy px-4 py-4 text-navy-foreground sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-sm bg-primary font-serif text-xl font-bold">
-              E
-            </span>
+            <BrandMark className="size-9 shrink-0 overflow-hidden rounded-sm" />
             <div>
               <p className="font-serif text-lg font-semibold">UniWay</p>
               <p className="text-[0.65rem] uppercase tracking-[0.16em] text-white/55">
@@ -827,6 +917,15 @@ export function OnboardingFlow({ onCompleted }: { onCompleted?: () => void }) {
           <div className="mt-4 h-1.5 bg-muted">
             <div className="h-full bg-primary" style={{ width: `${((step + 1) / 6) * 100}%` }} />
           </div>
+          {syncStatus !== "idle" ? (
+            <p className="mt-3 text-xs font-semibold text-muted-foreground" role="status">
+              {syncStatus === "saving"
+                ? t("onboarding.sync.saving")
+                : syncStatus === "offline"
+                  ? t("onboarding.sync.offline")
+                  : t("onboarding.sync.saved")}
+            </p>
+          ) : null}
           <ol className="mt-6 hidden space-y-1 lg:block">
             {Array.from({ length: 6 }, (_, index) => (
               <li
