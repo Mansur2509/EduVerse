@@ -59,10 +59,12 @@ import {
 } from "@/features/suggestions";
 import { getRecommendationsRequest } from "@/features/universities";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
+import { cn } from "@/shared/lib/cn";
 import { formatDate, formatDateTime } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { ProgressRing } from "@/shared/ui/progress-ring";
 import { HelpTooltip } from "@/shared/ui/help-tooltip";
 
 type DashboardUrgency =
@@ -116,6 +118,31 @@ const PROFILE_SECTION_HREFS: Record<string, string> = {
 function profileSectionHref(component: string) {
   return PROFILE_SECTION_HREFS[component] ?? "/profile";
 }
+
+// Icon-chip + top-accent classes for each Core tools tone -- kept to a fixed
+// map (not computed) so the four tones stay stable and never drift into an
+// arbitrary color per render.
+const CORE_TOOL_TONE_CLASSES: Record<
+  "recommendation" | "success" | "info" | "accent",
+  { chip: string; topBar: string }
+> = {
+  recommendation: {
+    chip: "border-recommendation/30 bg-recommendation/10 text-recommendation",
+    topBar: "bg-recommendation"
+  },
+  success: {
+    chip: "border-success/30 bg-success/10 text-success",
+    topBar: "bg-success"
+  },
+  info: {
+    chip: "border-info/30 bg-info/10 text-info",
+    topBar: "bg-info"
+  },
+  accent: {
+    chip: "border-accent/35 bg-accent/10 text-accent",
+    topBar: "bg-accent"
+  }
+};
 
 export function DashboardScreen() {
   const { user } = useAuth();
@@ -522,6 +549,12 @@ export function DashboardScreen() {
   const coreTools: Array<{
     key: string;
     href: string;
+    // Each tool gets its own semantic tone (never a random color) so the row
+    // reads as four distinct destinations instead of four identical chips:
+    // essay feedback is AI-assisted (violet), the catalog leans on verified
+    // data (emerald), the event map is discovery/informational (blue), and
+    // the tracker is about deadlines (gold/accent).
+    tone: "recommendation" | "success" | "info" | "accent";
     icon: LucideIcon;
     titleKey: TranslationKey;
     descriptionKey: TranslationKey;
@@ -531,6 +564,7 @@ export function DashboardScreen() {
     {
       key: "essays",
       href: "/essays",
+      tone: "recommendation",
       icon: FilePenLine,
       titleKey: "dashboard.coreTools.essay.title",
       descriptionKey: "dashboard.coreTools.essay.description",
@@ -543,6 +577,7 @@ export function DashboardScreen() {
     {
       key: "universities",
       href: "/universities",
+      tone: "success",
       icon: GraduationCap,
       titleKey: "dashboard.coreTools.universities.title",
       descriptionKey: "dashboard.coreTools.universities.description",
@@ -555,6 +590,7 @@ export function DashboardScreen() {
     {
       key: "events",
       href: "/events",
+      tone: "info",
       icon: Map,
       titleKey: "dashboard.coreTools.events.title",
       descriptionKey: "dashboard.coreTools.events.description",
@@ -567,6 +603,7 @@ export function DashboardScreen() {
     {
       key: "applications",
       href: "/applications",
+      tone: "accent",
       icon: ClipboardList,
       titleKey: "dashboard.coreTools.applications.title",
       descriptionKey: "dashboard.coreTools.applications.description",
@@ -662,25 +699,40 @@ export function DashboardScreen() {
           <p className="text-xs text-muted-foreground">{t("dashboard.coreTools.description")}</p>
         </div>
         <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {coreTools.map((tool) => (
-            <Card className="flex flex-col gap-2 p-4" key={tool.key}>
-              <div className="flex items-center gap-2">
-                <span className="grid size-9 shrink-0 place-items-center rounded-sm border border-primary/25 bg-primary/10 text-primary-hover">
-                  <tool.icon aria-hidden className="size-4" strokeWidth={1.75} />
-                </span>
-                <h3 className="font-semibold">{t(tool.titleKey)}</h3>
-              </div>
-              <p className="flex-1 text-xs leading-5 text-muted-foreground">
-                {t(tool.descriptionKey)}
-              </p>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                {tool.status}
-              </p>
-              <Button asChild className="w-full" size="sm">
-                <Link href={tool.href}>{t(tool.actionKey)}</Link>
-              </Button>
-            </Card>
-          ))}
+          {coreTools.map((tool, index) => {
+            const tone = CORE_TOOL_TONE_CLASSES[tool.tone];
+            return (
+              <Card
+                animate="fade-up"
+                animationDelayMs={index * 60}
+                className="relative flex flex-col gap-2 overflow-hidden p-4 pt-5"
+                interactive
+                key={tool.key}
+              >
+                <span aria-hidden className={cn("absolute inset-x-0 top-0 h-1", tone.topBar)} />
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "grid size-9 shrink-0 place-items-center rounded-sm border",
+                      tone.chip
+                    )}
+                  >
+                    <tool.icon aria-hidden className="size-4" strokeWidth={1.75} />
+                  </span>
+                  <h3 className="font-semibold">{t(tool.titleKey)}</h3>
+                </div>
+                <p className="flex-1 text-xs leading-5 text-muted-foreground">
+                  {t(tool.descriptionKey)}
+                </p>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {tool.status}
+                </p>
+                <Button asChild className="w-full" size="sm">
+                  <Link href={tool.href}>{t(tool.actionKey)}</Link>
+                </Button>
+              </Card>
+            );
+          })}
         </div>
       </section>
 
@@ -704,23 +756,14 @@ export function DashboardScreen() {
                 {t("dashboard.profile.title")}
               </h2>
             </div>
-            <span className="text-xl font-semibold text-accent">
-              {isLoading ? "—" : `${completionPercentage}%`}
-            </span>
-          </div>
-          <div
-            aria-label={t("a11y.profileCompletion", {
-              percentage: completionPercentage
-            })}
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={completionPercentage}
-            className="mt-4 h-2 overflow-hidden rounded-sm bg-elevated"
-            role="progressbar"
-          >
-            <div
-              className="h-full bg-primary transition-[width]"
-              style={{ width: `${completionPercentage}%` }}
+            <ProgressRing
+              // Emerald once foundation fields are actually complete (a
+              // genuinely "done" state); gold while still in progress, same
+              // meaning gold already carries elsewhere (tracked metric, not
+              // yet a completed one).
+              label={t("a11y.profileCompletion", { percentage: completionPercentage })}
+              percentage={isLoading ? null : completionPercentage}
+              tone={completionPercentage >= 100 ? "success" : "accent"}
             />
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
