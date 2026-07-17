@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  Award,
   CheckCircle2,
   ClipboardList,
   ExternalLink,
@@ -960,7 +961,12 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                 </p>
               </Card>
               <Card>
-                <h2 className="text-2xl font-semibold">{t("universities.detail.scholarships")}</h2>
+                <div className="flex items-center gap-2">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-sm border border-success/30 bg-success/10 text-success">
+                    <Award aria-hidden className="size-4" />
+                  </span>
+                  <h2 className="text-2xl font-semibold">{t("universities.detail.scholarships")}</h2>
+                </div>
                 {university.scholarships.length === 0 ? (
                   <p className="mt-3 text-sm italic text-muted-foreground">
                     {t("universities.notVerifiedYet")}
@@ -968,7 +974,10 @@ export function UniversityDetailScreen({ slug }: { slug: string }) {
                 ) : (
                   <ul className="mt-3 space-y-2 text-sm">
                     {university.scholarships.map((scholarship) => (
-                      <li className="rounded-sm border bg-surface px-3 py-2" key={scholarship.id}>
+                      <li
+                        className="rounded-sm border border-l-2 border-l-success bg-surface px-3 py-2"
+                        key={scholarship.id}
+                      >
                         <span className="font-semibold">{scholarship.name}</span>
                         {scholarship.deadline ? (
                           <span className="ml-2 text-muted-foreground">

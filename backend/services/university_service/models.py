@@ -89,6 +89,17 @@ class University(models.Model):
     scholarship_available = models.BooleanField(null=True, blank=True)
     essay_requirements = models.TextField(blank=True)
 
+    # Real, attributed imagery only -- never a fabricated or unverified
+    # hotlinked photo. Blank means "no image available" and the frontend must
+    # fall back to the existing designed gradient header, never a broken
+    # image. cover_image_source_title/url are shown to students as visible
+    # attribution (e.g. "Image: Wikipedia") whenever cover_image_url is set;
+    # the fetch_university_cover_images command always writes them together.
+    cover_image_url = models.URLField(blank=True, validators=[validate_http_url])
+    cover_image_source_title = models.CharField(max_length=240, blank=True)
+    cover_image_source_url = models.URLField(blank=True, validators=[validate_http_url])
+    cover_image_retrieved_at = models.DateTimeField(null=True, blank=True)
+
     # Raw, source-backed text blocks preserved verbatim from imported datasets when
     # the content is too unstructured to split into discrete records safely. These
     # are displayed as-is (never parsed into invented structure) so a beta user can

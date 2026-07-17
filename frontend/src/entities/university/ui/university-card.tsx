@@ -1,7 +1,9 @@
 "use client";
 
 import { Award, Building2, CalendarClock, GraduationCap, MapPin, Star, Trophy } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 
 import { formatTuitionAmount, type UniversityDetails } from "@/entities/university";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
@@ -12,14 +14,16 @@ import { Card } from "@/shared/ui/card";
 
 import { StatValue } from "./stat-value";
 
-// No campus photography is sourced for university cards -- there is no
-// licensed/verified image field on the University model, and hotlinking
-// unverified stock photos would risk misrepresenting a real institution (see
-// docs/UNIVERSITY_DATA_PROHIBITIONS.md). Instead each card gets a designed
-// header band, its hue picked deterministically from the university's own
-// name so the catalog reads as visually varied without implying any of these
-// colors are official branding. A small fixed palette (not an arbitrary hash
-// to a full hue wheel) keeps the result restrained rather than confetti-like.
+// Real imagery only, sourced by the backend `fetch_university_cover_images`
+// command from Wikipedia's REST API (Wikimedia Commons-hosted, exact-title
+// matched -- see that command's docstring). cover_image_url is blank for any
+// university not yet fetched or with no safe match, and the card must fall
+// back to this designed header band rather than a broken image (see
+// docs/UNIVERSITY_DATA_PROHIBITIONS.md). The band's hue is picked
+// deterministically from the university's own name so the catalog reads as
+// visually varied without implying any of these colors are official
+// branding. A small fixed palette (not an arbitrary hash to a full hue
+// wheel) keeps the result restrained rather than confetti-like.
 const HEADER_BAND_CLASSES = [
   "from-navy to-navy/70",
   "from-primary/90 to-primary/60",
@@ -53,19 +57,48 @@ export function UniversityCard({
   isShortlistPending?: boolean;
 }) {
   const { locale, t } = useI18n();
+  const [coverFailed, setCoverFailed] = useState(false);
+  const showCover = Boolean(university.cover_image_url) && !coverFailed;
 
   return (
     <Card className="flex h-full min-w-0 flex-col overflow-hidden" interactive>
       <div
-        className={`-mx-4 -mt-4 mb-3 flex h-14 shrink-0 items-center justify-between bg-gradient-to-br px-4 ${headerBandClass(university.name)}`}
+        className={`relative -mx-4 -mt-4 mb-3 flex h-14 shrink-0 items-center justify-between px-4 ${
+          showCover ? "" : `bg-gradient-to-br ${headerBandClass(university.name)}`
+        }`}
       >
-        <GraduationCap aria-hidden className="size-6 text-navy-foreground/90" strokeWidth={1.5} />
+        {showCover ? (
+          <Image
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+            height={112}
+            onError={() => setCoverFailed(true)}
+            src={university.cover_image_url}
+            unoptimized
+            width={400}
+          />
+        ) : null}
+        <GraduationCap
+          aria-hidden
+          className={`relative z-10 size-6 drop-shadow ${showCover ? "text-white" : "text-navy-foreground/90"}`}
+          strokeWidth={1.5}
+        />
         {university.global_rank ? (
           <span
             aria-label={t("universities.badges.globalRank", { rank: university.global_rank })}
-            className="flex items-center gap-1 rounded-sm bg-navy-foreground/15 px-2 py-1 text-xs font-semibold text-navy-foreground"
+            className={`relative z-10 flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-semibold ${
+              showCover ? "bg-black/40 text-white" : "bg-navy-foreground/15 text-navy-foreground"
+            }`}
           >
             <Trophy aria-hidden className="size-3.5" />#{university.global_rank}
+          </span>
+        ) : null}
+        {showCover && university.cover_image_source_title ? (
+          <span
+            className="absolute bottom-0.5 right-1.5 z-10 text-[0.6rem] font-medium text-white/80 drop-shadow"
+            title={university.cover_image_source_url || undefined}
+          >
+            {university.cover_image_source_title}
           </span>
         ) : null}
       </div>

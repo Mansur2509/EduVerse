@@ -212,6 +212,14 @@ export type UniversitySummary = {
   ranking_confidence: SourceConfidence;
   national_ranking_source: string;
   is_shortlisted: boolean;
+  // Real, attributed imagery only (see docs/UNIVERSITY_DATA_PROHIBITIONS.md).
+  // Empty string means "no image available" -- the UI must fall back to the
+  // designed gradient header, never a broken image. cover_image_source_title
+  // is shown as visible attribution (e.g. "Image: Wikipedia") whenever
+  // cover_image_url is set.
+  cover_image_url: string;
+  cover_image_source_title: string;
+  cover_image_source_url: string;
   budget_comparison: BudgetComparison | null;
   program_display_names?: string[];
   programs: UniversityProgram[];

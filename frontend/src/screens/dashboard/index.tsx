@@ -1027,7 +1027,8 @@ export function DashboardScreen() {
         <Card className="p-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:divide-x">
             <div>
-              <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-primary-hover">
+                <CalendarClock aria-hidden className="size-3.5 text-accent" />
                 {t("dashboard.deadlineWidget.title")}
                 <HelpTooltip label={t("applications.help.deadlineConfidence")} />
               </p>

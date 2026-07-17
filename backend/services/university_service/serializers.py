@@ -1,11 +1,14 @@
 from rest_framework import serializers
 
 from common.xlsx_security import validate_xlsx_archive
+from services.user_profile_service.models import UserPreference
 
 from .budget import compare_cost_to_budget
 from .import_jobs import MAX_IMPORT_UPLOAD_BYTES
 from .major_matching import build_program_recommendation_summary
 from .models import (
+    ExcludedUniversity,
+    PinnedUniversity,
     SavedUniversity,
     University,
     UniversityDataSource,
@@ -165,6 +168,9 @@ class UniversityListSerializer(UniversityShortlistMixin, serializers.ModelSerial
             "majors_list",
             "admissions_cycle_target",
             "is_shortlisted",
+            "cover_image_url",
+            "cover_image_source_title",
+            "cover_image_source_url",
             "created_at",
             "updated_at",
         )
@@ -231,6 +237,9 @@ class UniversitySerializer(UniversityShortlistMixin, serializers.ModelSerializer
             "admissions_cycle_target",
             "scholarship_available",
             "essay_requirements",
+            "cover_image_url",
+            "cover_image_source_title",
+            "cover_image_source_url",
             "application_requirements",
             "ap_recommendations",
             "financial_aid_notes",
@@ -331,6 +340,69 @@ class SavedUniversityLiteSerializer(serializers.ModelSerializer):
         model = SavedUniversity
         fields = ("id", "university", "created_at")
         read_only_fields = fields
+
+
+class PinnedUniversitySerializer(serializers.ModelSerializer):
+    university = ShortlistUniversitySummarySerializer(read_only=True)
+
+    class Meta:
+        model = PinnedUniversity
+        fields = ("id", "university", "created_at")
+        read_only_fields = fields
+
+
+class ExcludedUniversitySerializer(serializers.ModelSerializer):
+    university = ShortlistUniversitySummarySerializer(read_only=True)
+
+    class Meta:
+        model = ExcludedUniversity
+        fields = ("id", "university", "created_at")
+        read_only_fields = fields
+
+
+class RecommendationPreferenceSerializer(serializers.ModelSerializer):
+    """022 Phase 11: only the recommendation-generation controls on
+    UserPreference -- countries/major/budget/aid already live on
+    StudentProfile and are edited through the existing profile endpoints,
+    not duplicated here.
+    """
+
+    class Meta:
+        model = UserPreference
+        fields = (
+            "desired_recommendation_count",
+            "category_distribution",
+            "preferred_ranking_min",
+            "preferred_ranking_max",
+            "institution_type_preference",
+            "campus_setting_preference",
+            "test_optional_preference",
+        )
+
+    def validate_category_distribution(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("category_distribution must be an object.")
+        allowed_keys = {"dream", "reach", "target", "safety"}
+        for key, count in value.items():
+            if key not in allowed_keys:
+                raise serializers.ValidationError(f"Unknown category: {key}.")
+            if not isinstance(count, int) or isinstance(count, bool) or not (0 <= count <= 50):
+                raise serializers.ValidationError(f"{key} must be an integer between 0 and 50.")
+        return value
+
+    def validate_desired_recommendation_count(self, value):
+        if value is not None and not (1 <= value <= 100):
+            raise serializers.ValidationError("desired_recommendation_count must be between 1 and 100.")
+        return value
+
+    def validate(self, attrs):
+        ranking_min = attrs.get("preferred_ranking_min", getattr(self.instance, "preferred_ranking_min", None))
+        ranking_max = attrs.get("preferred_ranking_max", getattr(self.instance, "preferred_ranking_max", None))
+        if ranking_min is not None and ranking_max is not None and ranking_min > ranking_max:
+            raise serializers.ValidationError(
+                {"preferred_ranking_min": "preferred_ranking_min must not exceed preferred_ranking_max."}
+            )
+        return attrs
 
 
 class UniversityImportUploadSerializer(serializers.Serializer):
