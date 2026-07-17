@@ -1,5 +1,6 @@
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db.models import F, Prefetch, Q
+from django.db.models import Count, F, Max, Min, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -26,6 +27,8 @@ from services.user_profile_service.services import (
 from .currency import normalize_amount_to_usd
 from .import_jobs import enqueue_university_import_job, mark_stale_university_import_job
 from .models import (
+    ExcludedUniversity,
+    PinnedUniversity,
     SavedUniversity,
     University,
     UniversityFieldVerification,
@@ -41,9 +44,16 @@ from .recommendation_cache import (
     recommendations_cache_key,
     strategy_cache_key,
 )
-from .recommendations import calculate_university_recommendations
+from .recommendations import (
+    calculate_university_recommendations,
+    diagnose_university_recommendations,
+    explain_recommendation_for_university,
+)
 from .semantic_fit import build_fit_response, refresh_semantic_fit, semantic_fit_status
 from .serializers import (
+    ExcludedUniversitySerializer,
+    PinnedUniversitySerializer,
+    RecommendationPreferenceSerializer,
     SavedUniversityLiteSerializer,
     SavedUniversitySerializer,
     UniversityImportJobSerializer,
@@ -56,17 +66,26 @@ from .serializers import (
 from .services import calculate_university_fit
 from .strategy import build_application_strategy
 
+User = get_user_model()
+
 SELF_SERVICE_ACTIONS = {
     "list",
     "retrieve",
     "fit",
     "refresh_fit",
     "filter_options",
+    "destinations",
     "shortlist",
     "shortlisted",
     "compare",
     "recommendations",
     "strategy",
+    "pin",
+    "pinned",
+    "exclude",
+    "excluded",
+    "recommendation_preferences",
+    "recommendation_explanation",
 }
 
 # filter_options scans every published university across ~9 distinct-value/
@@ -207,6 +226,77 @@ def build_university_filter_options(*, include_demo: bool) -> dict:
     }
 
 
+# Real, uncontroversial geographic facts (ISO 3166-1 alpha-2 code for flag
+# display, and the country's own primary/official language) -- never a claim
+# about any specific university's language of instruction. A country missing
+# from this map simply renders without a flag/language on its destination
+# card (graceful fallback, never fabricated).
+COUNTRY_METADATA: dict[str, dict[str, str]] = {
+    "United States": {"code": "us", "primary_language": "English"},
+    "United Kingdom": {"code": "gb", "primary_language": "English"},
+    "Canada": {"code": "ca", "primary_language": "English"},
+    "Singapore": {"code": "sg", "primary_language": "English"},
+    "Italy": {"code": "it", "primary_language": "Italian"},
+    "South Korea": {"code": "kr", "primary_language": "Korean"},
+    "Australia": {"code": "au", "primary_language": "English"},
+    "Germany": {"code": "de", "primary_language": "German"},
+    "France": {"code": "fr", "primary_language": "French"},
+    "Netherlands": {"code": "nl", "primary_language": "Dutch"},
+    "Switzerland": {"code": "ch", "primary_language": "German, French, Italian"},
+    "Japan": {"code": "jp", "primary_language": "Japanese"},
+    "China": {"code": "cn", "primary_language": "Mandarin"},
+    "Hong Kong": {"code": "hk", "primary_language": "Cantonese, English"},
+    "Ireland": {"code": "ie", "primary_language": "English"},
+    "New Zealand": {"code": "nz", "primary_language": "English"},
+    "Sweden": {"code": "se", "primary_language": "Swedish"},
+    "Spain": {"code": "es", "primary_language": "Spanish"},
+}
+
+DESTINATIONS_CACHE_SECONDS = 600
+DESTINATIONS_CACHE_KEY_TEMPLATE = "university-destinations:include_demo={include_demo}"
+
+
+def build_study_destinations(*, include_demo: bool) -> list[dict]:
+    """Real, computed per-country aggregates for the "Study destinations"
+    section -- every number is a live count/min/max over published
+    universities, never invented. Demo/fictional countries (is_demo=True
+    records) are excluded by default just like the rest of the catalog.
+    """
+
+    queryset = University.objects.filter(is_published=True)
+    if not include_demo:
+        queryset = queryset.exclude(is_demo=True)
+
+    rows = (
+        queryset.exclude(country="")
+        .values("country")
+        .annotate(
+            university_count=Count("id", distinct=True),
+            min_tuition_usd=Min("tuition_usd_amount"),
+            max_tuition_usd=Max("tuition_usd_amount"),
+            scholarship_count=Count("id", filter=Q(scholarship_available=True), distinct=True),
+        )
+        .order_by("-university_count", "country")
+    )
+
+    destinations = []
+    for row in rows:
+        country = row["country"]
+        metadata = COUNTRY_METADATA.get(country, {})
+        destinations.append(
+            {
+                "country": country,
+                "country_code": metadata.get("code"),
+                "primary_language": metadata.get("primary_language"),
+                "university_count": row["university_count"],
+                "min_tuition_usd": row["min_tuition_usd"],
+                "max_tuition_usd": row["max_tuition_usd"],
+                "has_scholarships": row["scholarship_count"] > 0,
+            }
+        )
+    return destinations
+
+
 class UniversityViewSet(ModelViewSet):
     throttle_scope = None
     serializer_class = UniversitySerializer
@@ -307,6 +397,20 @@ class UniversityViewSet(ModelViewSet):
             FILTER_OPTIONS_CACHE_SECONDS,
         )
         return Response(payload)
+
+    @action(detail=False, methods=["get"], url_path="destinations")
+    def destinations(self, request):
+        include_demo = bool(
+            request.user.is_authenticated
+            and request.user.is_admin_role
+            and request.query_params.get("include_demo", "").lower() == "true"
+        )
+        cache_key = DESTINATIONS_CACHE_KEY_TEMPLATE.format(include_demo=include_demo)
+        payload = cache.get_or_set(
+            cache_key, lambda: build_study_destinations(include_demo=include_demo),
+            DESTINATIONS_CACHE_SECONDS,
+        )
+        return Response({"results": payload})
 
     def _apply_program_and_ranking_filters(self, queryset):
         params = self.request.query_params
@@ -520,6 +624,100 @@ class UniversityViewSet(ModelViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["post", "delete"], url_path="pin")
+    def pin(self, request, slug=None):
+        """022 Phase 11: pinning always keeps a university in the student's
+        recommendation list (with an honestly computed fit label) regardless
+        of quota/diversity capping.
+        """
+
+        university = self.get_object()
+        if request.method == "POST":
+            ExcludedUniversity.objects.filter(user=request.user, university=university).delete()
+            pinned, created = PinnedUniversity.objects.get_or_create(user=request.user, university=university)
+            if created:
+                invalidate_recommendation_caches(request.user)
+                track_event(
+                    user=request.user,
+                    event_type=AnalyticsEvent.EventType.UNIVERSITY_PINNED,
+                    entity_type="university",
+                    entity_id=university.id,
+                )
+            serializer = PinnedUniversitySerializer(pinned, context=self.get_serializer_context())
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+        deleted, _ = PinnedUniversity.objects.filter(user=request.user, university=university).delete()
+        if deleted:
+            invalidate_recommendation_caches(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"], url_path="pinned")
+    def pinned(self, request):
+        queryset = (
+            PinnedUniversity.objects.filter(user=request.user)
+            .select_related("university")
+            .order_by("-created_at")
+        )
+        serializer = PinnedUniversitySerializer(queryset, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post", "delete"], url_path="exclude")
+    def exclude(self, request, slug=None):
+        """022 Phase 11: an explicit, unconditional veto -- takes priority
+        over a pin for the same university (see calculate_university_recommendations).
+        """
+
+        university = self.get_object()
+        if request.method == "POST":
+            PinnedUniversity.objects.filter(user=request.user, university=university).delete()
+            excluded, created = ExcludedUniversity.objects.get_or_create(
+                user=request.user, university=university
+            )
+            if created:
+                invalidate_recommendation_caches(request.user)
+                track_event(
+                    user=request.user,
+                    event_type=AnalyticsEvent.EventType.UNIVERSITY_EXCLUDED,
+                    entity_type="university",
+                    entity_id=university.id,
+                )
+            serializer = ExcludedUniversitySerializer(excluded, context=self.get_serializer_context())
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+        deleted, _ = ExcludedUniversity.objects.filter(user=request.user, university=university).delete()
+        if deleted:
+            invalidate_recommendation_caches(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"], url_path="excluded")
+    def excluded(self, request):
+        queryset = (
+            ExcludedUniversity.objects.filter(user=request.user)
+            .select_related("university")
+            .order_by("-created_at")
+        )
+        serializer = ExcludedUniversitySerializer(queryset, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get", "patch"], url_path="recommendation-preferences")
+    def recommendation_preferences(self, request):
+        _, preferences = ensure_profile_records(request.user)
+        if request.method == "GET":
+            return Response(RecommendationPreferenceSerializer(preferences).data)
+        serializer = RecommendationPreferenceSerializer(preferences, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        invalidate_recommendation_caches(request.user)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"], url_path="recommendation-explanation")
+    def recommendation_explanation(self, request, slug=None):
+        university = self.get_object()
+        profile, preferences = get_profile_records_for_read(request.user)
+        return Response(explain_recommendation_for_university(profile, university, preferences))
+
     @action(detail=False, methods=["get"], url_path="compare")
     def compare(self, request):
         raw_ids = [value.strip() for value in request.query_params.get("ids", "").split(",") if value.strip()]
@@ -552,6 +750,19 @@ class UniversityViewSet(ModelViewSet):
                 *get_profile_records_for_read(request.user)
             ),
             RECOMMENDATIONS_CACHE_SECONDS,
+        )
+        # 022 Phase 13: log every list the student is actually shown (not just
+        # cache misses) so future ranking work has real impression history to
+        # evaluate against -- see track_event() for the sanitization guarantee.
+        track_event(
+            user=request.user,
+            event_type=AnalyticsEvent.EventType.RECOMMENDATION_IMPRESSION,
+            entity_type="recommendation_list",
+            metadata={
+                "result_count": len(payload.get("recommendations", [])),
+                "excluded_by_user_count": payload.get("excluded_by_user_count", 0),
+                "list_size_limited": bool(payload.get("list_size_limited")),
+            },
         )
         return Response(payload)
 
@@ -669,3 +880,19 @@ class AdminUniversityModerationActionView(GenericAPIView):
         return Response(
             UniversityModerationRecordSerializer(record).data, status=status.HTTP_201_CREATED
         )
+
+
+class AdminRecommendationDiagnosticsView(APIView):
+    """022 Phase 12: authorized-internal-only trace of how a specific
+    student's recommendation list was built (candidate pool size, hard-filter
+    removal reason codes, category-cap outcomes, cache hit/miss). Admin-gated
+    like every other Admin* view in this module -- never reachable by an
+    ordinary user, and never returns another user's data to a non-admin.
+    """
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, user_id: int):
+        target_user = get_object_or_404(User, pk=user_id)
+        profile, preferences = get_profile_records_for_read(target_user)
+        return Response(diagnose_university_recommendations(profile, preferences))

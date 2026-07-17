@@ -194,6 +194,53 @@ class UniversityCatalogTests(APITestCase):
         self.assertNotIn("Uncached Country", second.data["countries"])
         self.assertEqual(len(queries), 0)
 
+    def test_destinations_are_real_computed_aggregates(self):
+        create_university(
+            "destination-us-cheap",
+            country="United States",
+            tuition_usd_amount=Decimal("20000"),
+            scholarship_available=False,
+        )
+        create_university(
+            "destination-us-expensive",
+            country="United States",
+            tuition_usd_amount=Decimal("60000"),
+            scholarship_available=True,
+        )
+        create_university(
+            "destination-demo-country",
+            country="Demo Country",
+            is_demo=True,
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get("/api/v1/universities/destinations/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_country = {row["country"]: row for row in response.data["results"]}
+        self.assertIn("United States", by_country)
+        us_row = by_country["United States"]
+        self.assertEqual(us_row["university_count"], 2)
+        self.assertEqual(us_row["min_tuition_usd"], Decimal("20000"))
+        self.assertEqual(us_row["max_tuition_usd"], Decimal("60000"))
+        self.assertTrue(us_row["has_scholarships"])
+        self.assertEqual(us_row["country_code"], "us")
+        self.assertEqual(us_row["primary_language"], "English")
+        self.assertNotIn("Demo Country", by_country)
+
+    def test_destinations_omit_metadata_for_unmapped_country(self):
+        create_university("destination-unmapped-country", country="Wakanda")
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get("/api/v1/universities/destinations/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_country = {row["country"]: row for row in response.data["results"]}
+        self.assertIn("Wakanda", by_country)
+        self.assertIsNone(by_country["Wakanda"]["country_code"])
+        self.assertIsNone(by_country["Wakanda"]["primary_language"])
+        self.assertFalse(by_country["Wakanda"]["has_scholarships"])
+
     def test_institution_scholarship_and_confidence_filters(self):
         private_aid = create_university(
             "private-aid-university",
