@@ -39,6 +39,14 @@ const config: Config = {
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         danger: "hsl(var(--danger))",
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))"
+        },
+        recommendation: {
+          DEFAULT: "hsl(var(--recommendation))",
+          foreground: "hsl(var(--recommendation-foreground))"
+        },
         focus: "hsl(var(--focus-ring))"
       },
       borderRadius: {

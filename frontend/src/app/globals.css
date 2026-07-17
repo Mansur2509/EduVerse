@@ -29,6 +29,15 @@
   --success: 151 45% 29%;
   --warning: 35 76% 34%;
   --danger: 0 63% 42%;
+  /* Two additions to the semantic palette (light): --info for exams/neutral
+     informational content, --recommendation for AI-assisted/matching content
+     (recommendations, semantic fit). Kept distinct from --accent (gold, used
+     for deadlines/rankings/general emphasis) and --warning (used for
+     attention-needed states) so each meaning gets its own hue. */
+  --info: 211 64% 38%;
+  --info-foreground: 42 40% 97%;
+  --recommendation: 261 32% 45%;
+  --recommendation-foreground: 42 40% 97%;
   --focus-ring: 348 74% 31%;
   --radius: 0.125rem;
   --motion-fast: 140ms;
@@ -76,6 +85,13 @@
   --success: 148 43% 47%;
   --warning: 38 75% 55%;
   --danger: 0 64% 58%;
+  /* Lightened the same way success/warning/danger already are here (see the
+     comment above on --primary): dark-mode text needs a lighter, more
+     saturated value than the light-mode hue to clear 4.5:1 against --card. */
+  --info: 211 70% 66%;
+  --info-foreground: 220 38% 9%;
+  --recommendation: 261 48% 74%;
+  --recommendation-foreground: 220 38% 9%;
   --focus-ring: 39 72% 58%;
   /* Original --primary/-hover values: kept as the button/active-tab/marker
      fill so white foreground text stays comfortably readable (the lightened
@@ -192,6 +208,24 @@ textarea::placeholder {
 
 .scrollbar-quiet-inverse::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Gentle entrance for a freshly-loaded batch of cards (Card's `animate="fade-up"`
+   prop). Deliberately small (8px, 220ms) -- a hint of motion, not a slide-in
+   effect -- and neutralized entirely by the prefers-reduced-motion block below. */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up var(--motion-normal) var(--motion-ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
