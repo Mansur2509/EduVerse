@@ -97,6 +97,7 @@ function ExamDateRow({ item }: { item: OfficialExamDate }) {
 export function ExamsScreen() {
   const { locale, t } = useI18n();
   const [dates, setDates] = useState<OfficialExamDate[]>([]);
+  const [apSearch, setApSearch] = useState("");
   const [selectedSatDateId, setSelectedSatDateId] = useState("");
   const [apPlans, setApPlans] = useState<ApPlanRow[]>([
     {
@@ -212,6 +213,11 @@ export function ExamsScreen() {
     [apExamDates]
   );
   const selectedSatDate = satPlanOptions.find((item) => String(item.id) === selectedSatDateId);
+  const filteredApExamDates = useMemo(() => {
+    const query = apSearch.trim().toLowerCase();
+    if (!query) return apExamDates;
+    return apExamDates.filter((item) => item.name.toLowerCase().includes(query));
+  }, [apExamDates, apSearch]);
   const apSubjects = useMemo(
     () =>
       Array.from(
@@ -644,9 +650,28 @@ export function ExamsScreen() {
             <p className="mt-4 text-sm text-muted-foreground">
               {t("exams.plan.officialDatesNotPublished")}
             </p>
-          ) : null}
+          ) : (
+            <>
+              <label className="mt-3 block">
+                <span className="sr-only">{t("exams.ap.searchLabel")}</span>
+                <input
+                  aria-label={t("exams.ap.searchLabel")}
+                  className={fieldClassName}
+                  onChange={(event) => setApSearch(event.target.value)}
+                  placeholder={t("exams.ap.searchPlaceholder")}
+                  type="search"
+                  value={apSearch}
+                />
+              </label>
+              {filteredApExamDates.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  {t("exams.ap.searchNoMatches")}
+                </p>
+              ) : null}
+            </>
+          )}
           <div className="mt-4 max-h-[34rem] space-y-2 overflow-y-auto pr-1 scrollbar-quiet">
-            {apExamDates.map((item) => (
+            {filteredApExamDates.map((item) => (
               <ExamDateRow item={item} key={item.id} />
             ))}
           </div>
