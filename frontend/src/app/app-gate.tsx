@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, RefreshCw, ShieldCheck } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
@@ -16,6 +16,7 @@ import { LanguageSwitcher } from "@/shared/ui/language-switcher";
 import { SupportLink } from "@/shared/ui/support-link";
 import { AppShell } from "@/widgets/app-shell";
 
+import { AuthBrandPanel } from "./auth-brand-panel";
 import { AuthForm } from "@/features/auth/ui/auth-form";
 import { ForgotPasswordForm } from "@/features/auth/ui/forgot-password-form";
 import { ResetPasswordForm } from "@/features/auth/ui/reset-password-form";
@@ -28,45 +29,6 @@ const AUTH_ROUTE_PATHS = new Set([
   "/forgot-password",
   "/reset-password"
 ]);
-
-function AcademicBrand() {
-  const { t } = useI18n();
-
-  return (
-    <section className="flex min-h-[18rem] flex-col justify-between border-b border-white/15 bg-navy px-6 py-8 text-navy-foreground lg:min-h-screen lg:border-b-0 lg:border-r lg:px-12 lg:py-12">
-      <div className="flex items-center gap-3">
-        <BrandMark className="size-11 shrink-0 overflow-hidden rounded-sm" />
-        <div>
-          <p className="font-serif text-2xl font-semibold tracking-tight">UniWay</p>
-          <p className="text-xs uppercase tracking-[0.18em] text-white/65">
-            {t("auth.gateway.institution")}
-          </p>
-        </div>
-      </div>
-      <div className="max-w-xl py-10 lg:py-16">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">
-          {t("auth.gateway.eyebrow")}
-        </p>
-        <h1 className="mt-4 font-serif text-4xl font-semibold leading-tight sm:text-5xl">
-          {t("auth.gateway.title")}
-        </h1>
-        <p className="mt-5 max-w-lg text-base leading-7 text-white/70">
-          {t("auth.gateway.description")}
-        </p>
-      </div>
-      <div className="grid gap-3 text-sm text-white/70 sm:grid-cols-2 lg:grid-cols-1">
-        <p className="flex items-center gap-3">
-          <ShieldCheck aria-hidden className="size-4 text-accent" />
-          {t("auth.gateway.secure")}
-        </p>
-        <p className="flex items-center gap-3">
-          <BookOpen aria-hidden className="size-4 text-accent" />
-          {t("auth.gateway.academic")}
-        </p>
-      </div>
-    </section>
-  );
-}
 
 function FullScreenStatus({
   offline = false,
@@ -170,17 +132,32 @@ export function AppGate({ children }: { children: ReactNode }) {
     if (
       status === "authenticated" &&
       onboardingStatus === "complete" &&
-      ["/login", "/register", "/onboarding"].includes(pathname)
+      ["/", "/login", "/register", "/onboarding"].includes(pathname)
     ) {
       router.replace("/dashboard");
     }
   }, [onboardingStatus, pathname, router, status]);
 
   useEffect(() => {
-    if (status === "unauthenticated" && !isAuthRoute) {
+    // "/" is a public landing route (see the render guard below) -- an
+    // unauthenticated visitor there must not be bounced to /login a moment
+    // after the landing page has already rendered.
+    if (status === "unauthenticated" && !isAuthRoute && pathname !== "/") {
       router.replace("/login");
     }
-  }, [isAuthRoute, router, status]);
+  }, [isAuthRoute, pathname, router, status]);
+
+  // Public marketing route: render it immediately regardless of
+  // session-check status, so logged-out visitors, crawlers, and the SSR
+  // pass never see a spinner before real content -- the landing page has no
+  // backend dependency at all, so a slow session check or an unreachable
+  // backend (status "checking"/"unauthenticated"/"offline") must never
+  // block it. Only a confirmed "authenticated" session falls through past
+  // this guard, into the same onboarding-aware redirect-to-dashboard
+  // handling used below for /login, /register, /onboarding.
+  if (pathname === "/" && status !== "authenticated") {
+    return <>{children}</>;
+  }
 
   if (status === "checking") return <FullScreenStatus />;
   if (status === "offline") {
@@ -204,7 +181,7 @@ export function AppGate({ children }: { children: ReactNode }) {
 
     return (
       <main className="min-h-screen bg-background lg:grid lg:grid-cols-[minmax(22rem,0.9fr)_minmax(30rem,1.1fr)]">
-        <AcademicBrand />
+        <AuthBrandPanel />
         <section className="relative grid place-items-center px-4 py-10 sm:px-8 lg:px-12">
           <div className="absolute right-4 top-4 sm:right-8 sm:top-6">
             <LanguageSwitcher compact />
@@ -253,7 +230,7 @@ export function AppGate({ children }: { children: ReactNode }) {
   if (onboardingStatus === "incomplete") {
     return <OnboardingFlow onCompleted={() => void checkOnboarding()} />;
   }
-  if (["/login", "/register", "/onboarding"].includes(pathname)) {
+  if (["/", "/login", "/register", "/onboarding"].includes(pathname)) {
     return <FullScreenStatus onboarding />;
   }
 
