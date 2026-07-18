@@ -1,6 +1,17 @@
 "use client";
 
-import { Archive, CalendarPlus, Send, Users } from "lucide-react";
+import {
+  Archive,
+  AlertTriangle,
+  CalendarPlus,
+  CheckCircle2,
+  Clock,
+  Layers,
+  Send,
+  UserCheck,
+  Users,
+  type LucideIcon
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -19,11 +30,27 @@ import {
 } from "@/features/organizer-events";
 import { StatValue } from "@/entities/university";
 import { useI18n } from "@/shared/i18n";
+import { cn } from "@/shared/lib/cn";
 import { formatDateTime } from "@/shared/lib/date-time";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DEFAULT_PAGE_SIZE, PaginationControls } from "@/shared/ui/pagination";
 import { Reveal } from "@/shared/ui/reveal";
+
+// Icon-chip + top-accent classes for each status tile tone, matching the
+// dashboard Core Tools treatment so authenticated surfaces share one visual
+// language for "small colored metric card" (Stage 2 goal #1).
+const STATUS_TILE_TONE_CLASSES: Record<
+  "muted" | "warning" | "success" | "info" | "accent" | "danger",
+  { chip: string; topBar: string }
+> = {
+  muted: { chip: "border-muted-foreground/25 bg-surface text-muted-foreground", topBar: "bg-muted-foreground/40" },
+  warning: { chip: "border-warning/30 bg-warning/10 text-warning", topBar: "bg-warning" },
+  success: { chip: "border-success/30 bg-success/10 text-success", topBar: "bg-success" },
+  info: { chip: "border-info/30 bg-info/10 text-info", topBar: "bg-info" },
+  accent: { chip: "border-accent/35 bg-accent/10 text-accent", topBar: "bg-accent" },
+  danger: { chip: "border-danger/35 bg-danger/10 text-danger", topBar: "bg-danger" }
+};
 
 export function OrganizerEventsScreen() {
   const { locale, t } = useI18n();
@@ -150,26 +177,35 @@ export function OrganizerEventsScreen() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {(
               [
-                { label: t("organizer.statusSummary.total"), value: totalCount, suffix: undefined },
+                {
+                  label: t("organizer.statusSummary.total"),
+                  value: totalCount,
+                  icon: Layers,
+                  tone: "muted"
+                },
                 {
                   label: t("organizer.statusSummary.pending"),
                   value: statusCounts.pending,
-                  suffix: undefined
+                  icon: Clock,
+                  tone: "warning"
                 },
                 {
                   label: t("organizer.statusSummary.published"),
                   value: statusCounts.published,
-                  suffix: undefined
+                  icon: CheckCircle2,
+                  tone: "success"
                 },
                 {
                   label: t("organizer.statusSummary.registrations"),
                   value: analytics?.total_registrations ?? 0,
-                  suffix: undefined
+                  icon: Users,
+                  tone: "info"
                 },
                 {
                   label: t("organizer.statusSummary.checkedIn"),
                   value: analytics?.checked_in_count ?? 0,
-                  suffix: undefined
+                  icon: UserCheck,
+                  tone: "info"
                 },
                 {
                   label: t("organizer.statusSummary.attendanceRate"),
@@ -180,26 +216,93 @@ export function OrganizerEventsScreen() {
                   suffix:
                     analytics?.attendance_rate === null || analytics?.attendance_rate === undefined
                       ? undefined
-                      : "%"
+                      : "%",
+                  icon: Users,
+                  tone: "accent"
                 },
                 {
                   label: t("organizer.statusSummary.needsAction"),
                   value: statusCounts.needsAction,
-                  suffix: undefined
+                  icon: AlertTriangle,
+                  tone: statusCounts.needsAction > 0 ? "danger" : "muted"
                 }
-              ] as Array<{ label: string; value: string | number; suffix?: string }>
-            ).map(({ label, value, suffix }, index) => (
-              <Reveal delayMs={index * 30} key={label}>
-                <Card className="p-4">
-                  <p className="text-eyebrow text-muted-foreground">{label}</p>
-                  <p className="text-feature-heading mt-2 text-accent">
-                    <StatValue suffix={suffix} value={value} />
-                  </p>
-                </Card>
-              </Reveal>
-            ))}
+              ] as Array<{
+                label: string;
+                value: string | number;
+                suffix?: string;
+                icon: LucideIcon;
+                tone: keyof typeof STATUS_TILE_TONE_CLASSES;
+              }>
+            ).map(({ label, value, suffix, icon: TileIcon, tone }, index) => {
+              const toneClasses = STATUS_TILE_TONE_CLASSES[tone];
+              return (
+                <Reveal delayMs={index * 30} key={label}>
+                  <Card className="relative overflow-hidden p-4" interactive>
+                    <span aria-hidden className={cn("absolute inset-x-0 top-0 h-1", toneClasses.topBar)} />
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={cn(
+                          "grid size-8 shrink-0 place-items-center rounded-sm border",
+                          toneClasses.chip
+                        )}
+                      >
+                        <TileIcon aria-hidden className="size-4" strokeWidth={1.75} />
+                      </span>
+                      <p className="text-eyebrow text-muted-foreground">{label}</p>
+                    </div>
+                    <p className="text-feature-heading mt-3 text-accent">
+                      <StatValue suffix={suffix} value={value} />
+                    </p>
+                  </Card>
+                </Reveal>
+              );
+            })}
           </div>
         </section>
+      ) : null}
+
+      {!isLoading && !hasError && analytics && analytics.registrations_by_event.length > 0 ? (
+        <Card className="p-5">
+          <p className="text-eyebrow text-primary-hover">{t("organizer.analytics.title")}</p>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {t("organizer.analytics.description")}
+          </p>
+          {analytics.capacity_fill_percentage !== null ? (
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                <span>{t("organizer.analytics.capacityFill")}</span>
+                <span className="text-accent">{analytics.capacity_fill_percentage}%</span>
+              </div>
+              <div
+                aria-valuemax={100}
+                aria-valuemin={0}
+                aria-valuenow={Math.round(analytics.capacity_fill_percentage)}
+                className="mt-1.5 h-2 overflow-hidden rounded-full bg-elevated"
+                role="progressbar"
+              >
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-slow ease-academic"
+                  style={{ width: `${Math.min(100, Math.max(0, analytics.capacity_fill_percentage))}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+          <ul className="mt-4 divide-y divide-border">
+            {analytics.registrations_by_event.slice(0, 5).map((row) => (
+              <li className="flex items-center justify-between gap-3 py-2.5 text-sm" key={row.slug}>
+                <Link className="truncate font-semibold hover:text-primary-hover" href={`/organizer/events/${row.slug}`}>
+                  {row.title}
+                </Link>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {t("organizer.analytics.checkedInOf", {
+                    checkedIn: row.checked_in_count,
+                    registered: row.registration_count
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       {isLoading ? (
@@ -236,7 +339,22 @@ export function OrganizerEventsScreen() {
             className="grid gap-5 xl:grid-cols-2"
           >
             {events.map((event) => (
-              <Card className="flex flex-col" key={event.id}>
+              <Card className="relative flex flex-col overflow-hidden" interactive key={event.id}>
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute inset-x-0 top-0 h-1",
+                  STATUS_TILE_TONE_CLASSES[
+                    event.status === "published"
+                      ? "success"
+                      : event.status === "pending_review"
+                        ? "warning"
+                        : event.status === "rejected" || event.status === "cancelled"
+                          ? "danger"
+                          : "muted"
+                  ].topBar
+                )}
+              />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <ModerationStatusBadge status={event.status} />
                 <span className="text-xs text-muted-foreground">
