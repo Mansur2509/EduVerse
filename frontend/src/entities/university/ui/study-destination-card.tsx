@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { formatTuitionAmount, type StudyDestination } from "@/entities/university";
 import { useI18n } from "@/shared/i18n";
+import { Badge } from "@/shared/ui/badge";
 import { Card } from "@/shared/ui/card";
 
 // Real flag imagery only (flagcdn.com -- a free, public, purpose-built flag
@@ -50,12 +51,16 @@ export function StudyDestinationCard({ destination }: { destination: StudyDestin
   return (
     <Card className="flex h-full flex-col overflow-hidden" interactive>
       <div
-        className={`-mx-4 -mt-4 mb-3 flex h-20 shrink-0 items-center justify-center bg-gradient-to-br ${headerBandClass(destination.country)}`}
+        className={`relative -mx-4 -mt-4 mb-3 flex h-20 shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br ${headerBandClass(destination.country)}`}
       >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-white/10"
+        />
         {showFlag ? (
           <Image
             alt=""
-            className="h-10 w-14 rounded-sm border border-navy-foreground/30 object-cover shadow-sm"
+            className="relative z-10 h-10 w-14 rounded-sm border border-navy-foreground/30 object-cover shadow-md"
             height={40}
             onError={() => setFlagFailed(true)}
             src={`https://flagcdn.com/w160/${destination.country_code}.png`}
@@ -63,7 +68,11 @@ export function StudyDestinationCard({ destination }: { destination: StudyDestin
             width={56}
           />
         ) : (
-          <GraduationCap aria-hidden className="size-8 text-navy-foreground/85" strokeWidth={1.5} />
+          <GraduationCap
+            aria-hidden
+            className="relative z-10 size-8 text-navy-foreground/85"
+            strokeWidth={1.5}
+          />
         )}
       </div>
 
@@ -71,7 +80,9 @@ export function StudyDestinationCard({ destination }: { destination: StudyDestin
 
       <dl className="mt-4 space-y-2.5 text-sm">
         <div className="flex items-center gap-2.5">
-          <GraduationCap aria-hidden className="size-4 shrink-0 text-accent" />
+          <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-accent/30 bg-accent/10 text-accent">
+            <GraduationCap aria-hidden className="size-3.5" strokeWidth={1.75} />
+          </span>
           <dt className="sr-only">{t("universities.destinations.universityCount")}</dt>
           <dd>
             {t("universities.destinations.universityCountValue", {
@@ -81,14 +92,18 @@ export function StudyDestinationCard({ destination }: { destination: StudyDestin
         </div>
         {destination.primary_language ? (
           <div className="flex items-center gap-2.5">
-            <Languages aria-hidden className="size-4 shrink-0 text-info" />
+            <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-info/30 bg-info/10 text-info">
+              <Languages aria-hidden className="size-3.5" strokeWidth={1.75} />
+            </span>
             <dt className="sr-only">{t("universities.destinations.language")}</dt>
             <dd>{destination.primary_language}</dd>
           </div>
         ) : null}
         {costLabel ? (
           <div className="flex items-center gap-2.5">
-            <Wallet aria-hidden className="size-4 shrink-0 text-primary-hover" />
+            <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-primary/30 bg-primary/10 text-primary-hover">
+              <Wallet aria-hidden className="size-3.5" strokeWidth={1.75} />
+            </span>
             <dt className="sr-only">{t("universities.destinations.costRange")}</dt>
             <dd>{costLabel}</dd>
           </div>
@@ -96,10 +111,10 @@ export function StudyDestinationCard({ destination }: { destination: StudyDestin
       </dl>
 
       {destination.has_scholarships ? (
-        <span className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-sm border border-scholarship/40 bg-scholarship/15 px-2.5 py-1 text-xs font-bold text-scholarship">
+        <Badge className="mt-4 w-fit gap-1.5 normal-case tracking-normal" tone="scholarship">
           <Award aria-hidden className="size-3.5" />
           {t("universities.destinations.scholarshipsAvailable")}
-        </span>
+        </Badge>
       ) : null}
     </Card>
   );

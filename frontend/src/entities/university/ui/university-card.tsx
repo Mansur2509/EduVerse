@@ -5,7 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
-import { formatTuitionAmount, type UniversityDetails } from "@/entities/university";
+import {
+  formatTuitionAmount,
+  getFieldVerification,
+  type UniversityDetails
+} from "@/entities/university";
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { formatDate } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
@@ -13,6 +17,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 
 import { StatValue } from "./stat-value";
+import { VerificationBadge } from "./verified-stat";
 
 // Real imagery only, sourced by the backend `fetch_university_cover_images`
 // command from Wikipedia's REST API (Wikimedia Commons-hosted, exact-title
@@ -113,9 +118,7 @@ export function UniversityCard({
           </span>
         )}
         {university.is_demo ? (
-          <span className="rounded-sm border border-warning/35 bg-warning/10 px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-warning">
-            {t("universities.demoDataBadge")}
-          </span>
+          <Badge tone="warning">{t("universities.demoDataBadge")}</Badge>
         ) : null}
         <Button
           aria-pressed={university.is_shortlisted}
@@ -152,16 +155,16 @@ export function UniversityCard({
       {university.scholarship_available || university.application_deadline ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {university.scholarship_available ? (
-            <span className="inline-flex items-center gap-1.5 rounded-sm border border-scholarship/40 bg-scholarship/15 px-2.5 py-1 text-xs font-bold text-scholarship">
+            <Badge className="gap-1.5 normal-case tracking-normal" tone="scholarship">
               <Award aria-hidden className="size-3.5" />
               {t("universities.fields.scholarshipAvailable")}
-            </span>
+            </Badge>
           ) : null}
           {university.application_deadline ? (
-            <span className="inline-flex items-center gap-1.5 rounded-sm border border-accent/35 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
+            <Badge className="gap-1.5 normal-case tracking-normal" tone="accent">
               <CalendarClock aria-hidden className="size-3.5" />
               {formatDate(university.application_deadline, locale)}
-            </span>
+            </Badge>
           ) : null}
         </div>
       ) : null}
@@ -171,8 +174,17 @@ export function UniversityCard({
           <dt className="text-xs text-muted-foreground">
             {t("universities.fields.acceptanceRate")}
           </dt>
-          <dd className="mt-0.5 font-semibold">
+          <dd className="mt-0.5 flex flex-wrap items-center gap-1.5 font-semibold">
             <StatValue suffix="%" value={university.acceptance_rate} />
+            {university.acceptance_rate !== null && university.acceptance_rate !== undefined ? (
+              (() => {
+                const verification = getFieldVerification(
+                  university.field_verifications,
+                  "acceptance_rate"
+                );
+                return verification ? <VerificationBadge status={verification.status} /> : null;
+              })()
+            ) : null}
           </dd>
         </div>
         <div>
