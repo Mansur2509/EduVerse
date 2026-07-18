@@ -13,7 +13,6 @@ import {
   FileText,
   Inbox,
   ListChecks,
-  LoaderCircle,
   RefreshCw,
   Settings2,
   ShieldCheck,
@@ -41,7 +40,10 @@ import { formatDateTime } from "@/shared/lib/date-time";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { AppIcon } from "@/shared/ui/icon";
+import { LoadingNotice } from "@/shared/ui/loading-notice";
+import { DEFAULT_PAGE_SIZE, PaginatedList } from "@/shared/ui/pagination";
 
 const STATUS_FILTERS: Array<NotificationStatus | "all"> = ["all", "unread", "read", "archived"];
 
@@ -50,6 +52,22 @@ const PRIORITY_STYLES: Record<Notification["priority"], string> = {
   normal: "border-accent/35 bg-accent/10 text-accent",
   high: "border-warning/35 bg-warning/10 text-warning",
   urgent: "border-danger/35 bg-danger/10 text-danger"
+};
+
+const PRIORITY_ICON_CHIP_STYLES: Record<Notification["priority"], string> = {
+  low: "border-muted-foreground/30 bg-surface text-muted-foreground",
+  normal: "border-accent/35 bg-accent/10 text-accent",
+  high: "border-warning/35 bg-warning/10 text-warning",
+  urgent: "border-danger/35 bg-danger/10 text-danger"
+};
+
+// Full literal class strings (not dynamically concatenated) so Tailwind's
+// static analyzer can actually find and keep them in the production build.
+const PRIORITY_HOVER_STYLES: Record<Notification["priority"], string> = {
+  low: "hover:border-muted-foreground/45",
+  normal: "hover:border-accent/45",
+  high: "hover:border-warning/45",
+  urgent: "hover:border-danger/45"
 };
 
 const PREFERENCE_FIELDS: Array<{
@@ -82,6 +100,7 @@ export function NotificationsScreen() {
   const { locale, t } = useI18n();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [statusFilter, setStatusFilter] = useState<NotificationStatus | "all">("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -109,6 +128,7 @@ export function NotificationsScreen() {
 
   useEffect(() => {
     void loadNotifications();
+    setCurrentPage(1);
   }, [loadNotifications]);
 
   const loadPreferences = useCallback(() => {
@@ -175,7 +195,7 @@ export function NotificationsScreen() {
       <section className="rounded-sm border bg-card p-6 shadow-card sm:p-9">
         <div className="flex items-center gap-2 text-primary-hover">
           <AppIcon icon={BellRing} size="md" />
-          <p className="text-xs font-bold uppercase tracking-[0.18em]">
+          <p className="text-eyebrow">
             {t("notifications.page.eyebrow")}
           </p>
         </div>
@@ -215,13 +235,8 @@ export function NotificationsScreen() {
           </p>
         ) : null}
 
-        {isLoading ? (
-          <Card>
-            <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-              <AppIcon className="animate-spin motion-reduce:animate-none" icon={LoaderCircle} />
-              {t("notifications.page.loading")}
-            </p>
-          </Card>
+        {isLoading && notifications.length === 0 ? (
+          <LoadingNotice message={t("notifications.page.loading")} />
         ) : hasError ? (
           <Card>
             <p className="flex items-center gap-2 text-sm text-danger" role="alert">
@@ -233,21 +248,29 @@ export function NotificationsScreen() {
               {t("essays.actions.retry")}
             </Button>
           </Card>
-        ) : notifications.length === 0 ? (
-          <Card>
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <AppIcon icon={Inbox} />
-              {t("notifications.page.empty")}
-            </p>
-          </Card>
         ) : (
-          <div className="space-y-3">
-            {notifications.map((notification) => (
-              <Card key={notification.id}>
+          <PaginatedList
+            currentPage={currentPage}
+            emptyState={
+              <EmptyState description={t("notifications.page.empty")} icon={Inbox} title={t("notifications.page.title")} />
+            }
+            getItemKey={(notification) => notification.id}
+            items={notifications.slice(
+              (currentPage - 1) * DEFAULT_PAGE_SIZE,
+              currentPage * DEFAULT_PAGE_SIZE
+            )}
+            onPageChange={setCurrentPage}
+            pageSize={DEFAULT_PAGE_SIZE}
+            totalCount={notifications.length}
+            totalPages={Math.max(1, Math.ceil(notifications.length / DEFAULT_PAGE_SIZE))}
+            renderItem={(notification) => (
+              <Card className={PRIORITY_HOVER_STYLES[notification.priority]} interactive>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="grid size-8 place-items-center rounded-sm border bg-surface text-muted-foreground">
+                      <span
+                        className={`grid size-8 shrink-0 place-items-center rounded-sm border ${PRIORITY_ICON_CHIP_STYLES[notification.priority]}`}
+                      >
                         <AppIcon icon={NOTIFICATION_ICONS[notification.notification_type]} />
                       </span>
                       <span
@@ -301,8 +324,8 @@ export function NotificationsScreen() {
                   </div>
                 </div>
               </Card>
-            ))}
-          </div>
+            )}
+          />
         )}
       </section>
 
@@ -333,7 +356,7 @@ export function NotificationsScreen() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {PREFERENCE_FIELDS.map(({ key, labelKey }) => (
                   <label
-                    className="flex items-center justify-between gap-3 rounded-sm border bg-surface px-3 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-sm border bg-surface px-3 py-2.5 transition-colors hover:border-accent/40 hover:bg-elevated"
                     key={key}
                   >
                     <span className="text-sm">{t(labelKey)}</span>
