@@ -218,10 +218,10 @@ export const betaModules: Record<BetaModuleId, BetaModuleConfig> = {
     titleKey: "beta.research.title",
     descriptionKey: "beta.research.description",
     statusKey: "beta.status.preview",
-    primaryActionKey: "beta.actions.exploreEvents",
-    primaryHref: "/events",
-    secondaryActionKey: "beta.actions.completeProfile",
-    secondaryHref: "/profile",
+    primaryActionKey: "beta.actions.completeProfile",
+    primaryHref: "/profile#profile-section-research",
+    secondaryActionKey: "beta.actions.exploreEvents",
+    secondaryHref: "/events",
     nextFeatureKey: "beta.research.next",
     features: [
       {
