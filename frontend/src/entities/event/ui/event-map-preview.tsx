@@ -31,9 +31,13 @@ export function EventMapPreview({ events }: { events: EventDetails[] }) {
   return (
     <Card animate="fade-up" className="overflow-hidden p-0">
       <div className="grid lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="relative min-h-[22rem] overflow-hidden bg-navy">
+        <div className="relative min-h-[16rem] overflow-hidden bg-navy sm:min-h-[22rem]">
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-[radial-gradient(60%_60%_at_30%_20%,rgba(164,16,52,.18),transparent),radial-gradient(50%_50%_at_85%_85%,rgba(255,255,255,.08),transparent)]"
+          />
           <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:3rem_3rem]" />
-          <div className="absolute inset-x-[8%] top-[18%] h-[52%] border border-white/15 bg-white/[0.025] [clip-path:polygon(2%_27%,15%_16%,28%_24%,38%_11%,52%_19%,64%_7%,78%_20%,96%_14%,91%_43%,98%_58%,83%_62%,73%_85%,57%_73%,44%_91%,30%_74%,17%_80%,8%_56%)]" />
+          <div className="absolute inset-x-[8%] top-[18%] h-[52%] border border-white/15 bg-white/[0.025] shadow-[0_0_40px_rgba(0,0,0,0.25)_inset] [clip-path:polygon(2%_27%,15%_16%,28%_24%,38%_11%,52%_19%,64%_7%,78%_20%,96%_14%,91%_43%,98%_58%,83%_62%,73%_85%,57%_73%,44%_91%,30%_74%,17%_80%,8%_56%)]" />
           <div className="absolute left-5 top-5 z-10 max-w-md">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">
               {t("events.map.title")}

@@ -90,23 +90,15 @@ export function EventCard({ event }: { event: EventDetails }) {
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{event.category.name}</Badge>
-        <span className="rounded-sm border bg-surface px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+        <Badge tone="event">{event.category.name}</Badge>
+        <Badge className="normal-case tracking-normal" tone="muted">
           {t(`events.filters.${event.format}` as TranslationKey)}
-        </span>
-        <span className="rounded-sm border bg-elevated/55 px-2.5 py-1 text-xs text-muted-foreground">
+        </Badge>
+        <Badge className="normal-case tracking-normal" tone="muted">
           {t(priceLabelKey(event))}
-        </span>
-        {isDemoEvent(event) ? (
-          <span className="rounded-sm border border-warning/35 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
-            {t("events.demoBadge")}
-          </span>
-        ) : null}
-        {registrationKey ? (
-          <span className="rounded-sm border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-            {t(registrationKey)}
-          </span>
-        ) : null}
+        </Badge>
+        {isDemoEvent(event) ? <Badge tone="warning">{t("events.demoBadge")}</Badge> : null}
+        {registrationKey ? <Badge tone="success">{t(registrationKey)}</Badge> : null}
       </div>
 
       <h2 className="mt-4 text-2xl font-semibold">
@@ -119,19 +111,23 @@ export function EventCard({ event }: { event: EventDetails }) {
       </p>
 
       <dl className="mt-5 space-y-3 text-sm">
-        <div className="flex items-start gap-3">
-          <CalendarDays aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+        <div className="flex items-center gap-3">
+          <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-event/30 bg-event/10 text-event">
+            <CalendarDays aria-hidden className="size-3.5" strokeWidth={1.75} />
+          </span>
           <div>
             <dt className="sr-only">{t("events.fields.start")}</dt>
             <dd>{formatDateTime(event.start_at, locale)}</dd>
           </div>
         </div>
-        <div className="flex items-start gap-3">
-          {event.is_online ? (
-            <Monitor aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
-          ) : (
-            <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
-          )}
+        <div className="flex items-center gap-3">
+          <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-event/30 bg-event/10 text-event">
+            {event.is_online ? (
+              <Monitor aria-hidden className="size-3.5" strokeWidth={1.75} />
+            ) : (
+              <MapPin aria-hidden className="size-3.5" strokeWidth={1.75} />
+            )}
+          </span>
           <div>
             <dt className="sr-only">{t("events.fields.location")}</dt>
             <dd>
@@ -144,11 +140,10 @@ export function EventCard({ event }: { event: EventDetails }) {
           </div>
         </div>
         {event.registration_deadline ? (
-          <div className="flex items-start gap-3">
-            <CalendarDays
-              aria-hidden
-              className="mt-0.5 size-4 shrink-0 text-warning"
-            />
+          <div className="flex items-center gap-3">
+            <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-warning/30 bg-warning/10 text-warning">
+              <CalendarDays aria-hidden className="size-3.5" strokeWidth={1.75} />
+            </span>
             <div>
               <dt className="text-xs text-muted-foreground">
                 {t("events.fields.deadline")}
@@ -157,8 +152,10 @@ export function EventCard({ event }: { event: EventDetails }) {
             </div>
           </div>
         ) : null}
-        <div className="flex items-start gap-3">
-          <Users aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+        <div className="flex items-center gap-3">
+          <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-muted-foreground/25 bg-surface text-muted-foreground">
+            <Users aria-hidden className="size-3.5" strokeWidth={1.75} />
+          </span>
           <div>
             <dt className="text-xs text-muted-foreground">
               {t("events.fields.organizer")}
@@ -167,8 +164,10 @@ export function EventCard({ event }: { event: EventDetails }) {
           </div>
         </div>
         {event.spots_left !== null ? (
-          <div className="flex items-start gap-3">
-            <Users aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+          <div className="flex items-center gap-3">
+            <span className="grid size-7 shrink-0 place-items-center rounded-sm border border-muted-foreground/25 bg-surface text-muted-foreground">
+              <Users aria-hidden className="size-3.5" strokeWidth={1.75} />
+            </span>
             <div>
               <dt className="sr-only">{t("events.fields.capacity")}</dt>
               <dd>{t("events.spotsLeft", { count: event.spots_left })}</dd>
