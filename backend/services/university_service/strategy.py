@@ -94,5 +94,11 @@ def build_application_strategy(profile, preferences=None) -> dict:
         "data_scarcity": data["list_size_limited"],
         "excluded_low_data_count": data["excluded_low_data_count"],
         "missing_preferences": data["missing_preferences"],
+        # Passed through unchanged (022 Phase 9) so the Strategy Engine can
+        # build "University research"/"Financial planning" actions from the
+        # same signals already computed here, without a second
+        # calculate_profile_strength call.
+        "missing_profile_signals": data["missing_profile_signals"],
+        "financial_risk_warning": data["financial_risk_warning"],
         "disclaimer": data["disclaimer"],
     }

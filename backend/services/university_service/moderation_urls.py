@@ -1,6 +1,10 @@
 from django.urls import path
 
-from .views import AdminUniversityModerationActionView, AdminUniversityReviewQueueView
+from .views import (
+    AdminRecommendationDiagnosticsView,
+    AdminUniversityModerationActionView,
+    AdminUniversityReviewQueueView,
+)
 
 app_name = "university-moderation"
 
@@ -10,5 +14,10 @@ urlpatterns = [
         "<int:pk>/moderation/",
         AdminUniversityModerationActionView.as_view(),
         name="moderation-action",
+    ),
+    path(
+        "<int:user_id>/recommendation-diagnostics/",
+        AdminRecommendationDiagnosticsView.as_view(),
+        name="recommendation-diagnostics",
     ),
 ]

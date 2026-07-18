@@ -148,6 +148,54 @@ class ProfileAssessmentServiceTests(APITestCase):
 
         self.assertNotEqual(original, changed)
 
+    def test_snapshot_hash_changes_on_each_022_phase_10_listed_field(self):
+        """022 Phase 10's own verification requirement: changing each of the
+        fields it names individually (major, country, GPA, test score,
+        activity, financial need, essay, application round) must change
+        compute_profile_snapshot_hash's output, so the recommendation and
+        strategy caches (both keyed on this hash) never serve a stale
+        response after any of these edits. Add/remove-university is
+        deliberately not covered here -- that trigger already works through
+        the separate, explicit `invalidate_recommendation_caches` call, not
+        this hash.
+        """
+
+        university = create_university("hash-invalidation-university")
+        application = ApplicationTrackerItem.objects.create(
+            user=self.user,
+            university=university,
+            application_round=ApplicationTrackerItem.ApplicationRound.REGULAR_DECISION,
+        )
+
+        cases = {
+            "major": lambda: setattr(self.profile, "intended_majors", ["Physics"]),
+            "country": lambda: setattr(self.profile, "country", "Kazakhstan"),
+            "gpa": lambda: setattr(self.profile, "gpa", "3.10"),
+            "test_score": lambda: setattr(self.profile, "test_scores", {"sat": 1500, "ielts": 7.0}),
+            "financial_need": lambda: setattr(
+                self.profile, "scholarship_need", self.profile.ScholarshipNeed.YES
+            ),
+        }
+        for field_name, mutate in cases.items():
+            before = compute_profile_snapshot_hash(self.user)
+            mutate()
+            self.profile.save()
+            after = compute_profile_snapshot_hash(self.user)
+            self.assertNotEqual(before, after, f"snapshot hash did not change for: {field_name}")
+
+        before_activity = compute_profile_snapshot_hash(self.user)
+        Activity.objects.create(user=self.user, title="Robotics club", role="Member")
+        self.assertNotEqual(before_activity, compute_profile_snapshot_hash(self.user), "activity")
+
+        before_essay = compute_profile_snapshot_hash(self.user)
+        EssayWorkspace.objects.create(user=self.user, title="Common App essay")
+        self.assertNotEqual(before_essay, compute_profile_snapshot_hash(self.user), "essay")
+
+        before_round = compute_profile_snapshot_hash(self.user)
+        application.application_round = ApplicationTrackerItem.ApplicationRound.EARLY_DECISION
+        application.save()
+        self.assertNotEqual(before_round, compute_profile_snapshot_hash(self.user), "application_round")
+
     def test_profile_input_is_compact_and_excludes_private_contact_and_raw_essays(self):
         EssayWorkspace.objects.create(
             user=self.user,

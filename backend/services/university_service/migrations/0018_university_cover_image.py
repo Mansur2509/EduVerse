@@ -8,7 +8,7 @@ import common.validators
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('university_service', '0017_excludeduniversity_pinneduniversity'),
+        ('university_service', '0016_university_gpa_average_scale'),
     ]
 
     operations = [

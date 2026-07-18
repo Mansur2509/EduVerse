@@ -369,6 +369,42 @@ export type StrategyEvent = {
   [key: string]: unknown;
 };
 
+// 022 Phase 9: the unified, prioritized action list spanning all ten
+// categories (Academics/Testing/Extracurriculars/Research/Essays/
+// Recommendations/Financial planning/University research/Application
+// timeline/Documents). Every action shares this same shape regardless of
+// category.
+export type StrategyActionCategory =
+  | "academics"
+  | "testing"
+  | "extracurriculars"
+  | "research"
+  | "essays"
+  | "recommendations"
+  | "financial_planning"
+  | "university_research"
+  | "application_timeline"
+  | "documents";
+
+export type StrategyActionUniversityRef = { id: number; name: string; slug: string };
+
+export type StrategyAction = {
+  title: string;
+  category: StrategyActionCategory;
+  reason: string;
+  affected_universities: StrategyActionUniversityRef[];
+  affected_university_count: number;
+  urgency: string;
+  estimated_effort: "low" | "medium" | "high";
+  expected_strategic_value: "low" | "medium" | "high";
+  evidence_source: Record<string, unknown>;
+  deadline: string | null;
+  completion_state: "not_started" | "in_progress" | "done";
+  dependency: string | null;
+  confidence: "low" | "medium" | "high";
+  next_action: string;
+};
+
 export type ProfileStrategy = {
   generated_at: string;
   has_tracked_applications: boolean;
@@ -397,6 +433,7 @@ export type ProfileStrategy = {
     next_actions: string[];
   };
   university_list_strategy: Record<string, unknown>;
+  prioritized_actions: StrategyAction[];
   needs_assessment: boolean;
 };
 

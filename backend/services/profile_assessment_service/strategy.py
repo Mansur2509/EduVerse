@@ -29,6 +29,8 @@ from services.university_service.recommendation_cache import (
 from services.university_service.strategy import build_application_strategy
 from services.user_profile_service.models import Recommender
 
+from .strategy_actions import build_strategy_action_list
+
 # Mirrors application_service.timeline._deadline_events's private kind->type
 # mapping so an undated deadline (see the loop in `build_profile_strategy`
 # below) reads the same "type" as its dated counterpart would have.
@@ -240,6 +242,17 @@ def build_profile_strategy(user, profile, preferences, assessment) -> dict:
         STRATEGY_CACHE_SECONDS,
     )
 
+    # 022 Phase 9: the unified, prioritized action list. Reuses every input
+    # already computed above (applications, buckets, university_list_strategy)
+    # -- no new query loop, no second fit/profile-strength calculation.
+    prioritized_actions = build_strategy_action_list(
+        assessment=assessment,
+        profile=profile,
+        applications=applications,
+        university_list_strategy=university_list_strategy,
+        buckets=buckets,
+    )
+
     return {
         "generated_at": today.isoformat(),
         "has_tracked_applications": bool(applications),
@@ -250,4 +263,5 @@ def build_profile_strategy(user, profile, preferences, assessment) -> dict:
         "recommendation_letter_plan": _recommendation_letter_plan(user, events, missing_evidence),
         "activities_research_plan": _activities_research_plan(missing_evidence),
         "university_list_strategy": university_list_strategy,
+        "prioritized_actions": prioritized_actions,
     }

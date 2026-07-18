@@ -55,6 +55,10 @@ export type RecommendationItem = {
     city: string;
   };
   category: RecommendationCategory;
+  /** The canonical Fit Engine's own independent tier (reach/competitive/target/safety),
+   * shown for transparency alongside `category` -- the two may legitimately disagree,
+   * since `category` also weighs program/cost/extracurricular/preference/readiness. */
+  canonical_fit_tier: "reach" | "competitive" | "target" | "safety" | null;
   is_international: boolean | null;
   fit_score: number;
   confidence: "low" | "medium" | "high";
@@ -84,6 +88,12 @@ export type RecommendationItem = {
   deadline_risk: RiskLevel;
   main_strength: FitStrengthCode | null;
   main_risk: FitRiskCode | FitMissingFieldCode | null;
+  /** Bounded, deduplicated "top reasons" list -- extends main_strength without replacing it. */
+  top_reason_keys: FitStrengthCode[];
+  /** Bounded, deduplicated "main risks" list -- extends main_risk without replacing it. */
+  main_risks: (FitRiskCode | FitMissingFieldCode)[];
+  /** Coarse EC/holistic signal; null when there isn't yet enough evidence to say anything. */
+  holistic_context_key: "extracurricular_strong_evidence" | "extracurricular_limited_evidence" | null;
   why_recommended_keys: string[];
   next_action: FitNextActionCode | string;
   missing_data: FitMissingFieldCode[];
@@ -94,6 +104,9 @@ export type RecommendationItem = {
   source_notes: UniversityFitSourceNote[];
   is_shortlisted: boolean;
   application_id: number | null;
+  /** 022 Phase 11: always included regardless of quota/diversity capping, with the same
+   * honestly-computed category as every other item -- pinning changes inclusion, never the label. */
+  is_pinned: boolean;
 };
 
 export type RecommendationCounts = {
@@ -105,11 +118,26 @@ export type RecommendationCounts = {
   total: number;
 };
 
+export type FinancialRiskWarning = {
+  active: boolean;
+  high_cost_risk_count: number;
+  total: number;
+};
+
 export type RecommendationsResponse = {
   recommendations: RecommendationItem[];
   counts: RecommendationCounts;
   missing_preferences: string[];
+  /** Deduplicated checklist of profile-strength reason codes with no evidence yet (e.g. no
+   * activities, no test scores) -- distinct from genuinely weak evidence, never penalized. */
+  missing_profile_signals: string[];
+  /** Set when the student has declared financial need and the current list is dominated by
+   * confirmed-high cost risk (no verified aid signal) -- a signal about the list, not a school. */
+  financial_risk_warning: FinancialRiskWarning;
   excluded_low_data_count: number;
+  excluded_degree_mismatch_count: number;
+  /** 022 Phase 11: universities the student explicitly excluded via the exclude control. */
+  excluded_by_user_count: number;
   list_size_limited: boolean;
   disclaimer: string;
 };

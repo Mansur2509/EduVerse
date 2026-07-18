@@ -414,6 +414,46 @@ class SavedUniversity(models.Model):
         ]
 
 
+class PinnedUniversity(models.Model):
+    """022 Phase 11: a university a student has explicitly chosen to always
+    keep in their recommendation list. Pinned items are still scored and
+    categorized by the same canonical Fit Engine and category derivation as
+    everything else -- pinning changes *inclusion*, never the fit label.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pinned_universities"
+    )
+    university = models.ForeignKey(University, on_delete=models.CASCADE, related_name="pinned_by")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(fields=("user", "university"), name="unique_pinned_university")
+        ]
+
+
+class ExcludedUniversity(models.Model):
+    """022 Phase 11: a university a student has explicitly asked never to
+    see in their recommendation list. A hard filter, same tier as the
+    confirmed-degree-mismatch/expired-deadline filters (022 Phase 4) -- an
+    explicit user choice, not a scoring outcome.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="excluded_universities"
+    )
+    university = models.ForeignKey(University, on_delete=models.CASCADE, related_name="excluded_by")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(fields=("user", "university"), name="unique_excluded_university")
+        ]
+
+
 class UniversityImportJob(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

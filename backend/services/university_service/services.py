@@ -1261,6 +1261,11 @@ def calculate_university_fit(profile, university: University) -> dict:
         "essay_subscore": essay_score,
         "deadline_subscore": deadline_score,
         "cost_subscore": cost_score,
+        # A confirmed (not missing-data) severe SAT/IELTS shortfall -- already
+        # used above to cap fit_score, now also surfaced so the recommendation
+        # layer (022 Phase 7, Case B) can stop a strong extracurricular or
+        # financial-fit score from "erasing" a real academic-minimum gap.
+        "severe_academic_gap": severe_academic_gap,
         "profile_evidence": profile_evidence,
         # Additive, spec-friendly aliases for the same subscores above, plus a
         # data_confidence readout — never a second, differently-weighted score.

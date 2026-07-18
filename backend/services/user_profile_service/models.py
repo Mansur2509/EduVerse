@@ -158,6 +158,17 @@ class StudentProfile(models.Model):
 
 
 class UserPreference(models.Model):
+    class InstitutionTypePreference(models.TextChoices):
+        ANY = "any", "Any"
+        PUBLIC = "public", "Public"
+        PRIVATE = "private", "Private"
+
+    class CampusSettingPreference(models.TextChoices):
+        ANY = "any", "Any"
+        URBAN = "urban", "Urban"
+        SUBURBAN = "suburban", "Suburban"
+        RURAL = "rural", "Rural"
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -171,6 +182,22 @@ class UserPreference(models.Model):
     mun_debate_interest = models.BooleanField(default=False)
     research_interest = models.BooleanField(default=False)
     finance_literacy_interest = models.BooleanField(default=False)
+
+    desired_recommendation_count = models.PositiveSmallIntegerField(null=True, blank=True)
+    category_distribution = models.JSONField(default=dict, blank=True)
+    preferred_ranking_min = models.PositiveIntegerField(null=True, blank=True)
+    preferred_ranking_max = models.PositiveIntegerField(null=True, blank=True)
+    institution_type_preference = models.CharField(
+        max_length=10,
+        choices=InstitutionTypePreference.choices,
+        default=InstitutionTypePreference.ANY,
+    )
+    campus_setting_preference = models.CharField(
+        max_length=10,
+        choices=CampusSettingPreference.choices,
+        default=CampusSettingPreference.ANY,
+    )
+    test_optional_preference = models.BooleanField(default=False)
 
     # Null = the first-login product tour has not been dismissed yet, so it
     # is still shown automatically on dashboard entry. Set once, permanently,

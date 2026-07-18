@@ -334,6 +334,11 @@ def _target_context(user, profile) -> dict:
                 "university": item.university.name,
                 "status": item.status,
                 "priority": item.priority,
+                # 022 Phase 10: a round change (e.g. Regular Decision ->
+                # Early Decision) shifts deadline/readiness context enough
+                # that cached recommendations/strategy/assessment must
+                # invalidate on it, same as status/priority already do.
+                "application_round": item.application_round,
                 "target_program": item.target_program.name if item.target_program else "",
             }
             for item in applications[:25]
