@@ -179,6 +179,7 @@ export const landingEn = {
   "landing.partners.nexusVolunteers": "Nexus Volunteers",
   "landing.partners.xproject": "Xproject",
   "landing.partners.eduunity": "Eduunity",
+  "landing.partners.dynamicsVolunteers": "Dynamics Volunteers",
   "landing.partners.openDetails": "Open {{name}} partner details",
   "landing.partners.close": "Close partner details",
   "landing.partners.modalEyebrow": "Confirmed partner",

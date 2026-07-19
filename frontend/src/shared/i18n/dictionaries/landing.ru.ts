@@ -202,6 +202,7 @@ export const landingRu = {
   "landing.features.visual.evidenceFit": "Evidence fit",
   "landing.partners.xproject": "Xproject",
   "landing.partners.eduunity": "Eduunity",
+  "landing.partners.dynamicsVolunteers": "Dynamics Volunteers",
   "landing.partners.openDetails": "Открыть детали партнёра {{name}}",
   "landing.partners.close": "Закрыть детали партнёра",
   "landing.partners.modalEyebrow": "Подтверждённый партнёр",

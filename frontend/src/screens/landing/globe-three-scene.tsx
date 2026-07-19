@@ -53,11 +53,20 @@ export function GlobeThreeScene({
   const markerMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const selectedIdRef = useRef(activeId);
   const onSelectRef = useRef(onSelect);
+  const focusTargetRef = useRef<{ x: number; y: number; until: number }>({ x: 0, y: 0, until: 0 });
   const prefersReducedMotion = usePrefersReducedMotion();
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
 
   useEffect(() => {
     selectedIdRef.current = activeId;
+    const activeMarker = markers.find((marker) => marker.id === activeId);
+    if (activeMarker) {
+      focusTargetRef.current = {
+        x: THREE.MathUtils.clamp(THREE.MathUtils.degToRad(activeMarker.lat * -0.32), -0.55, 0.18),
+        y: THREE.MathUtils.degToRad(-activeMarker.lon - 90),
+        until: performance.now() + (prefersReducedMotion ? 0 : 1500)
+      };
+    }
     markerMeshesRef.current.forEach((mesh, id) => {
       const selected = id === activeId;
       mesh.scale.setScalar(selected ? 1.55 : 1);
@@ -68,7 +77,7 @@ export function GlobeThreeScene({
         material.emissiveIntensity = selected ? 0.38 : 0.16;
       }
     });
-  }, [activeId]);
+  }, [activeId, markers, prefersReducedMotion]);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -214,6 +223,10 @@ export function GlobeThreeScene({
     let tabVisible = !document.hidden;
     let lastFrame = 0;
 
+    function shortestAngleTo(current: number, target: number) {
+      return Math.atan2(Math.sin(target - current), Math.cos(target - current));
+    }
+
     function syncSelectedRing() {
       const selected = markerMeshes.get(selectedIdRef.current);
       if (!selected) return;
@@ -243,7 +256,13 @@ export function GlobeThreeScene({
       lastFrame = now;
 
       if (!prefersReducedMotion) {
-        if (!drag.active) {
+        const shouldFocus = focusTargetRef.current.until > now;
+        if (!drag.active && shouldFocus) {
+          root.rotation.x += (focusTargetRef.current.x - root.rotation.x) * 0.075;
+          root.rotation.y += shortestAngleTo(root.rotation.y, focusTargetRef.current.y) * 0.075;
+          drag.velocityX = 0;
+          drag.velocityY = 0;
+        } else if (!drag.active) {
           root.rotation.y += drag.velocityX;
           root.rotation.x += drag.velocityY;
           drag.velocityX *= 0.94;
@@ -289,6 +308,7 @@ export function GlobeThreeScene({
       root.rotation.x = THREE.MathUtils.clamp(root.rotation.x + rotateX, -0.72, 0.38);
       drag.velocityX = rotateY;
       drag.velocityY = rotateX;
+      focusTargetRef.current.until = 0;
     }
 
     function selectMarkerFromPointer(event: PointerEvent) {
@@ -377,6 +397,7 @@ export function GlobeThreeScene({
       <canvas
         aria-label={ariaLabel}
         className={`size-full touch-none ${status === "fallback" ? "pointer-events-none opacity-0" : ""}`}
+        data-active-country={activeId}
         data-globe-render-status={status}
         ref={canvasRef}
       />

@@ -202,6 +202,7 @@ export const landingUzCyrl = {
   "landing.features.visual.evidenceFit": "Evidence fit",
   "landing.partners.xproject": "Xproject",
   "landing.partners.eduunity": "Eduunity",
+  "landing.partners.dynamicsVolunteers": "Dynamics Volunteers",
   "landing.partners.openDetails": "{{name}} ҳамкор тафсилотларини очиш",
   "landing.partners.close": "Ҳамкор тафсилотларини ёпиш",
   "landing.partners.modalEyebrow": "Тасдиқланган ҳамкор",

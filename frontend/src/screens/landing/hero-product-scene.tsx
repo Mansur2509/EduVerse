@@ -20,25 +20,34 @@ import { TiltCard } from "@/shared/ui/tilt-card";
 
 import { UNIVERSITY_COUNT_DISPLAY } from "./site-stats";
 
+// Stable semantic depth map: z-index and translateZ layers stay separated so entrance motion cannot cross cards.
+const HERO_LAYERS = {
+  atmosphere: "z-0",
+  rearDocument: "z-10",
+  dossier: "z-20",
+  frontFragment: "z-30",
+  foregroundAccent: "z-40"
+} as const;
+
 export function HeroProductScene() {
   const { t } = useI18n();
 
   return (
-    <div className="landing-poster-frame relative mx-auto min-h-[27rem] w-full max-w-[25rem] sm:min-h-[34rem] sm:max-w-[38rem] lg:min-h-[30rem] lg:max-w-[40rem] xl:min-h-[32rem] xl:max-w-[42rem]">
+    <div className="landing-hero-stage relative mx-auto min-h-[27rem] w-full max-w-[25rem] overflow-visible sm:min-h-[34rem] sm:max-w-[38rem] lg:min-h-[30rem] lg:max-w-[40rem] xl:min-h-[32rem] xl:max-w-[42rem]">
       <div
         aria-hidden
-        className="absolute -left-8 top-10 h-[78%] w-[62%] -rotate-6 bg-primary shadow-2xl shadow-black/30"
+        className={`absolute -left-8 top-10 ${HERO_LAYERS.atmosphere} h-[78%] w-[62%] -rotate-6 bg-primary shadow-2xl shadow-black/30`}
       />
       <div
         aria-hidden
-        className="absolute bottom-10 right-0 h-[64%] w-[58%] rotate-6 bg-info/75 shadow-2xl shadow-black/20"
+        className={`absolute bottom-10 right-0 ${HERO_LAYERS.atmosphere} h-[64%] w-[58%] rotate-6 bg-info/75 shadow-2xl shadow-black/20`}
       />
       <div
         aria-hidden
-        className="absolute left-8 top-20 h-[70%] w-[76%] border border-white/20"
+        className={`absolute left-8 top-20 ${HERO_LAYERS.rearDocument} h-[70%] w-[76%] border border-white/20`}
       />
 
-      <TiltCard className="absolute inset-x-5 top-7 z-20 sm:inset-x-10 lg:top-8" maxTiltDeg={6}>
+      <TiltCard className={`absolute inset-x-5 top-7 ${HERO_LAYERS.dossier} sm:inset-x-10 lg:top-8`} maxTiltDeg={4}>
         <div className="landing-poster-object animate-[landing-poster-enter_700ms_cubic-bezier(0.16,1,0.3,1)_both]">
           <div className="landing-poster-paper relative min-h-[24rem] overflow-hidden border border-border bg-surface p-4 text-foreground sm:min-h-[31rem] sm:p-6 lg:min-h-[27rem]">
             <span
@@ -116,10 +125,10 @@ export function HeroProductScene() {
       </TiltCard>
 
       <ParallaxLayer
-        className="absolute -left-1 top-20 z-30 w-32 -rotate-[13deg] sm:left-0 sm:top-24 sm:w-44"
+        className={`absolute -left-1 top-20 ${HERO_LAYERS.frontFragment} w-36 -rotate-[13deg] sm:left-0 sm:top-24 sm:w-44 lg:w-44`}
         depth={0.38}
       >
-        <div className="border border-white/20 bg-navy p-4 text-white shadow-2xl shadow-black/35">
+        <div className="landing-hero-depth-front min-w-36 border border-white/20 bg-navy p-4 text-white shadow-2xl shadow-black/35 sm:min-w-44">
           <Globe2 aria-hidden className="size-7 text-info" />
           <p className="mt-5 text-sm font-semibold">{t("landing.hero.scenePlan")}</p>
         </div>
@@ -127,10 +136,10 @@ export function HeroProductScene() {
 
       <ParallaxLayer
         axis="y"
-        className="absolute right-0 top-2 z-30 w-40 rotate-[9deg] sm:right-3 sm:w-56"
+        className={`absolute right-0 top-2 ${HERO_LAYERS.foregroundAccent} w-44 rotate-[9deg] sm:right-3 sm:w-56`}
         depth={0.28}
       >
-        <div className="border border-accent/35 bg-accent p-4 text-accent-foreground shadow-2xl shadow-accent/25">
+        <div className="landing-hero-depth-foreground min-w-44 border border-accent/35 bg-accent p-4 text-accent-foreground shadow-2xl shadow-accent/25 sm:min-w-56">
           <div className="flex items-center justify-between">
             <Ticket aria-hidden className="size-6" />
             <span className="border border-current/30 px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.14em]">
@@ -142,7 +151,7 @@ export function HeroProductScene() {
       </ParallaxLayer>
 
       <ParallaxLayer
-        className="absolute bottom-4 left-4 z-30 hidden w-52 -rotate-[8deg] border bg-card p-4 text-foreground shadow-2xl sm:block"
+        className={`absolute bottom-4 left-4 ${HERO_LAYERS.frontFragment} hidden w-56 -rotate-[8deg] border bg-card p-4 text-foreground shadow-2xl sm:block`}
         depth={0.5}
       >
         <div className="flex items-center gap-3">

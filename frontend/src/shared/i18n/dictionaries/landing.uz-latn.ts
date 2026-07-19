@@ -202,6 +202,7 @@ export const landingUzLatn = {
   "landing.features.visual.evidenceFit": "Evidence fit",
   "landing.partners.xproject": "Xproject",
   "landing.partners.eduunity": "Eduunity",
+  "landing.partners.dynamicsVolunteers": "Dynamics Volunteers",
   "landing.partners.openDetails": "{{name}} hamkor tafsilotlarini ochish",
   "landing.partners.close": "Hamkor tafsilotlarini yopish",
   "landing.partners.modalEyebrow": "Tasdiqlangan hamkor",

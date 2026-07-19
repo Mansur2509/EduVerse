@@ -190,8 +190,21 @@ h3 {
   perspective: 1200px;
 }
 
+.landing-hero-stage {
+  perspective: 1400px;
+  transform-style: preserve-3d;
+}
+
+.landing-hero-depth-front {
+  transform: translateZ(76px);
+}
+
+.landing-hero-depth-foreground {
+  transform: translateZ(96px);
+}
+
 .landing-poster-object {
-  transform: rotateX(6deg) rotateY(-10deg) rotateZ(1deg);
+  transform: translateZ(42px) rotateX(6deg) rotateY(-10deg) rotateZ(1deg);
   transform-style: preserve-3d;
 }
 
@@ -498,11 +511,11 @@ textarea::placeholder {
 @keyframes landing-poster-enter {
   from {
     opacity: 0;
-    transform: translateY(24px) rotateX(10deg) rotateY(-18deg) rotateZ(3deg) scale(0.96);
+    transform: translate3d(0, 24px, 42px) rotateX(10deg) rotateY(-18deg) rotateZ(3deg) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0) rotateX(6deg) rotateY(-10deg) rotateZ(1deg) scale(1);
+    transform: translate3d(0, 0, 42px) rotateX(6deg) rotateY(-10deg) rotateZ(1deg) scale(1);
   }
 }
 

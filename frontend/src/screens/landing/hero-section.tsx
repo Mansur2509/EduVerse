@@ -28,6 +28,11 @@ export function HeroSection() {
         aria-hidden
         className="absolute inset-x-0 bottom-0 -z-10 h-44 bg-gradient-to-b from-transparent to-background"
       />
+      <div aria-hidden className="absolute right-[6vw] top-[16vh] z-10 hidden text-accent/80 lg:block">
+        <span className="absolute block size-10 rotate-45 border border-current" />
+        <span className="absolute left-12 top-16 block size-5 rotate-45 bg-current" />
+        <span className="absolute -left-10 top-28 block size-3 rotate-45 border border-current" />
+      </div>
 
       <div className="mx-auto grid h-full w-full max-w-[98rem] gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[0.84fr_1.16fr] lg:items-center lg:gap-5 lg:px-10 lg:py-5 xl:py-6">
         <MotionReveal>

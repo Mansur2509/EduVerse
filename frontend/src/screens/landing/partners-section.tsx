@@ -14,7 +14,6 @@ type Partner = {
   nameKey: TranslationKey;
   telegramUrl: string;
   src?: string;
-  wide?: boolean;
   textMark?: string;
 };
 
@@ -32,8 +31,7 @@ const PARTNERS: Partner[] = [
   {
     nameKey: "landing.partners.uniteens",
     src: "/landing-partners/clean/uniteens-clean.png",
-    telegramUrl: "https://t.me/uniteens_uz",
-    wide: true
+    telegramUrl: "https://t.me/uniteens_uz"
   },
   {
     nameKey: "landing.partners.lexNova",
@@ -54,6 +52,11 @@ const PARTNERS: Partner[] = [
     nameKey: "landing.partners.eduunity",
     src: "/landing-partners/clean/eduunity-clean.png",
     telegramUrl: "https://t.me/+IU3CKBjSsSlmNzFi"
+  },
+  {
+    nameKey: "landing.partners.dynamicsVolunteers",
+    telegramUrl: "https://t.me/dynvolunteers",
+    textMark: "DV"
   }
 ];
 
@@ -65,18 +68,25 @@ function PartnerMark({ partner, modal = false }: { partner: Partner; modal?: boo
     return (
       <Image
         alt={modal ? name : ""}
-        className={`w-full object-contain ${modal ? "max-h-32" : partner.wide ? "max-h-24" : "max-h-28"}`}
+        className={`${modal ? "max-h-32 w-full" : "size-[72%]"} object-contain`}
         height={modal ? 160 : 130}
         loading={modal ? "eager" : "lazy"}
         src={partner.src}
-        width={partner.wide ? 320 : 240}
+        width={240}
       />
     );
   }
 
+  const mark = partner.textMark ?? name;
+  const longMark = mark.length > 3;
+
   return (
-    <span className="text-display-condensed-sm text-4xl leading-none text-primary-hover dark:text-primary">
-      {partner.textMark ?? name}
+    <span
+      className={`text-display-condensed-sm max-w-[84%] text-center leading-none text-primary-hover dark:text-primary ${
+        modal ? (longMark ? "text-4xl" : "text-5xl") : longMark ? "text-[1.7rem] sm:text-[1.95rem] lg:text-[2.1rem]" : "text-4xl"
+      }`}
+    >
+      {mark}
     </span>
   );
 }
@@ -92,9 +102,8 @@ function PartnerLogo({
 }) {
   const { t } = useI18n();
   const name = t(partner.nameKey);
-  const className = `group/partner grid h-32 shrink-0 place-items-center px-4 py-3 transition-transform hover:-translate-y-1 focus-visible:-translate-y-1 sm:h-36 ${
-    partner.wide ? "w-[18rem] sm:w-[22rem]" : "w-[13rem] sm:w-[17rem]"
-  }`;
+  const className =
+    "group/partner grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border border-border/80 bg-card shadow-[0_18px_46px_hsl(var(--navy)/0.12)] transition-transform hover:-translate-y-1 focus-visible:-translate-y-1 sm:size-32 lg:size-36";
 
   if (decorative) {
     return (
@@ -107,12 +116,13 @@ function PartnerLogo({
   return (
     <button
       aria-label={t("landing.partners.openDetails", { name })}
-      className={`${className} cursor-pointer border-b border-transparent hover:border-primary/45 focus-visible:border-primary`}
+      className={`${className} cursor-pointer overflow-hidden hover:border-primary/45 focus-visible:border-primary`}
+      data-partner-name={name}
+      data-partner-url={partner.telegramUrl}
       onClick={() => onOpen?.(partner)}
       type="button"
     >
       <PartnerMark partner={partner} />
-      <span className="sr-only">{name}</span>
     </button>
   );
 }
@@ -198,13 +208,14 @@ export function PartnersSection() {
   return (
     <section className="relative overflow-hidden bg-surface py-20 sm:py-24 lg:py-24" id="partners" tabIndex={-1}>
       <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-primary/30" />
-      <div aria-hidden className="absolute inset-y-0 left-0 w-[16vw] bg-primary/90" />
-      <div aria-hidden className="absolute bottom-8 right-0 h-24 w-[28vw] bg-accent/20" />
+      <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_8%_22%,hsl(var(--primary)/0.18),transparent_30%),radial-gradient(circle_at_92%_70%,hsl(var(--info)/0.12),transparent_30%)]" />
+      <div aria-hidden className="absolute left-8 top-16 hidden size-24 rotate-45 border border-primary/25 lg:block" />
+      <div aria-hidden className="absolute bottom-12 right-16 hidden size-12 rotate-45 bg-accent/25 lg:block" />
       <div className="relative mx-auto w-full max-w-[98rem] px-4 sm:px-6 lg:px-10">
         <MotionReveal>
-          <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
             <div>
-              <p className="text-eyebrow text-primary-foreground lg:text-accent">{t("landing.partners.eyebrow")}</p>
+              <p className="text-eyebrow text-primary-hover">{t("landing.partners.eyebrow")}</p>
               <h2 className="text-display-condensed-sm mt-4 max-w-4xl">{t("landing.partners.title")}</h2>
             </div>
             <p className="max-w-2xl text-base leading-7 text-muted-foreground lg:justify-self-end">
@@ -215,17 +226,17 @@ export function PartnersSection() {
 
         <MotionReveal delayMs={80}>
           <div
-            className="group relative mt-10 overflow-hidden border-y border-border bg-[linear-gradient(90deg,hsl(var(--surface)),hsl(var(--background)),hsl(var(--surface)))] py-5"
+            className="group relative mt-12 overflow-x-auto overflow-y-hidden border-y border-border bg-[linear-gradient(90deg,hsl(var(--surface)),hsl(var(--background)),hsl(var(--surface)))] py-8 scrollbar-quiet md:overflow-hidden"
             onFocusCapture={() => setPaused(true)}
             onBlurCapture={() => setPaused(false)}
             onPointerEnter={() => setPaused(true)}
             onPointerLeave={() => setPaused(false)}
           >
             <div
-              className={`flex flex-wrap justify-center gap-x-5 gap-y-3 px-3 ${
+              className={`flex w-max items-center gap-6 px-6 sm:gap-8 lg:gap-10 ${
                 scrolling
-                  ? `sm:w-max sm:flex-nowrap sm:animate-[landing-partner-scroll_52s_linear_infinite] sm:justify-start ${
-                      paused ? "sm:[animation-play-state:paused]" : ""
+                  ? `md:animate-[landing-partner-scroll_46s_linear_infinite] ${
+                      paused ? "md:[animation-play-state:paused]" : ""
                     }`
                   : ""
               }`}
@@ -234,7 +245,7 @@ export function PartnersSection() {
                 <PartnerLogo key={partner.nameKey} onOpen={setSelectedPartner} partner={partner} />
               ))}
               {scrolling ? (
-                <div className="hidden gap-5 sm:flex">
+                <div className="hidden items-center gap-6 sm:gap-8 md:flex lg:gap-10">
                   {PARTNERS.map((partner) => (
                     <PartnerLogo decorative key={`${partner.nameKey}-duplicate`} partner={partner} />
                   ))}

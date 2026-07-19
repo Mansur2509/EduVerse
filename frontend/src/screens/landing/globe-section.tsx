@@ -169,6 +169,7 @@ function GlobeFallback({
                 ? "size-10 border-accent bg-accent text-accent-foreground shadow-2xl shadow-accent/40"
                 : "size-7 border-white/45 bg-white/20 text-white backdrop-blur"
             }`}
+            data-country-id={destination.id}
             key={destination.id}
             onClick={(event) => {
               event.stopPropagation();
@@ -284,7 +285,10 @@ export function GlobeSection() {
               />
             </div>
 
-            <div className="border border-white/15 bg-white/[0.08] p-5 shadow-2xl shadow-black/30 backdrop-blur">
+            <div
+              className="border border-white/15 bg-white/[0.08] p-5 shadow-2xl shadow-black/30 backdrop-blur"
+              data-active-country-panel={active.id}
+            >
               <div className="flex items-center gap-2 text-accent">
                 <Globe2 aria-hidden className="size-5" />
                 <p className="text-eyebrow">{t(active.regionKey)}</p>
@@ -330,6 +334,7 @@ export function GlobeSection() {
                     ? "border-accent bg-accent text-accent-foreground"
                     : "border-white/15 bg-white/[0.06] text-white/[0.72] hover:bg-white/[0.12] hover:text-white"
                 }`}
+                data-country-id={destination.id}
                 key={destination.id}
                 onClick={() => setActiveId(destination.id)}
                 type="button"
