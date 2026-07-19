@@ -1,18 +1,12 @@
 "use client";
 
 import { Award, GraduationCap, Languages, Wallet } from "lucide-react";
-import Image from "next/image";
-import { useState } from "react";
 
 import { formatTuitionAmount, type StudyDestination } from "@/entities/university";
 import { useI18n } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { Card } from "@/shared/ui/card";
 
-// Real flag imagery only (flagcdn.com -- a free, public, purpose-built flag
-// CDN, not scraped/hotlinked stock photography). A country missing from the
-// backend's metadata map (no country_code) simply renders the Globe icon
-// fallback instead of a broken image, exactly like event cover images.
 const HEADER_BAND_CLASSES = [
   "from-navy to-navy/70",
   "from-primary/90 to-primary/60",
@@ -44,9 +38,8 @@ function costRangeLabel(destination: StudyDestination): string | null {
 
 export function StudyDestinationCard({ destination }: { destination: StudyDestination }) {
   const { t } = useI18n();
-  const [flagFailed, setFlagFailed] = useState(false);
-  const showFlag = Boolean(destination.country_code) && !flagFailed;
   const costLabel = costRangeLabel(destination);
+  const countryCode = destination.country_code?.toUpperCase();
 
   return (
     <Card className="flex h-full flex-col overflow-hidden" interactive>
@@ -57,16 +50,13 @@ export function StudyDestinationCard({ destination }: { destination: StudyDestin
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-white/10"
         />
-        {showFlag ? (
-          <Image
-            alt=""
-            className="relative z-10 h-10 w-14 rounded-sm border border-navy-foreground/30 object-cover shadow-md"
-            height={40}
-            onError={() => setFlagFailed(true)}
-            src={`https://flagcdn.com/w160/${destination.country_code}.png`}
-            unoptimized
-            width={56}
-          />
+        {countryCode ? (
+          <span
+            aria-hidden
+            className="relative z-10 grid h-10 min-w-14 place-items-center rounded-sm border border-navy-foreground/30 bg-navy-foreground/12 px-3 text-sm font-bold tracking-[0.18em] text-navy-foreground shadow-md"
+          >
+            {countryCode}
+          </span>
         ) : (
           <GraduationCap
             aria-hidden

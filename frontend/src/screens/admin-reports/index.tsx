@@ -211,6 +211,7 @@ export function AdminReportsScreen() {
                   </p>
                 </div>
                 <select
+                  aria-label={t("adminReports.filters.status")}
                   className={fieldClassName}
                   disabled={savingId === report.id}
                   onChange={(event) =>
