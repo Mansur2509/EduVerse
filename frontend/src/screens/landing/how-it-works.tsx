@@ -60,7 +60,6 @@ export function HowItWorks() {
     target: sectionRef,
     offset: ["start 80%", "end 30%"]
   });
-  const desktopX = useTransform(scrollYProgress, [0, 1], ["0%", "-22%"]);
   const pathScale = useTransform(scrollYProgress, [0, 1], [0.12, 1]);
   const progressRotate = useTransform(scrollYProgress, [0, 1], [-4, 4]);
 
@@ -91,7 +90,7 @@ export function HowItWorks() {
             </div>
           </div>
 
-          <div className="relative mt-10 overflow-hidden border-y border-border py-7 sm:mt-12 sm:py-8">
+          <div className="relative mt-10 border-y border-border py-7 sm:mt-12 sm:py-8">
             <div aria-hidden className="absolute left-8 right-8 top-1/2 hidden h-px -translate-y-1/2 bg-border lg:block" />
             <m.div
               aria-hidden
@@ -99,8 +98,7 @@ export function HowItWorks() {
               style={prefersReducedMotion ? undefined : { scaleX: pathScale }}
             />
             <m.div
-              className="grid gap-5 md:grid-cols-2 lg:flex lg:w-[118rem]"
-              style={prefersReducedMotion ? undefined : { x: desktopX }}
+              className="grid gap-5 md:grid-cols-2 xl:grid-cols-5"
             >
               {STEPS.map((step, index) => {
                 const Icon = step.icon;
@@ -108,8 +106,8 @@ export function HowItWorks() {
                 return (
                   <Card
                     className={cn(
-                      "relative min-h-72 overflow-hidden p-5 transition-[transform,box-shadow,border-color] lg:w-[24rem]",
-                      active ? "border-primary/45 shadow-2xl shadow-primary/10" : "lg:scale-[0.94] lg:opacity-85"
+                      "relative min-h-72 overflow-hidden p-5 transition-[box-shadow,border-color,background-color]",
+                      active ? "border-primary/45 bg-card shadow-2xl shadow-primary/10" : "bg-card/80"
                     )}
                     key={step.titleKey}
                   >

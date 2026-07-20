@@ -41,6 +41,175 @@ function canUseWebGl() {
   }
 }
 
+type LatLon = readonly [number, number];
+
+type GlobeOutline = {
+  closed?: boolean;
+  color?: string;
+  opacity?: number;
+  points: LatLon[];
+};
+
+const GLOBE_OUTLINES: GlobeOutline[] = [
+  {
+    closed: true,
+    opacity: 0.34,
+    points: [
+      [72, -168],
+      [69, -128],
+      [58, -60],
+      [43, -66],
+      [27, -81],
+      [14, -92],
+      [20, -111],
+      [34, -124],
+      [52, -132],
+      [72, -168]
+    ]
+  },
+  {
+    closed: true,
+    opacity: 0.26,
+    points: [
+      [50, -124],
+      [49, -67],
+      [31, -81],
+      [25, -97],
+      [32, -117],
+      [42, -124],
+      [50, -124]
+    ]
+  },
+  {
+    closed: true,
+    opacity: 0.26,
+    points: [
+      [69, -141],
+      [70, -62],
+      [55, -53],
+      [49, -67],
+      [50, -124],
+      [60, -141],
+      [69, -141]
+    ]
+  },
+  {
+    closed: true,
+    opacity: 0.34,
+    points: [
+      [71, -10],
+      [64, 32],
+      [52, 41],
+      [41, 29],
+      [36, 10],
+      [43, -9],
+      [55, -11],
+      [62, -25],
+      [71, -10]
+    ]
+  },
+  {
+    closed: true,
+    color: "#d8a340",
+    opacity: 0.5,
+    points: [
+      [58.8, -5.8],
+      [56.5, -2.0],
+      [52.0, 1.5],
+      [50.0, -4.7],
+      [53.7, -8.2],
+      [58.8, -5.8]
+    ]
+  },
+  {
+    closed: true,
+    color: "#d8a340",
+    opacity: 0.42,
+    points: [
+      [46.6, 7.5],
+      [44.6, 12.2],
+      [41.7, 14.7],
+      [38.2, 16.2],
+      [37.0, 13.2],
+      [40.6, 8.6],
+      [44.3, 7.2],
+      [46.6, 7.5]
+    ]
+  },
+  {
+    closed: true,
+    opacity: 0.34,
+    points: [
+      [78, 45],
+      [64, 97],
+      [57, 140],
+      [40, 146],
+      [23, 113],
+      [8, 78],
+      [26, 44],
+      [45, 33],
+      [61, 54],
+      [78, 45]
+    ]
+  },
+  {
+    closed: true,
+    color: "#d8a340",
+    opacity: 0.48,
+    points: [
+      [42.5, 124.2],
+      [40.2, 129.5],
+      [35.2, 129.3],
+      [33.1, 126.5],
+      [36.5, 124.4],
+      [42.5, 124.2]
+    ]
+  },
+  {
+    closed: true,
+    color: "#d8a340",
+    opacity: 0.5,
+    points: [
+      [1.65, 103.55],
+      [1.52, 104.08],
+      [1.16, 104.0],
+      [1.08, 103.62],
+      [1.34, 103.45],
+      [1.65, 103.55]
+    ]
+  },
+  {
+    closed: true,
+    opacity: 0.28,
+    points: [
+      [36, -17],
+      [31, 32],
+      [10, 42],
+      [-33, 28],
+      [-35, 18],
+      [0, 8],
+      [12, -17],
+      [36, -17]
+    ]
+  }
+];
+
+function createGlobeOutline(outline: GlobeOutline, radius: number) {
+  const points = outline.closed ? [...outline.points, outline.points[0]] : outline.points;
+  const geometry = new THREE.BufferGeometry().setFromPoints(
+    points.map(([lat, lon]) => latLonToVector3(lat, lon, radius))
+  );
+  return new THREE.Line(
+    geometry,
+    new THREE.LineBasicMaterial({
+      color: outline.color ?? "#f8f3e8",
+      depthWrite: false,
+      opacity: outline.opacity ?? 0.3,
+      transparent: true
+    })
+  );
+}
+
 export function GlobeThreeScene({
   activeId,
   ariaLabel,
@@ -171,6 +340,12 @@ export function GlobeThreeScene({
       land.add(patch);
     });
     root.add(land);
+
+    const borderGroup = new THREE.Group();
+    GLOBE_OUTLINES.forEach((outline) => {
+      borderGroup.add(createGlobeOutline(outline, 2.182));
+    });
+    root.add(borderGroup);
 
     const markerGeometry = new THREE.SphereGeometry(0.075, 18, 12);
     const markerMeshes = new Map<string, THREE.Mesh>();
@@ -369,6 +544,14 @@ export function GlobeThreeScene({
       });
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh) {
+          object.geometry.dispose();
+          if (Array.isArray(object.material)) {
+            object.material.forEach((material) => material.dispose());
+          } else {
+            object.material.dispose();
+          }
+        }
+        if (object instanceof THREE.Line) {
           object.geometry.dispose();
           if (Array.isArray(object.material)) {
             object.material.forEach((material) => material.dispose());
