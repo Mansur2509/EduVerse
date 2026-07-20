@@ -58,9 +58,9 @@ export function HowItWorks() {
   const [activeIndex, setActiveIndex] = useState(0);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
-    offset: ["start 70%", "end 35%"]
+    offset: ["start 80%", "end 30%"]
   });
-  const desktopX = useTransform(scrollYProgress, [0, 1], ["0%", "-48%"]);
+  const desktopX = useTransform(scrollYProgress, [0, 1], ["0%", "-22%"]);
   const pathScale = useTransform(scrollYProgress, [0, 1], [0.12, 1]);
   const progressRotate = useTransform(scrollYProgress, [0, 1], [-4, 4]);
 
@@ -71,14 +71,14 @@ export function HowItWorks() {
 
   return (
     <section
-      className="relative overflow-hidden bg-surface py-20 sm:py-24 lg:min-h-[210vh] lg:py-0"
+      className="relative overflow-hidden bg-surface py-16 sm:py-20 lg:py-24"
       id="how-it-works"
       ref={sectionRef}
       tabIndex={-1}
     >
       <div aria-hidden className="absolute inset-0 bg-[linear-gradient(120deg,hsl(var(--surface))_0_58%,hsl(var(--primary)/0.08)_58%_72%,transparent_72%)]" />
       <div aria-hidden className="absolute left-8 top-24 hidden h-[32rem] w-24 -rotate-12 bg-accent/20 lg:block" />
-      <div className="relative mx-auto w-full max-w-[98rem] px-4 sm:px-6 lg:sticky lg:top-20 lg:flex lg:min-h-[calc(100vh-5rem)] lg:items-center lg:px-10">
+      <div className="relative mx-auto w-full max-w-[98rem] px-4 sm:px-6 lg:px-10">
         <div className="w-full">
           <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
             <div>
@@ -91,7 +91,7 @@ export function HowItWorks() {
             </div>
           </div>
 
-          <div className="relative mt-12 overflow-hidden border-y border-border py-8">
+          <div className="relative mt-10 overflow-hidden border-y border-border py-7 sm:mt-12 sm:py-8">
             <div aria-hidden className="absolute left-8 right-8 top-1/2 hidden h-px -translate-y-1/2 bg-border lg:block" />
             <m.div
               aria-hidden
@@ -99,7 +99,7 @@ export function HowItWorks() {
               style={prefersReducedMotion ? undefined : { scaleX: pathScale }}
             />
             <m.div
-              className="grid gap-5 md:grid-cols-2 lg:flex lg:w-max"
+              className="grid gap-5 md:grid-cols-2 lg:flex lg:w-[118rem]"
               style={prefersReducedMotion ? undefined : { x: desktopX }}
             >
               {STEPS.map((step, index) => {

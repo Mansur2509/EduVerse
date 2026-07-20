@@ -12,6 +12,8 @@ import { usePrefersReducedMotion } from "@/shared/ui/use-reduced-motion";
 
 type Partner = {
   nameKey: TranslationKey;
+  logoClassName?: string;
+  modalLogoClassName?: string;
   telegramUrl: string;
   src?: string;
   textMark?: string;
@@ -40,8 +42,10 @@ const PARTNERS: Partner[] = [
   },
   {
     nameKey: "landing.partners.xproject",
-    telegramUrl: "https://t.me/xprojectuz",
-    textMark: "Xproject"
+    logoClassName: "size-[82%]",
+    modalLogoClassName: "max-h-40 w-full",
+    src: "/landing-partners/clean/xproject-clean.png",
+    telegramUrl: "https://t.me/xprojectuz"
   },
   {
     nameKey: "landing.partners.xdebates",
@@ -55,8 +59,10 @@ const PARTNERS: Partner[] = [
   },
   {
     nameKey: "landing.partners.dynamicsVolunteers",
-    telegramUrl: "https://t.me/dynvolunteers",
-    textMark: "DV"
+    logoClassName: "max-h-[82%] w-[96%]",
+    modalLogoClassName: "max-h-32 w-full",
+    src: "/landing-partners/clean/dynamics-volunteers-clean.png",
+    telegramUrl: "https://t.me/dynvolunteers"
   }
 ];
 
@@ -68,7 +74,7 @@ function PartnerMark({ partner, modal = false }: { partner: Partner; modal?: boo
     return (
       <Image
         alt={modal ? name : ""}
-        className={`${modal ? "max-h-32 w-full" : "size-[72%]"} object-contain`}
+        className={`${modal ? (partner.modalLogoClassName ?? "max-h-32 w-full") : (partner.logoClassName ?? "size-[72%]")} object-contain`}
         height={modal ? 160 : 130}
         loading={modal ? "eager" : "lazy"}
         src={partner.src}
@@ -103,13 +109,22 @@ function PartnerLogo({
   const { t } = useI18n();
   const name = t(partner.nameKey);
   const className =
-    "group/partner grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border border-border/80 bg-card shadow-[0_18px_46px_hsl(var(--navy)/0.12)] transition-transform hover:-translate-y-1 focus-visible:-translate-y-1 sm:size-32 lg:size-36";
+    "group/partner grid size-28 shrink-0 place-items-center overflow-hidden rounded-full border border-border/80 bg-card shadow-[0_18px_46px_hsl(var(--navy)/0.12)] transition-transform hover:-translate-y-1 focus-visible:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary sm:size-32 lg:size-36";
 
   if (decorative) {
     return (
-      <div aria-hidden className={className}>
+      <button
+        aria-hidden
+        className={`${className} cursor-pointer hover:border-primary/45`}
+        data-partner-clone="true"
+        data-partner-name={name}
+        data-partner-url={partner.telegramUrl}
+        onClick={() => onOpen?.(partner)}
+        tabIndex={-1}
+        type="button"
+      >
         <PartnerMark partner={partner} />
-      </div>
+      </button>
     );
   }
 
@@ -187,7 +202,7 @@ function PartnerDialog({ onClose, partner }: { onClose: () => void; partner: Par
         <a
           className="mt-5 flex min-h-12 items-center justify-center gap-2 border bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary-hover"
           href={partner.telegramUrl}
-          rel="noreferrer"
+          rel="noopener noreferrer"
           target="_blank"
         >
           {t("landing.partners.openTelegram")}
@@ -203,7 +218,16 @@ export function PartnersSection() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
   const [paused, setPaused] = useState(false);
+  const lastFocusRef = useRef<HTMLElement | null>(null);
   const scrolling = !prefersReducedMotion;
+  const openPartner = (partner: Partner) => {
+    lastFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelectedPartner(partner);
+  };
+  const closePartner = () => {
+    setSelectedPartner(null);
+    window.setTimeout(() => lastFocusRef.current?.focus(), 0);
+  };
 
   return (
     <section className="relative overflow-hidden bg-surface py-20 sm:py-24 lg:py-24" id="partners" tabIndex={-1}>
@@ -233,21 +257,21 @@ export function PartnersSection() {
             onPointerLeave={() => setPaused(false)}
           >
             <div
-              className={`flex w-max items-center gap-6 px-6 sm:gap-8 lg:gap-10 ${
+              className={`items-center gap-6 px-6 sm:gap-8 lg:gap-10 ${
                 scrolling
-                  ? `md:animate-[landing-partner-scroll_46s_linear_infinite] ${
+                  ? `flex w-max md:animate-[landing-partner-scroll_46s_linear_infinite] ${
                       paused ? "md:[animation-play-state:paused]" : ""
                     }`
-                  : ""
+                  : "flex w-full flex-wrap justify-center"
               }`}
             >
               {PARTNERS.map((partner) => (
-                <PartnerLogo key={partner.nameKey} onOpen={setSelectedPartner} partner={partner} />
+                <PartnerLogo key={partner.nameKey} onOpen={openPartner} partner={partner} />
               ))}
               {scrolling ? (
                 <div className="hidden items-center gap-6 sm:gap-8 md:flex lg:gap-10">
                   {PARTNERS.map((partner) => (
-                    <PartnerLogo decorative key={`${partner.nameKey}-duplicate`} partner={partner} />
+                    <PartnerLogo decorative key={`${partner.nameKey}-duplicate`} onOpen={openPartner} partner={partner} />
                   ))}
                 </div>
               ) : null}
@@ -258,7 +282,7 @@ export function PartnersSection() {
 
       <AnimatePresence>
         {selectedPartner ? (
-          <PartnerDialog onClose={() => setSelectedPartner(null)} partner={selectedPartner} />
+          <PartnerDialog onClose={closePartner} partner={selectedPartner} />
         ) : null}
       </AnimatePresence>
     </section>
