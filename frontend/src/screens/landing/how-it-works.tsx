@@ -3,7 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { CalendarDays, ClipboardCheck, Compass, FolderKanban, MapPinned, TrendingUp, UserCog } from "lucide-react";
 import { m, useMotionValueEvent, useScroll, useTransform } from "motion/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useI18n, type TranslationKey } from "@/shared/i18n";
 import { cn } from "@/shared/lib/cn";
@@ -54,14 +54,38 @@ const TONE_CLASSES: Record<string, string> = {
 export function HowItWorks() {
   const { t } = useI18n();
   const sectionRef = useRef<HTMLElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [horizontalTravel, setHorizontalTravel] = useState(0);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
-    offset: ["start 80%", "end 30%"]
+    offset: ["start 72%", "end 28%"]
   });
   const pathScale = useTransform(scrollYProgress, [0, 1], [0.12, 1]);
   const progressRotate = useTransform(scrollYProgress, [0, 1], [-4, 4]);
+  const desktopX = useTransform(scrollYProgress, (latest) =>
+    prefersReducedMotion ? 0 : -latest * horizontalTravel
+  );
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setHorizontalTravel(0);
+      return;
+    }
+
+    function updateTravel() {
+      const viewport = viewportRef.current;
+      const track = trackRef.current;
+      if (!viewport || !track) return;
+      setHorizontalTravel(Math.max(0, track.scrollWidth - viewport.clientWidth));
+    }
+
+    updateTravel();
+    window.addEventListener("resize", updateTravel);
+    return () => window.removeEventListener("resize", updateTravel);
+  }, [prefersReducedMotion]);
 
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
     if (prefersReducedMotion) return;
@@ -70,14 +94,22 @@ export function HowItWorks() {
 
   return (
     <section
-      className="relative scroll-mt-24 overflow-hidden bg-surface py-16 sm:py-20 lg:py-24"
+      className={cn(
+        "relative scroll-mt-24 overflow-hidden bg-surface py-16 sm:py-20 lg:py-24",
+        !prefersReducedMotion && "lg:min-h-[170vh] lg:py-0"
+      )}
       id="how-it-works"
       ref={sectionRef}
       tabIndex={-1}
     >
       <div aria-hidden className="absolute inset-0 bg-[linear-gradient(120deg,hsl(var(--surface))_0_58%,hsl(var(--primary)/0.08)_58%_72%,transparent_72%)]" />
       <div aria-hidden className="absolute left-8 top-24 hidden h-[32rem] w-24 -rotate-12 bg-accent/20 lg:block" />
-      <div className="relative mx-auto w-full max-w-[98rem] px-4 sm:px-6 lg:px-10">
+      <div
+        className={cn(
+          "relative mx-auto w-full max-w-[98rem] px-4 sm:px-6 lg:px-10",
+          !prefersReducedMotion && "lg:sticky lg:top-20 lg:flex lg:min-h-[calc(100vh-5rem)] lg:items-center"
+        )}
+      >
         <div className="w-full">
           <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
             <div>
@@ -90,64 +122,66 @@ export function HowItWorks() {
             </div>
           </div>
 
-          <div className="relative mt-10 border-y border-border py-7 sm:mt-12 sm:py-8">
+          <div
+            className="relative mt-10 overflow-hidden border-y border-border py-7 sm:mt-12 sm:py-8"
+            ref={viewportRef}
+          >
             <div aria-hidden className="absolute left-8 right-8 top-1/2 hidden h-px -translate-y-1/2 bg-border lg:block" />
             <m.div
               aria-hidden
               className="absolute left-8 top-1/2 hidden h-1 origin-left -translate-y-1/2 bg-gradient-to-r from-primary via-accent to-info lg:block"
               style={prefersReducedMotion ? undefined : { scaleX: pathScale }}
             />
-            <m.div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+            <m.div
+              className={cn(
+                "grid gap-5 md:grid-cols-2",
+                prefersReducedMotion ? "xl:grid-cols-5" : "lg:flex lg:w-max"
+              )}
+              ref={trackRef}
+              style={prefersReducedMotion ? undefined : { x: desktopX }}
+            >
               {STEPS.map((step, index) => {
                 const Icon = step.icon;
                 const active = activeIndex === index || prefersReducedMotion;
                 return (
-                  <m.div
-                    className="h-full"
-                    initial={prefersReducedMotion ? false : { clipPath: "inset(0 0 12% 0)", opacity: 0 }}
+                  <Card
+                    className={cn(
+                      "relative min-h-72 overflow-hidden p-5 transition-[transform,box-shadow,border-color,background-color] lg:w-[24rem]",
+                      active ? "border-primary/45 bg-card shadow-2xl shadow-primary/10" : "bg-card/80 lg:scale-[0.94] lg:opacity-85"
+                    )}
                     key={step.titleKey}
-                    transition={{ delay: index * 0.06, duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-                    viewport={{ margin: "-80px", once: true }}
-                    whileInView={prefersReducedMotion ? undefined : { clipPath: "inset(0 0 0% 0)", opacity: 1 }}
                   >
-                    <Card
-                      className={cn(
-                        "relative h-full min-h-72 overflow-hidden p-5 transition-[box-shadow,border-color,background-color]",
-                        active ? "border-primary/45 bg-card shadow-2xl shadow-primary/10" : "bg-card/80"
-                      )}
-                    >
-                      <div aria-hidden className="absolute -right-16 -top-16 size-40 rounded-full bg-primary/10 blur-2xl" />
-                      <div className="relative flex h-full flex-col">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className={cn("grid size-14 place-items-center border", TONE_CLASSES[step.tone])}>
-                            <Icon aria-hidden className="size-7" />
-                          </div>
-                          <m.span
-                            className="text-display-condensed-sm text-6xl leading-none text-border"
-                            style={prefersReducedMotion ? undefined : { rotate: progressRotate }}
-                          >
-                            {String(index + 1).padStart(2, "0")}
-                          </m.span>
+                    <div aria-hidden className="absolute -right-16 -top-16 size-40 rounded-full bg-primary/10 blur-2xl" />
+                    <div className="relative flex h-full flex-col">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className={cn("grid size-14 place-items-center border", TONE_CLASSES[step.tone])}>
+                          <Icon aria-hidden className="size-7" />
                         </div>
-                        <h3 className="mt-8 font-serif text-2xl font-semibold leading-tight">{t(step.titleKey)}</h3>
-                        <p className="mt-4 text-sm leading-6 text-muted-foreground">{t(step.descriptionKey)}</p>
-                        <div className="mt-auto pt-8">
-                          <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-                            <span className={cn("grid size-10 place-items-center border", TONE_CLASSES[step.tone])}>
-                              <FolderKanban aria-hidden className="size-5" />
-                            </span>
-                            <span className="h-2 bg-muted">
-                              <m.span
-                                animate={{ scaleX: index <= activeIndex || prefersReducedMotion ? 1 : 0.34 }}
-                                className="block h-2 origin-left bg-primary"
-                                transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-                              />
-                            </span>
-                          </div>
+                        <m.span
+                          className="text-display-condensed-sm text-6xl leading-none text-border"
+                          style={prefersReducedMotion ? undefined : { rotate: progressRotate }}
+                        >
+                          {String(index + 1).padStart(2, "0")}
+                        </m.span>
+                      </div>
+                      <h3 className="mt-8 font-serif text-2xl font-semibold leading-tight">{t(step.titleKey)}</h3>
+                      <p className="mt-4 text-sm leading-6 text-muted-foreground">{t(step.descriptionKey)}</p>
+                      <div className="mt-auto pt-8">
+                        <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+                          <span className={cn("grid size-10 place-items-center border", TONE_CLASSES[step.tone])}>
+                            <FolderKanban aria-hidden className="size-5" />
+                          </span>
+                          <span className="h-2 bg-muted">
+                            <m.span
+                              animate={{ scaleX: index <= activeIndex || prefersReducedMotion ? 1 : 0.34 }}
+                              className="block h-2 origin-left bg-primary"
+                              transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                            />
+                          </span>
                         </div>
                       </div>
-                    </Card>
-                  </m.div>
+                    </div>
+                  </Card>
                 );
               })}
             </m.div>

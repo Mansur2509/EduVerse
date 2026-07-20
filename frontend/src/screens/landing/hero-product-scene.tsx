@@ -32,7 +32,7 @@ export function HeroProductScene() {
   const { t } = useI18n();
 
   return (
-    <div className="landing-hero-stage relative mx-auto min-h-[27rem] w-full max-w-[25rem] overflow-hidden sm:min-h-[34rem] sm:max-w-[38rem] lg:min-h-[29rem] lg:max-w-[38rem] xl:min-h-[30rem] xl:max-w-[40rem]">
+    <div className="landing-hero-stage relative mx-auto min-h-[27rem] w-full max-w-[25rem] overflow-visible sm:min-h-[34rem] sm:max-w-[38rem] lg:min-h-[30rem] lg:max-w-[40rem] xl:min-h-[32rem] xl:max-w-[42rem]">
       <div
         aria-hidden
         className={`absolute -left-8 top-10 ${HERO_LAYERS.atmosphere} h-[78%] w-[62%] -rotate-6 bg-primary shadow-2xl shadow-black/30`}
@@ -46,7 +46,7 @@ export function HeroProductScene() {
         className={`absolute left-8 top-20 ${HERO_LAYERS.rearDocument} h-[70%] w-[76%] border border-white/20`}
       />
 
-      <div className="relative z-20 grid gap-3 px-3 pt-6 sm:grid-cols-[8.25rem_minmax(0,1fr)_9.25rem] sm:gap-4 lg:grid-cols-[8.75rem_minmax(0,1fr)_9.75rem] xl:grid-cols-[9.25rem_minmax(0,1fr)_10.25rem]">
+      <div className="relative z-20 grid gap-3 px-2 pt-6 sm:grid-cols-[8.5rem_minmax(0,1fr)_9.75rem] sm:gap-4 lg:grid-cols-[9.5rem_minmax(0,1fr)_10.5rem] xl:grid-cols-[10rem_minmax(0,1fr)_11rem]">
         <div className={`${HERO_LAYERS.frontRail} hidden flex-col gap-3 pt-24 sm:flex lg:pt-28`}>
           <div className="border border-white/20 bg-navy p-3 text-white shadow-2xl shadow-black/30 lg:p-4">
             <Globe2 aria-hidden className="size-6 text-info" />

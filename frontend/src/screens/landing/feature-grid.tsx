@@ -83,6 +83,15 @@ const FEATURES: Array<{
     scale: "tall"
   },
   {
+    icon: Compass,
+    tone: "accent",
+    visual: "major",
+    titleKey: "landing.features.majorDiscovery.title",
+    descriptionKey: "landing.features.majorDiscovery.description",
+    className: "",
+    scale: "compact"
+  },
+  {
     icon: FolderKanban,
     tone: "primary",
     visual: "applications",
@@ -133,15 +142,6 @@ const FEATURES: Array<{
     visual: "exams",
     titleKey: "landing.features.examTools.title",
     descriptionKey: "landing.features.examTools.description",
-    className: "",
-    scale: "compact"
-  },
-  {
-    icon: Compass,
-    tone: "accent",
-    visual: "major",
-    titleKey: "landing.features.majorDiscovery.title",
-    descriptionKey: "landing.features.majorDiscovery.description",
     className: "",
     scale: "compact"
   }
@@ -433,44 +433,44 @@ export function FeatureGrid() {
             style={prefersReducedMotion ? undefined : { opacity: sectionRuleOpacity, scaleX: sectionRuleScale }}
           />
           <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:auto-rows-[minmax(22rem,_auto)] lg:grid-cols-4">
-          {FEATURES.map((feature, index) => {
-            const scale = feature.scale ?? "compact";
-            return (
-              <MotionReveal className={feature.className} delayMs={index * 45} key={feature.titleKey}>
-                <Card
-                  className={cn(
-                    "group relative h-full min-h-[22rem] overflow-hidden border bg-gradient-to-br p-6 transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:shadow-2xl",
-                    SURFACE_CLASSES[feature.tone],
-                    scale === "large" ? "p-7" : "",
-                    scale === "compact" ? "min-h-[20rem]" : "",
-                    scale === "tall" || scale === "large" ? "lg:min-h-[45rem]" : "",
-                    scale === "wide" ? "lg:min-h-[22rem]" : ""
-                  )}
-                  interactive
-                >
-                  <div className="relative z-10 flex h-full flex-col">
-                    <FeatureIcon icon={feature.icon} tone={feature.tone} />
-                    <div className={scale === "wide" ? "sm:max-w-xl" : ""}>
-                      <h3
-                        className={cn(
-                          "mt-5 font-serif font-semibold leading-tight",
-                          scale === "large" ? "text-3xl sm:text-4xl" : "text-xl"
-                        )}
-                      >
-                        {t(feature.titleKey)}
-                      </h3>
-                      <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                        {t(feature.descriptionKey)}
-                      </p>
+            {FEATURES.map((feature, index) => {
+              const scale = feature.scale ?? "compact";
+              return (
+                <MotionReveal className={feature.className} delayMs={index * 45} key={feature.titleKey}>
+                  <Card
+                    className={cn(
+                      "group relative h-full min-h-[22rem] overflow-hidden border bg-gradient-to-br p-6 transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:shadow-2xl",
+                      SURFACE_CLASSES[feature.tone],
+                      scale === "large" ? "p-7" : "",
+                      scale === "compact" ? "min-h-[20rem]" : "",
+                      scale === "tall" || scale === "large" ? "lg:min-h-[45rem]" : "",
+                      scale === "wide" ? "lg:min-h-[22rem]" : ""
+                    )}
+                    interactive
+                  >
+                    <div className="relative z-10 flex h-full flex-col">
+                      <FeatureIcon icon={feature.icon} tone={feature.tone} />
+                      <div className={scale === "wide" ? "sm:max-w-xl" : ""}>
+                        <h3
+                          className={cn(
+                            "mt-5 font-serif font-semibold leading-tight",
+                            scale === "large" ? "text-3xl sm:text-4xl" : "text-xl"
+                          )}
+                        >
+                          {t(feature.titleKey)}
+                        </h3>
+                        <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+                          {t(feature.descriptionKey)}
+                        </p>
+                      </div>
+                      <div className="mt-auto">
+                        <FeatureVisual scale={scale} tone={feature.tone} visual={feature.visual} />
+                      </div>
                     </div>
-                    <div className="mt-auto">
-                      <FeatureVisual scale={scale} tone={feature.tone} visual={feature.visual} />
-                    </div>
-                  </div>
-                </Card>
-              </MotionReveal>
-            );
-          })}
+                  </Card>
+                </MotionReveal>
+              );
+            })}
           </div>
         </div>
       </div>

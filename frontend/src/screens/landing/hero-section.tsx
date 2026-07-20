@@ -15,7 +15,7 @@ export function HeroSection() {
   const { t } = useI18n();
 
   return (
-    <section className="relative isolate min-h-[calc(100svh-4.5rem)] overflow-hidden bg-navy text-navy-foreground lg:h-[calc(100svh-4.5rem)] lg:min-h-[38rem]">
+    <section className="relative isolate min-h-[calc(100svh-4.5rem)] overflow-hidden bg-navy text-navy-foreground lg:h-[calc(100svh-4.5rem)] lg:min-h-[40rem]">
       <div
         aria-hidden
         className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,hsl(var(--navy))_0_54%,hsl(var(--primary-hover))_54%_71%,hsl(var(--info))_71%_100%)] opacity-95"
@@ -34,7 +34,7 @@ export function HeroSection() {
         <span className="absolute -left-10 top-28 block size-3 rotate-45 border border-current" />
       </div>
 
-      <div className="mx-auto grid h-full w-full max-w-[98rem] gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[0.86fr_1.14fr] lg:items-center lg:gap-7 lg:px-10 lg:py-4 xl:py-5">
+      <div className="mx-auto grid h-full w-full max-w-[98rem] gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[0.84fr_1.16fr] lg:items-center lg:gap-5 lg:px-10 lg:py-5 xl:py-6">
         <MotionReveal>
           <p className="text-eyebrow inline-flex border border-accent/45 bg-accent/15 px-3 py-2 text-accent">
             {t("landing.hero.eyebrow")}
