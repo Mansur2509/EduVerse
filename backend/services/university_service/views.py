@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db.models import Count, F, Max, Min, Prefetch, Q
+from django.db.models import Case, Count, F, IntegerField, Max, Min, Prefetch, Q, Value, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -96,21 +96,75 @@ SELF_SERVICE_ACTIONS = {
 FILTER_OPTIONS_CACHE_SECONDS = 600
 FILTER_OPTIONS_CACHE_KEY_TEMPLATE = "university-filter-options:include_demo={include_demo}"
 
+# Fields whose *presence* (not their value) marks a university profile as more
+# filled-in. Used only to break ties within an ordering, never as a claim
+# about quality -- a university with more of these populated simply isn't
+# missing as much verified/imported data yet.
+COMPLETENESS_NOT_NULL_FIELDS = (
+    "acceptance_rate",
+    "gpa_average",
+    "sat_average",
+    "ielts_minimum",
+    "tuition_usd_amount",
+    "total_cost_usd_amount",
+    "application_deadline",
+    "scholarship_available",
+    "qs_ranking",
+    "global_rank",
+    "the_rank",
+    "national_rank",
+)
+COMPLETENESS_NOT_BLANK_FIELDS = (
+    "summary",
+    "cover_image_url",
+)
+
+
+def _completeness_score_expression():
+    """Sum of 1s for each meaningful field that is populated (not null / not
+    blank), 0 otherwise. Purely additive over plain scalar columns already
+    loaded by `UNIVERSITY_LIST_ONLY_FIELDS`, so it costs nothing beyond the
+    existing query -- no extra joins or related-row counts."""
+
+    terms = [
+        Case(When(**{f"{field}__isnull": False}, then=Value(1)), default=Value(0), output_field=IntegerField())
+        for field in COMPLETENESS_NOT_NULL_FIELDS
+    ] + [
+        Case(When(~Q(**{field: ""}), then=Value(1)), default=Value(0), output_field=IntegerField())
+        for field in COMPLETENESS_NOT_BLANK_FIELDS
+    ]
+    total = terms[0]
+    for term in terms[1:]:
+        total = total + term
+    return total
+
+
+# Every option orders by its named field first, then falls back to how filled
+# in the profile is (more populated fields first), then alphabetically as the
+# final, always-deterministic tiebreak.
 UNIVERSITY_NULLS_LAST_ORDERINGS = {
-    "acceptance_rate": (F("acceptance_rate").asc(nulls_last=True), "name"),
-    "-acceptance_rate": (F("acceptance_rate").desc(nulls_last=True), "name"),
-    "qs_ranking": (F("qs_ranking").asc(nulls_last=True), "name"),
-    "-qs_ranking": (F("qs_ranking").desc(nulls_last=True), "name"),
-    "global_rank": (F("global_rank").asc(nulls_last=True), "name"),
-    "-global_rank": (F("global_rank").desc(nulls_last=True), "name"),
-    "the_rank": (F("the_rank").asc(nulls_last=True), "name"),
-    "-the_rank": (F("the_rank").desc(nulls_last=True), "name"),
-    "national_rank": (F("national_rank").asc(nulls_last=True), "name"),
-    "-national_rank": (F("national_rank").desc(nulls_last=True), "name"),
-    "tuition_usd_amount": (F("tuition_usd_amount").asc(nulls_last=True), "name"),
-    "-tuition_usd_amount": (F("tuition_usd_amount").desc(nulls_last=True), "name"),
-    "total_cost_usd_amount": (F("total_cost_usd_amount").asc(nulls_last=True), "name"),
-    "-total_cost_usd_amount": (F("total_cost_usd_amount").desc(nulls_last=True), "name"),
+    "acceptance_rate": (F("acceptance_rate").asc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "-acceptance_rate": (F("acceptance_rate").desc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "qs_ranking": (F("qs_ranking").asc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "-qs_ranking": (F("qs_ranking").desc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "global_rank": (F("global_rank").asc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "-global_rank": (F("global_rank").desc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "the_rank": (F("the_rank").asc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "-the_rank": (F("the_rank").desc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "national_rank": (F("national_rank").asc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "-national_rank": (F("national_rank").desc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "tuition_usd_amount": (F("tuition_usd_amount").asc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "-tuition_usd_amount": (F("tuition_usd_amount").desc(nulls_last=True), F("completeness_score").desc(), "name"),
+    "total_cost_usd_amount": (
+        F("total_cost_usd_amount").asc(nulls_last=True),
+        F("completeness_score").desc(),
+        "name",
+    ),
+    "-total_cost_usd_amount": (
+        F("total_cost_usd_amount").desc(nulls_last=True),
+        F("completeness_score").desc(),
+        "name",
+    ),
 }
 
 UNIVERSITY_LIST_ONLY_FIELDS = (
@@ -340,8 +394,10 @@ class UniversityViewSet(ModelViewSet):
 
     def get_queryset(self):
         if self.action == "list":
-            queryset = University.objects.only(*UNIVERSITY_LIST_ONLY_FIELDS).prefetch_related(
-                "scholarships"
+            queryset = (
+                University.objects.only(*UNIVERSITY_LIST_ONLY_FIELDS)
+                .prefetch_related("scholarships")
+                .annotate(completeness_score=_completeness_score_expression())
             )
         else:
             rankings_with_program = UniversitySubjectRanking.objects.select_related("program")
