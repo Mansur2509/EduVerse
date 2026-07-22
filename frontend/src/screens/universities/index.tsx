@@ -39,7 +39,7 @@ const emptyFilters: UniversityFilters = {
   scholarship_available: "",
   verification_status: "",
   include_demo: "",
-  ordering: "",
+  ordering: "qs_ranking",
   ielts_minimum__lte: "",
   sat_average__gte: "",
   sat_average__lte: "",
