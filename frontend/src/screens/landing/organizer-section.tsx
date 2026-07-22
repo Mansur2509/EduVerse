@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CheckSquare, ClipboardType, Download, QrCode, ShieldCheck, Ticket } from "lucide-react";
+import { Bell, CheckSquare, ClipboardType, Download, Hash, ShieldCheck, Ticket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -91,10 +91,13 @@ export function OrganizerSection() {
                   </span>
                 </div>
                 <div className="mt-5 grid grid-cols-[auto_1fr] gap-3">
-                  <div className="grid size-20 grid-cols-4 gap-1 border border-white/20 p-2" aria-hidden>
-                    {Array.from({ length: 16 }).map((_, index) => (
-                      <span className={index % 3 === 0 ? "bg-white" : "bg-white/35"} key={index} />
-                    ))}
+                  <div
+                    aria-hidden
+                    className="grid size-20 place-items-center border border-white/20 bg-white/[0.06] p-2"
+                  >
+                    <span className="text-[0.6rem] font-bold uppercase leading-4 tracking-[0.08em] text-white/80">
+                      UNI-8K2Q
+                    </span>
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{t("landing.organizer.sceneTicketTitle")}</p>
@@ -105,7 +108,7 @@ export function OrganizerSection() {
 
               <div className="absolute bottom-24 left-4 z-20 w-56 -rotate-[7deg] border bg-card p-4 text-foreground shadow-xl dark:bg-elevated sm:left-8">
                 <div className="flex items-center gap-2">
-                  <QrCode aria-hidden className="size-4 text-info" />
+                  <Hash aria-hidden className="size-4 text-info" />
                   <p className="text-xs font-bold uppercase tracking-[0.13em] text-muted-foreground">
                     {t("landing.organizer.sceneCheckIn")}
                   </p>
