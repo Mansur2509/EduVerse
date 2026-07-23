@@ -582,8 +582,15 @@ export function GlobeThreeScene({
 
     function renderFrame(now: number) {
       frameId = window.requestAnimationFrame(renderFrame);
-      if (!visible || !tabVisible) return;
-      if (now - lastFrame < (prefersReducedMotion ? 500 : 32)) return;
+      // The very first frame always renders once, even if the tab/canvas
+      // isn't visible yet (e.g. opened in a background tab, or a browser
+      // that reports `document.hidden` briefly during preload). Without
+      // this, a page that never fires `visibilitychange` correctly would
+      // stay on the "loading" status forever with no way to recover.
+      // Every later frame still respects the pause-when-hidden/off-screen
+      // behavior as intended.
+      if (readyReported && (!visible || !tabVisible)) return;
+      if (readyReported && now - lastFrame < (prefersReducedMotion ? 500 : 32)) return;
       lastFrame = now;
 
       if (!prefersReducedMotion) {
@@ -686,8 +693,19 @@ export function GlobeThreeScene({
     frameId = window.requestAnimationFrame(renderFrame);
     void loadCountryBorders();
 
+    // Safety net: the "first frame always renders" fix above covers the
+    // normal cases, but if requestAnimationFrame itself never gets serviced
+    // for some reason, fall back to the accessible SVG view instead of an
+    // indefinite loading state.
+    const readyTimeoutId = window.setTimeout(() => {
+      if (!disposed && !readyReported) {
+        setStatus("fallback");
+      }
+    }, 4000);
+
     return () => {
       disposed = true;
+      window.clearTimeout(readyTimeoutId);
       window.cancelAnimationFrame(frameId);
       observer.disconnect();
       resizeObserver.disconnect();
